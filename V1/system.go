@@ -14,14 +14,29 @@ type ISystem interface {
 
 type SystemBase struct {
 	sync.RWMutex
-	data struct{}
+	es map[*Entity]struct{}
+	data
 }
+
 
 func (p *SystemBase) Requirements() []reflect.Type {
 	panic("implement me")
 }
 
-func (*SystemBase) Filter() {
+func (p *SystemBase) Filter(entity *Entity) {
+	//check exist
+	if _,ok:=p.es[entity];ok {
+		return
+	}
+	//check requirements
+	rqs:=p.Requirements()
+	for _, rq := range rqs {
+		if !entity.Has(rq) {
+			return
+		}
+	}
+	//generate data collection
+
 
 }
 
