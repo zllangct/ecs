@@ -1,4 +1,4 @@
-package main
+package ecs
 
 import "reflect"
 
@@ -12,12 +12,12 @@ type ComponentBase struct {
 	typ reflect.Type
 }
 
-func (this *ComponentBase)Type() reflect.Type {
-	return this.typ
+func (p *ComponentBase)Type() reflect.Type {
+	return p.typ
 }
 
-func (this *ComponentBase)Init(typ reflect.Type)  {
-	this.typ=typ
+func (p *ComponentBase)Init(typ reflect.Type)  {
+	p.typ=typ
 }
 
 

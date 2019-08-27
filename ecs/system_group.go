@@ -1,9 +1,9 @@
-package main
+package ecs
 
 import "reflect"
 
 type SystemGroup struct {
-	Flags []reflect.Type
+	flags []reflect.Type
 	systems []ISystem
 }
 

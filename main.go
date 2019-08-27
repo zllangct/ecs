@@ -1,30 +1,34 @@
 package main
 
+import (
+	"./ecs"
+)
+
 type NameComponent struct {
-	ComponentBase
+	ecs.ComponentBase
 	Name string
 }
 
 type CountComponent struct {
-	ComponentBase
+	ecs.ComponentBase
 	Count int
 }
 
 type AddressComponent struct {
-	ComponentBase
+	ecs.ComponentBase
 	Address string
 }
 
 type NameSystem struct {
-	SystemBase
+	ecs.SystemBase
 }
 
 func (this *NameSystem) Init() {
 
 }
 
-func (*NameSystem) ComponentRequire() []IComponent {
-	return []IComponent{&NameComponent{}}
+func (*NameSystem) ComponentRequire() []ecs.IComponent {
+	return []ecs.IComponent{&NameComponent{}}
 }
 
 func (*NameSystem) Update() {
@@ -32,15 +36,15 @@ func (*NameSystem) Update() {
 }
 
 type OtherSystem struct {
-	SystemBase
+	ecs.SystemBase
 }
 
 func (*OtherSystem) Init() {
 
 }
 
-func (*OtherSystem) ComponentRequire() []IComponent {
-	return []IComponent{&AddressComponent{},&CountComponent{}}
+func (*OtherSystem) ComponentRequire() []ecs.IComponent {
+	return []ecs.IComponent{&AddressComponent{},&CountComponent{}}
 }
 
 func (this *OtherSystem) Update() {
@@ -59,18 +63,26 @@ func main() {
 	//
 	//runtime.Run()
 
-	m:=map[interface{}]int{
-		struct {
-			Name string
-		}{}:2,
-		struct {
-			Count int
-		}{}:3,
+	e:=ecs.Entity{}
+
+	for i := 0; i < 10; i++ {
+		e.AddComponent(&NameComponent{})
 	}
 
-	println(m[struct {
-		Count int
-	}{}])
-	s,ok:=m["sss"]
-	println(ok,s)
+	m:=make(map[int]int)
+	ecs.ConcurrentTest(func() {
+		//e.Components()[0]=&NameComponent{Name:"1"}
+		m[1]=1
+	}, func() {
+		//cs := e.Components()
+		//cs = cs[1:]
+		m[1]=2
+	})
+
+	println(ecs.NextUID())
+
+
+
+	ch:=make(chan struct{})
+	<-ch
 }
