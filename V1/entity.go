@@ -7,14 +7,14 @@ import (
 
 type Entity struct {
 	sync.RWMutex
-
+	//private
 	index      *int
 	components []IComponent
-
+	//public
 	ID string
 }
 
-func (p *Entity)Has(typ reflect.Type) bool  {
+func (p *Entity) Has(typ reflect.Type) bool {
 	p.RLock()
 	for _, value := range p.components {
 		if reflect.TypeOf(value) == typ {
@@ -26,7 +26,7 @@ func (p *Entity)Has(typ reflect.Type) bool  {
 	return false
 }
 
-func (p *Entity)GetComponent(typ reflect.Type) interface{}  {
+func (p *Entity) GetComponent(typ reflect.Type) interface{} {
 	p.RLock()
 	for _, value := range p.components {
 		if reflect.TypeOf(value) == typ {
@@ -37,8 +37,8 @@ func (p *Entity)GetComponent(typ reflect.Type) interface{}  {
 	return nil
 }
 
-func (p *Entity)GetComponents(typs ...reflect.Type) []interface{}  {
-	cmps:=make([]interface{},0,len(typs))
+func (p *Entity) GetComponents(typs ...reflect.Type) []interface{} {
+	cmps := make([]interface{}, 0, len(typs))
 	p.RLock()
 	for index, typ := range typs {
 		for _, value := range p.components {
