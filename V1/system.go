@@ -20,28 +20,17 @@ var (
 	ErrSystemNotInit = errors.New("system not init")
 )
 
-type CollectionKV struct {
-	Entity *Entity
-	Data   []interface{}
-}
-
-type ISystemBase interface {
-	Inject(sys ISystem)
-	Filter(entity *Entity) //筛选感兴趣的组件
-}
-
 type ISystem interface {
-	ISystemBase
 	Init() //初始化
-	Run()  //执行系统逻辑
+	Filter(entity *Entity) //筛选感兴趣的组件
+	FrameUpdate()  //执行系统逻辑
 }
 
-type SystemBase struct {
+
+type Start struct {
 	sync.RWMutex
 	//private
-	this         ISystem
 	typ          SystemType
-	// traverse ratio: slice = 10 * map
 	es           map[*Entity]int
 	data         [][]interface{}
 	pop          *list.List
@@ -49,13 +38,11 @@ type SystemBase struct {
 	requirements []reflect.Type
 }
 
-func (p *SystemBase) Inject(sys ISystem) {
-	//Dependency inject
-	p.this = sys
+func (p *Start) Init() {
 	//TODO init members
 }
 
-func (p *SystemBase)PreUpdate()  {
+func (p *Start)PreUpdate()  {
 	p.Lock()
 	defer p.Unlock()
 
@@ -84,12 +71,12 @@ func (p *SystemBase)PreUpdate()  {
 	p.pop.Init()
 }
 
-func (p *SystemBase)Update()  {
+func (p *Start)FrameUpdate()  {
 	p.PreUpdate()
 	//TODO slice task queue task_length / k * cpu_num
 }
 
-func (p *SystemBase) Filter(entity *Entity) {
+func (p *Start) Filter(entity *Entity) {
 	//check exist
 	p.RLock()
 	if _, ok := p.es[entity]; ok {
@@ -119,7 +106,7 @@ func (p *SystemBase) Filter(entity *Entity) {
 
 }
 
-func (p *SystemBase) Clean(entity *Entity) {
+func (p *Start) Clean(entity *Entity) {
 	p.Lock()
 	defer p.Unlock()
 
@@ -140,17 +127,5 @@ func (p *SystemBase) Clean(entity *Entity) {
 	//		}
 	//	}
 
-
-}
-
-type Start struct {
-	SystemBase
-}
-
-func (p *Start) Init() {
-
-}
-
-func (*Start) Run() {
 
 }
