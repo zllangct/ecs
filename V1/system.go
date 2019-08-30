@@ -8,6 +8,7 @@ import (
 )
 
 type SystemLifeCircleType int
+
 const (
 	SYSTEM_LIFE_CIRCLE_TYPE_NONE SystemLifeCircleType = iota
 	SYSTEM_LIFE_CIRCLE_TYPE_Default
@@ -20,33 +21,43 @@ var (
 )
 
 type ISystem interface {
-	Type() reflect.Type    //类型
-	Init()                 //初始化
-	Filter(entity *Entity) //筛选感兴趣的组件
-	FrameUpdate()          //执行系统逻辑
+	Init()                                 //init
+	Type() reflect.Type                    //type of system
+	GetOrder() (SystemPeriod, int) //order of system
+	Filter(*Entity)                 	   //interest filter of component
+	FrameUpdate()                          //update every frame
 }
 
 type SystemBase struct {
 	sync.RWMutex
-	typ          SystemLifeCircleType
 	pop          *list.List
 	push         *list.List
 	requirements []reflect.Type
+	order        SystemOrder
 }
 
-func (p *SystemBase)SetOrder()  {
-
+func (p *SystemBase) SetOrder(order int, period ...SystemPeriod) {
+	mPeriod := SYSTEM_PERIOD_DEFAULT
+	if len(period) > 0 {
+		mPeriod = period[0]
+	}
+	p.Lock()
+	p.order = SystemOrder(mPeriod<<32) + SystemOrder(order)
+	p.Unlock()
 }
 
-func (p *SystemBase)SetLifeCircleType()  {
-
+func (p *SystemBase) GetOrder() (SystemPeriod, int) {
+	p.RLock()
+	defer p.RUnlock()
+	return SystemPeriod(p.order >> 32), int(p.order & 0xffff)
 }
+
 
 type Start struct {
 	SystemBase
 	//private
-	entityIndex  map[*Entity]int
-	data         [][]interface{}
+	entityIndex map[*Entity]int
+	data        [][]interface{}
 }
 
 func (p *Start) Type() reflect.Type {
@@ -64,21 +75,21 @@ func (p *Start) PreUpdate() {
 	for item := p.push.Front(); item != nil; item = item.Next() {
 		kv := item.Value.(CollectionKV)
 		p.data = append(p.data, kv.Data)
-		p.es[kv.Entity] = len(p.data) - 1
+		p.entityIndex[kv.Entity] = len(p.data) - 1
 	}
 	p.push.Init()
 	for item := p.pop.Front(); item != nil; item = item.Next() {
 		kv := item.Value.(CollectionKV)
 		length := len(p.data) - 1
-		index, ok := p.es[kv.Entity]
+		index, ok := p.entityIndex[kv.Entity]
 		if !ok {
 			continue
 		}
 		p.data[index], p.data[length] = p.data[length], p.data[index]
 		p.data = p.data[:length]
-		for key, value := range p.es {
+		for key, value := range p.entityIndex {
 			if value == len(p.data)-1 {
-				p.es[key] = index
+				p.entityIndex[key] = index
 				break
 			}
 		}
@@ -96,7 +107,7 @@ func (p *Start) FrameUpdate() {
 func (p *Start) Filter(entity *Entity) {
 	//check exist
 	p.RLock()
-	if _, ok := p.es[entity]; ok {
+	if _, ok := p.entityIndex[entity]; ok {
 		p.RUnlock()
 		return
 	}
@@ -122,7 +133,7 @@ func (p *Start) Clean(entity *Entity) {
 	p.Lock()
 	defer p.Unlock()
 
-	_, ok := p.es[entity]
+	_, ok := p.entityIndex[entity]
 	if !ok {
 		return
 	}
