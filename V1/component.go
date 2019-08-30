@@ -11,7 +11,8 @@ const (
 
 
 type IComponent interface {
-
+	IsAlive() bool
+	Init()
 }
 
 type ComponentBase struct {
@@ -20,8 +21,13 @@ type ComponentBase struct {
 	state ComponentState
 }
 
+func (p *ComponentBase)Init()  {
+
+}
+
 func (p *ComponentBase)IsAlive() bool {
 	p.RLock()
 	defer p.RUnlock()
 	return p.state != COMPONENT_STATE_CLOSED
 }
+

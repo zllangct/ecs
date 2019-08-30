@@ -11,3 +11,4 @@ type IEventUpdate interface {
 type IEventDestroy interface {
 	Destroy()
 }
+
