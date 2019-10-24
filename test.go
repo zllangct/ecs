@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	_ "net/http/pprof"
+	"reflect"
 	"runtime/debug"
 )
 
@@ -39,10 +40,12 @@ func (p *T)GetName()string  {
 }
 
 func tets()  {
-	i:=interface{}(&T{Name:"zhaolei"})
-	tt:= i.(IT)
-
-	println(tt.GetName())
+	i:=&T{Name:"zhaolei"}
+	typ := reflect.TypeOf(i)
+	name := reflect.TypeOf(123).Name()
+	str:= typ.String()
+	println(name)
+	println(str)
 }
 
 

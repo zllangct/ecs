@@ -14,11 +14,14 @@ type EcsConfig struct {
 	CpuNum int
 }
 
+type ComponentName = string
+
 type Runtime struct {
-	sync.RWMutex
+	sync.Mutex
 	isInit bool
  	config *EcsConfig
 	systemFlow *systemFlow
+	components map[ComponentName]interface{}
 }
 
 //config the runtime

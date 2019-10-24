@@ -21,23 +21,53 @@ var (
 )
 
 type ISystem interface {
-	Init()                                 //init
-	Type() reflect.Type                    //type of system
-	GetOrder() (SystemPeriod, int) //order of system
-	Filter(*Entity)                 	   //interest filter of component
-	FrameUpdate()                          //update every frame
+	Init()                //init
+	GetBase() *SystemBase //get system common data
+	Filter(*Entity)       //interest filter of component
+	SystemUpdate()        //update every frame
+	GetRequirements() []reflect.Type
 }
 
 type SystemBase struct {
-	sync.RWMutex
+	sync.Mutex
 	pop          *list.List
 	push         *list.List
 	requirements []reflect.Type
 	order        SystemOrder
+	runtime      *Runtime
+	typ          reflect.Type
+}
+
+func (p *SystemBase) GetRequirements() []reflect.Type {
+	panic("implement me")
+}
+
+func (p *SystemBase)Init()  {
+	p.pop = list.New()
+	p.push = list.New()
+	p.requirements = []reflect.Type{}
+}
+
+func (p *Start) SetType(typ reflect.Type){
+	p.Lock()
+	defer p.Unlock()
+
+	p.typ = typ
+}
+
+func (p *Start) GetType() reflect.Type {
+	p.Lock()
+	defer p.Unlock()
+
+	return reflect.TypeOf(p)
+}
+
+func (p *SystemBase) GetBase() *SystemBase {
+	return p
 }
 
 func (p *SystemBase) SetOrder(order int, period ...SystemPeriod) {
-	mPeriod := SYSTEM_PERIOD_DEFAULT
+	mPeriod := PERIOD_DEFAULT
 	if len(period) > 0 {
 		mPeriod = period[0]
 	}
@@ -47,24 +77,31 @@ func (p *SystemBase) SetOrder(order int, period ...SystemPeriod) {
 }
 
 func (p *SystemBase) GetOrder() (SystemPeriod, int) {
-	p.RLock()
-	defer p.RUnlock()
+	p.Lock()
+	defer p.Unlock()
 	return SystemPeriod(p.order >> 32), int(p.order & 0xffff)
 }
 
+func (p *SystemBase) Clean(entity *Entity) {
+	p.Lock()
+	defer p.Unlock()
+
+	p.pop.PushBack(entity)
+}
 
 type Start struct {
 	SystemBase
 	//private
+	entityLock sync.RWMutex
 	entityIndex map[*Entity]int
 	data        [][]interface{}
 }
 
-func (p *Start) Type() reflect.Type {
-	return reflect.TypeOf(p)
-}
-
 func (p *Start) Init() {
+	//inject system type info
+	p.SetType(reflect.TypeOf(p))
+
+
 	//TODO init members
 }
 
@@ -97,7 +134,7 @@ func (p *Start) PreUpdate() {
 	p.pop.Init()
 }
 
-func (p *Start) FrameUpdate() {
+func (p *Start) SystemUpdate() {
 	p.PreUpdate()
 	//TODO slice task queue task_length / k * cpu_num
 
@@ -106,12 +143,12 @@ func (p *Start) FrameUpdate() {
 
 func (p *Start) Filter(entity *Entity) {
 	//check exist
-	p.RLock()
+	p.entityLock.RLock()
 	if _, ok := p.entityIndex[entity]; ok {
-		p.RUnlock()
+		p.entityLock.RUnlock()
 		return
 	}
-	p.RUnlock()
+	p.entityLock.RUnlock()
 
 	//check requirements
 	for _, rq := range p.requirements {
@@ -129,13 +166,4 @@ func (p *Start) Filter(entity *Entity) {
 	p.push.PushBack(CollectionKV{Entity: entity, Data: cmps})
 }
 
-func (p *Start) Clean(entity *Entity) {
-	p.Lock()
-	defer p.Unlock()
 
-	_, ok := p.entityIndex[entity]
-	if !ok {
-		return
-	}
-	p.pop.PushBack(entity)
-}

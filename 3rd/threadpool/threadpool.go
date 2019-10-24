@@ -1,107 +1,97 @@
-package threadpool
+package theadpool
 
 import (
-	"container/list"
+	"math/rand"
 	"sync"
 )
 
-// ThreadPool is a common high level interface for a single producer multi-consumer pattern.
-type ThreadPool struct {
-	MaxThreads int
-	active     int
-	lock       *sync.Mutex
-	any        *sync.Mutex
-	pending    *list.List
+var globalPool *Pool
+
+//Pool is goroutine pool config.
+type Pool struct {
+	numWorkers  int32
+	jobQueueLen int32
+	jobPool     *sync.Pool
+	jobQueue    chan *Job
+	workerQueue []*Worker
 }
 
-// New returns a new empty ThreadPool
-func New() *ThreadPool {
-	return &ThreadPool{
-		MaxThreads: -1,
-		active:     0,
-		pending:    list.New(),
-		lock:       &sync.Mutex{},
-		any:        &sync.Mutex{}}
-}
-
-// Locker returns a new locker with the given action
-func (pool *ThreadPool) Locker(action func()) *Locker {
-	return pool.LockerWith(func(_ interface{}) { action() })
-}
-
-// LockerWith returns a new locker with the given action that takes an argument
-func (pool *ThreadPool) LockerWith(action func(interface{})) *Locker {
-	return &Locker{
-		lock:   &sync.Mutex{},
-		action: action}
-}
-
-// Run starts a new task, or puts the task on the queue of tasks to run.
-func (pool *ThreadPool) Run(task func()) {
-	pool.run(task, true)
-}
-
-// run starts a new task, or puts the task on the queue of tasks to run.
-func (pool *ThreadPool) run(task func(), requireLock bool) {
-	if requireLock {
-		pool.lock.Lock()
+//get the singleton pool
+func GetGlobalPool(numWorkers int, jobQueueLen int) *Pool {
+	if globalPool == nil {
+		globalPool = NewPool(numWorkers, jobQueueLen)
 	}
-	if pool.activeUp() {
-		go func() {
-			defer func() {
-				pool.lock.Lock()
-				if r := recover(); r != nil {
-					//logger.Error(fmt.Sprintf("%s\n%s", r, string(debug.Stack())))
-				}
-				pool.activeDown()
-				pool.nextTask()
-				pool.lock.Unlock()
-			}()
-			task()
-		}()
+	return globalPool
+}
+
+//NewPool news goroutine pool
+func NewPool(numWorkers int, jobQueueLen int) *Pool {
+	jobQueue := make(chan *Job, jobQueueLen)
+	workerQueue := make([]*Worker, numWorkers)
+
+	pool := &Pool{
+		numWorkers:  int32(numWorkers),
+		jobQueueLen: int32(jobQueueLen),
+		jobQueue:    jobQueue,
+		workerQueue: workerQueue,
+		jobPool:     &sync.Pool{New: func() interface{} { return &Job{WorkerID: int32(-1)} }},
+	}
+	pool.Start()
+	return pool
+}
+
+//random worker, task will run in a random worker
+func (p *Pool) AddJob(handler func([]interface{},...interface{}), args []interface{},typ ... JobType){
+	job := p.jobPool.Get().(*Job)
+	job.Job = handler
+	job.Args = args
+	job.WorkerID = WORKER_ID_RANDOM
+
+	if len(typ)>0 && (typ[0] == JOB_TYPE_SERIAL){
+		job.WorkerID = rand.Int31() % p.numWorkers
+		p.workerQueue[job.WorkerID].jobQueue <- job
+	}else{
+		p.jobQueue <- job
+	}
+}
+
+//fixed worker,task with the same worker id will push into the same goroutine
+func (p *Pool) AddJobFixed(handler func([]interface{}, ...interface{}), args []interface{}, wid int32) {
+	job := p.jobPool.Get().(*Job)
+	job.Job = handler
+	job.Args = args
+
+	if wid <= -1 || wid >= p.numWorkers {
+		job.WorkerID = rand.Int31() % p.numWorkers
+		p.workerQueue[job.WorkerID].jobQueue <- job
 	} else {
-		pool.pending.PushBack(task)
+		job.WorkerID = wid
 	}
-	if requireLock {
-		pool.lock.Unlock()
-	}
+	p.workerQueue[job.WorkerID].jobQueue <- job
 }
 
-// nextTask runs a task if there is any pending task
-func (pool *ThreadPool) nextTask() {
-	if pool.pending.Len() > 0 {
-		task, _ := pool.pending.Remove(pool.pending.Front()).(func())
-		pool.run(task, false)
-	}
-}
-
-// Active returns a count of active threads.
-func (pool *ThreadPool) Active() int {
-	return pool.active
-}
-
-// Wait blocks until all tasks are completed.
-func (pool *ThreadPool) Wait() {
-	pool.any.Lock()
-	pool.any.Unlock()
-}
-
-// Update the active count and lock state
-func (pool *ThreadPool) activeUp() bool {
-	if pool.MaxThreads < 0 || pool.active < pool.MaxThreads {
-		pool.active++
-		if pool.active == 1 {
-			pool.any.Lock()
+//Start starts all workers
+func (p *Pool) Start() {
+	for i := 0; i < cap(p.workerQueue); i++ {
+		worker := &Worker{
+			id:       int32(i),
+			p:        p,
+			jobQueue: make(chan *Job, 10),
+			stop:     make(chan struct{}),
 		}
-		return true
+		p.workerQueue[i] = worker
+		worker.Start()
 	}
-	return false
 }
 
-// Update the active count and lock state
-func (pool *ThreadPool) activeDown() {
-	pool.active--
-	if pool.active == 0 {
-		pool.any.Unlock()
+//get the pool size
+func (p *Pool) Size() int32 {
+	return p.numWorkers
+}
+
+//Release release all workers
+func (p *Pool) Release() {
+	for _, worker := range p.workerQueue {
+		worker.stop <- struct{}{}
 	}
 }
