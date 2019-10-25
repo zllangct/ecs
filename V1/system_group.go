@@ -5,7 +5,7 @@ import (
 	"sort"
 	"sync"
 )
-
+// system tree node
 type Node struct {
 	parent *Node
 	children []*Node
@@ -28,13 +28,8 @@ func (p *Node)attach(node *Node) {
 	for i := 0; i<len(p.children);i++ {
 		if p.children[i].isFriend(node) {
 			p.children[i].attach(node)
-			if len(p.children[i].children) > len(p.children) {
-				temp := p.children[i]
-				p.children = append(p.children[:i],p.children[i+1:]...)
-				temp.children = append(temp.children, p)
-				isAttached = true
-				break
-			}
+			isAttached = true
+			break
 		}
 	}
 	if !isAttached {
@@ -42,11 +37,7 @@ func (p *Node)attach(node *Node) {
 	}
 }
 
-type Group struct {
-	val *Node
-	ref []string
-}
-
+// system group ordered by interrelation
 type SystemGroup struct {
 	lock sync.Mutex
 	systems []*Node
@@ -74,7 +65,8 @@ func (p *SystemGroup)refCount(rqs []reflect.Type) int {
 	return ref
 }
 
-func (p *SystemGroup)iterInit()  {
+//initialise system group iterator
+func (p *SystemGroup) iterInit()  {
 	//need resort
 	if !p.ordered{
 		sort.Slice(p.systems, func(i, j int) bool {
@@ -89,15 +81,16 @@ func (p *SystemGroup)iterInit()  {
 					children: []*Node{},
 					val:      nil,
 				}
-			}else{
-				p.root.attach(node)
 			}
+			p.root.attach(node)
 		}
+		p.ordered = true
 	}
 	// initialise the iterator
 	p.top = []*Node{p.root}
 }
 
+//pop a batch of independent system array
 func (p *SystemGroup)pop()[]ISystem {
 	temp := make([]*Node,0)
 	systems := make([]ISystem,0)
@@ -111,7 +104,8 @@ func (p *SystemGroup)pop()[]ISystem {
 	return systems
 }
 
-func (p *SystemGroup) Insert(sys ISystem) {
+//insert system
+func (p *SystemGroup) insert(sys ISystem) {
 	//set cluster no ordered
 	p.ordered = false
 	//get system's required components

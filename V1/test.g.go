@@ -8,5 +8,7 @@ type Test struct {
 }
 
 func main()  {
-
+	s:=[]int{1,2,3}
+	s = s[:len(s)-1]
+	println(s)
 }

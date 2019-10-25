@@ -31,13 +31,13 @@ func (p *ComponentBase) GetBase() *ComponentBase {
 	return p
 }
 
-func (p *ComponentBase)GetState() ComponentState {
+func (p *ComponentBase) GetState() ComponentState {
 	p.Lock()
 	defer p.Unlock()
 	return p.state
 }
 
-func (p *ComponentBase)IsAlive() bool {
+func (p *ComponentBase) IsAlive() bool {
 	p.Lock()
 	defer p.Unlock()
 	return p.state != COMPONENT_STATE_CLOSED

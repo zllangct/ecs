@@ -26,6 +26,7 @@ type ISystem interface {
 	Filter(*Entity)       //interest filter of component
 	SystemUpdate()        //update every frame
 	GetRequirements() []reflect.Type
+	Call(label int)interface{}
 }
 
 type SystemBase struct {
@@ -38,8 +39,16 @@ type SystemBase struct {
 	typ          reflect.Type
 }
 
+func (p *SystemBase) Call(label int)interface{}{
+	return nil
+}
+
+func (p *SystemBase) SetRequirements(rqs ... reflect.Type){
+	p.requirements = rqs
+}
+
 func (p *SystemBase) GetRequirements() []reflect.Type {
-	panic("implement me")
+	return p.requirements
 }
 
 func (p *SystemBase)Init()  {
