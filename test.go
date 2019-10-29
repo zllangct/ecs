@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	_ "net/http/pprof"
-	"reflect"
 	"runtime/debug"
 )
 
@@ -33,19 +32,23 @@ type IT interface {
 
 type T struct {
 	Name string
+	x1 int
+	x2 int
+	x3 int
+	x4 int
+	x5 int
 }
 
 func (p *T)GetName()string  {
 	return p.Name
 }
 
+type T2 struct {
+	Name int
+}
+
 func tets()  {
-	i:=&T{Name:"zhaolei"}
-	typ := reflect.TypeOf(i)
-	name := reflect.TypeOf(123).Name()
-	str:= typ.String()
-	println(name)
-	println(str)
+
 }
 
 

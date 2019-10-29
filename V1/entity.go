@@ -8,10 +8,24 @@ import (
 type Entity struct {
 	sync.RWMutex
 	//private
-	index      *int
+	runtime *Runtime
 	components []IComponent
 	//public
-	ID string
+	ID uint64
+}
+
+func NewEntity(runtime *Runtime)*Entity  {
+	entity:= &Entity{
+		runtime:    runtime,
+		components: make([]IComponent,0),
+		ID:         UniqueID(),
+	}
+	runtime.AddEntity(entity)
+	return entity
+}
+
+func (p *Entity) Destroy()  {
+	p.runtime.DeleteEntity(p)
 }
 
 func (p *Entity) Has(typ reflect.Type) bool {
@@ -26,6 +40,15 @@ func (p *Entity) Has(typ reflect.Type) bool {
 	return false
 }
 
+func (p *Entity) AddComponent(com ... IComponent)  {
+	p.Lock()
+	for _, c := range com {
+		p.components = append(p.components, c)
+		c.setOwner(p)
+	}
+	p.Unlock()
+}
+
 func (p *Entity) GetComponent(typ reflect.Type) interface{} {
 	p.RLock()
 	for _, value := range p.components {
@@ -35,18 +58,4 @@ func (p *Entity) GetComponent(typ reflect.Type) interface{} {
 	}
 	p.RUnlock()
 	return nil
-}
-
-func (p *Entity) GetComponents(typs ...reflect.Type) []interface{} {
-	cmps := make([]interface{}, 0, len(typs))
-	p.RLock()
-	for index, typ := range typs {
-		for _, value := range p.components {
-			if reflect.TypeOf(value) == typ {
-				cmps[index] = value
-			}
-		}
-	}
-	p.RUnlock()
-	return cmps
 }

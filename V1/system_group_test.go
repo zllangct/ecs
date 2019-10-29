@@ -1,7 +1,6 @@
 package main
 
 import (
-	"reflect"
 	"testing"
 )
 
@@ -41,7 +40,7 @@ type TestSystem struct {
 	ID int
 }
 
-func NewTestSystem(ID int,rqs ... reflect.Type) *TestSystem {
+func NewTestSystem(ID int,rqs ... IComponent) *TestSystem {
 	s := &TestSystem{ID: ID}
 	s.SetRequirements(rqs...)
 	return s
@@ -55,7 +54,7 @@ func (p *TestSystem)Call(label int)interface{}  {
 	return nil
 }
 
-func (t TestSystem) Filter(*Entity) {
+func (t TestSystem) Filter() {
 
 }
 
@@ -65,13 +64,13 @@ func (t TestSystem) SystemUpdate() {
 
 func TestNewSystemGroup(t *testing.T) {
 	tests:=[]ISystem{
-		NewTestSystem(1,reflect.TypeOf(&Com1{}),reflect.TypeOf(&Com2{})),
-		NewTestSystem(2,reflect.TypeOf(&Com1{}),reflect.TypeOf(&Com3{})),
-		NewTestSystem(3,reflect.TypeOf(&Com2{}),reflect.TypeOf(&Com5{})),
-		NewTestSystem(4,reflect.TypeOf(&Com2{}),reflect.TypeOf(&Com3{}),reflect.TypeOf(&Com6{})),
-		NewTestSystem(5,reflect.TypeOf(&Com7{})),
-		NewTestSystem(6,reflect.TypeOf(&Com9{}),reflect.TypeOf(&Com10{})),
-		NewTestSystem(7,reflect.TypeOf(&Com6{})),
+		NewTestSystem(1,&Com1{},&Com2{}),
+		NewTestSystem(2,&Com1{},&Com3{}),
+		NewTestSystem(3,&Com2{},&Com5{}),
+		NewTestSystem(4,&Com2{},&Com3{},&Com6{}),
+		NewTestSystem(5,&Com7{}),
+		NewTestSystem(6,&Com9{},&Com10{}),
+		NewTestSystem(7,&Com6{}),
 	}
 	sg:=NewSystemGroup()
 	for _, test := range tests {

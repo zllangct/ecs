@@ -39,13 +39,13 @@ func (p *Node)attach(node *Node) {
 
 // system group ordered by interrelation
 type SystemGroup struct {
-	lock sync.Mutex
+	lock    sync.Mutex
 	systems []*Node
-	ref map[string]int
-	top []*Node
-	root *Node
+	ref     map[string]int
+	top     []*Node
+	root    *Node
 	ordered bool
-	order int
+	order   Order
 }
 
 func NewSystemGroup() *SystemGroup {

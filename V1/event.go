@@ -1,7 +1,7 @@
 package main
 
 type IEventInit interface {
-	Init()
+	Initialise()
 }
 
 type IEventStart interface {
@@ -16,3 +16,4 @@ type IEventDestroy interface {
 	Destroy()
 }
 
+//TODO 事件系统，事件需要分发到其他系统，实现系统间互通

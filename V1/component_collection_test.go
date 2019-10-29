@@ -36,12 +36,12 @@ func TestComponentCollection(t *testing.T) {
 		cc.push(value,strconv.Itoa(index))
 	}
 	//test GetComponents
-	com1:=cc.GetComponents(reflect.TypeOf(&TestComponent1{}))
+	com1:=cc.GetComponents(&TestComponent1{})
 	for _, value := range com1 {
 		println(value.(*TestComponent1).ID)
 	}
 	//test GetComponent
-	com2:=cc.GetComponent(reflect.TypeOf(&TestComponent3{}),"4")
+	com2:=cc.GetComponent(&TestComponent3{},"4")
 	if com2 != nil {
 		println(reflect.TypeOf(com2).String())
 	}
