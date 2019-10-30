@@ -2,6 +2,7 @@ package main
 
 import (
 	"testing"
+	"time"
 )
 
 type Com1 struct {
@@ -58,7 +59,7 @@ func (t TestSystem) Filter() {
 
 }
 
-func (t TestSystem) SystemUpdate() {
+func (t TestSystem) SystemUpdate(delta time.Duration) {
 
 }
 

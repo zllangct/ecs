@@ -87,7 +87,10 @@ func (p *SystemGroup) iterInit()  {
 		p.ordered = true
 	}
 	// initialise the iterator
-	p.top = []*Node{p.root}
+	p.top = make([]*Node,0)
+	if p.root!=nil {
+		p.top = append(p.top, p.root)
+	}
 }
 
 //pop a batch of independent system array
@@ -101,6 +104,15 @@ func (p *SystemGroup)pop()[]ISystem {
 		}
 	}
 	p.top = temp
+	return systems
+}
+
+//get all systems
+func (p *SystemGroup)all()[]ISystem {
+	systems := make([]ISystem,0)
+	for _, n := range p.systems {
+		systems = append(systems, n.val)
+	}
 	return systems
 }
 

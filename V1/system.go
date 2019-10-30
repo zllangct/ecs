@@ -4,6 +4,7 @@ import (
 	"errors"
 	"reflect"
 	"sync"
+	"time"
 )
 
 type SystemLifeCircleType int
@@ -20,13 +21,13 @@ var (
 )
 
 type ISystem interface {
-	Init()                           //init
+	Init(runtime *Runtime)                           //init
 	GetBase() *SystemBase            //get system base data
 	GetType() reflect.Type
 	GetOrder() (SystemPeriod, Order)
 	GetRequirements() []reflect.Type
 	Filter()       //interest filter of component
-	SystemUpdate() //update every frame
+	SystemUpdate(delta time.Duration) //update every frame
 	Call(label int) interface{}
 }
 
@@ -56,9 +57,10 @@ func (p *SystemBase) GetRequirements() []reflect.Type {
 	return p.requirements
 }
 
-func (p *SystemBase) Init() {
+func (p *SystemBase) Init(runtime *Runtime) {
 	p.requirements = []reflect.Type{}
 	p.SetOrder(ORDER_DEFAULT, PERIOD_DEFAULT)
+	p.runtime = runtime
 }
 
 func (p *SystemBase) SetType(typ reflect.Type) {
@@ -88,5 +90,17 @@ func (p *SystemBase) SetOrder(order Order, period ...SystemPeriod) {
 func (p *SystemBase) GetOrder() (SystemPeriod, Order) {
 	p.Lock()
 	defer p.Unlock()
-	return SystemPeriod(p.order >> 32), Order(p.order & 0xffff)
+	return SystemPeriod(p.order >> 32), Order(p.order & 0xFFFFFFFF)
+}
+
+func (p *SystemBase) IsConcerned(com IComponent) bool {
+	concerned := true
+	ctyp := reflect.TypeOf(com)
+	for _, typ := range p.requirements {
+		if typ != ctyp && !com.GetOwner().Has(typ){
+			concerned =false
+			break
+		}
+	}
+	return concerned
 }

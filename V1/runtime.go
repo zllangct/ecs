@@ -1,7 +1,6 @@
 package main
 
 import (
-	theadpool "github.com/zllangct/RockGO/3rd/threadpool"
 	"runtime"
 	"sync"
 	"time"
@@ -31,7 +30,7 @@ type Runtime struct {
 	//all entities
 	entities *EntityCollection
 	//runtime worker pool
-	workPool *theadpool.Pool
+	workPool *Pool
 }
 
 func NewRuntime() *Runtime {
@@ -45,7 +44,7 @@ func NewRuntime() *Runtime {
 		systemFlow: nil,
 		components: NewComponentCollection(),
 		entities:   NewEntityCollection(),
-		workPool:   theadpool.NewPool(config.MaxPoolThread, config.MaxPoolJobQueue),
+		workPool:   NewPool(config.MaxPoolThread, config.MaxPoolJobQueue),
 	}
 	//initialise system flow
 	sf := newSystemFlow(rt)
@@ -95,4 +94,15 @@ func (p *Runtime) DeleteEntity(entity *Entity) {
 //entity operate : delete
 func (p *Runtime) DeleteEntityByID(id uint64) {
 	p.entities.DeleteByID(id)
+}
+
+func (p *Runtime) ComponentAttach(com IComponent) {
+	p.components.TempComponentOperate(com,COLLECTION_OPERATE_ADD)
+}
+func (p *Runtime) ComponentRemove(com IComponent) {
+	p.components.TempComponentOperate(com,COLLECTION_OPERATE_DELETE)
+}
+
+func (p *Runtime) GetComponentsNew() []*CollectionOperateInfo {
+	return p.components.GetComponentsNew()
 }

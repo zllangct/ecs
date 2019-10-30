@@ -54,8 +54,7 @@ type ComponentCollection struct {
 	//new component cache
 	lockInput        sync.Mutex
 	componentsTemp   []*CollectionOperateInfo
-	componentsAdd    []IComponent
-	componentsDelete []IComponent
+	componentsNew   []*CollectionOperateInfo
 }
 
 func NewComponentCollection() *ComponentCollection {
@@ -63,7 +62,7 @@ func NewComponentCollection() *ComponentCollection {
 		collection:     map[reflect.Type]*componentData{},
 		lockInput:      sync.Mutex{},
 		componentsTemp: make([]*CollectionOperateInfo, 0, 10),
-		componentsAdd:  make([]IComponent, 0, 10),
+		componentsNew: make([]*CollectionOperateInfo, 0),
 	}
 }
 
@@ -78,26 +77,8 @@ func (p *ComponentCollection) TempComponentOperate(com IComponent, op Collection
 func (p *ComponentCollection) TempFlush() {
 	p.lockInput.Lock()
 	defer p.lockInput.Unlock()
-	//clear add and delete array
-	p.componentsAdd = p.componentsAdd[0:0]
-	p.componentsDelete = p.componentsDelete[0:0]
-	//update new add and delete component operate information
-	for i := 0; i < len(p.componentsTemp); i++ {
-		cpi := p.componentsTemp[i]
-		id := cpi.com.GetOwner().ID
-		switch p.componentsTemp[i].op {
-		case COLLECTION_OPERATE_ADD:
-			p.componentsAdd = append(p.componentsAdd, cpi.com)
-			p.push(cpi.com, id)
-		case COLLECTION_OPERATE_DELETE:
-			p.componentsDelete = append(p.componentsDelete, cpi.com)
-			p.pop(cpi.com, id)
-		case COLLECTION_OPERATE_NONE:
-		default:
-		}
-	}
-	//clear temp
-	p.componentsTemp = p.componentsTemp[0:0]
+	p.componentsNew = p.componentsNew[0:0]
+	p.componentsNew,p.componentsTemp = p.componentsTemp,p.componentsNew
 }
 
 func (p *ComponentCollection) push(com IComponent, id uint64) {
@@ -118,12 +99,8 @@ func (p *ComponentCollection) pop(com IComponent, id uint64) {
 	}
 }
 
-func (p *ComponentCollection) GetComponentsAdded() []IComponent {
-	return p.componentsAdd
-}
-
-func (p *ComponentCollection) GetComponentsDeleted() []IComponent {
-	return p.componentsDelete
+func (p *ComponentCollection) GetComponentsNew() []*CollectionOperateInfo {
+	return p.componentsNew
 }
 
 func (p *ComponentCollection) GetComponents(com IComponent) []IComponent {

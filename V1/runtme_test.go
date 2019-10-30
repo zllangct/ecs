@@ -1,0 +1,142 @@
+package main
+
+import (
+	"reflect"
+	"testing"
+	"time"
+)
+
+//position component
+type Position struct {
+	ComponentBase
+	X int
+	Y int
+	Z int
+}
+
+//movement component
+type Movement struct {
+	ComponentBase
+	v int
+	dir []int
+}
+
+//move system
+type MoveSystemData struct {
+	movement *Movement
+	position *Position
+}
+
+type MoveSystem struct {
+	SystemBase
+	components map[uint64]MoveSystemData
+}
+
+func (p *MoveSystem)Init(runtime *Runtime)  {
+	p.SystemBase.Init(runtime)
+	p.SetType(reflect.TypeOf(p))
+	p.SetRequirements(&Position{},&Movement{})
+	p.components = map[uint64]MoveSystemData{}
+}
+
+func (p *MoveSystem) Filter() {
+	comInfos:=p.runtime.GetComponentsNew()
+	for _, comInfo := range comInfos {
+		if p.IsConcerned(comInfo.com) {
+			owner:=comInfo.com.GetOwner()
+			switch comInfo.op   {
+			case COLLECTION_OPERATE_ADD :
+				p.components[owner.ID] = MoveSystemData{
+					movement:owner.GetComponent(&Movement{}).(*Movement),
+					position:owner.GetComponent(&Position{}).(*Position),
+				}
+			case COLLECTION_OPERATE_DELETE:
+				delete(p.components, owner.ID)
+			}
+		}
+	}
+}
+
+func (p *MoveSystem) SystemUpdate(delta time.Duration) {
+	for _, comInfos := range p.components {
+		position:= comInfos.position
+		move:= comInfos.movement
+		position.X = position.X + int(float64(move.dir[0] * move.v) *delta.Seconds())
+		position.Y = position.Y + int(float64(move.dir[1] * move.v) *delta.Seconds())
+		position.Z = position.Z + int(float64(move.dir[2] * move.v) *delta.Seconds())
+		//println("current position:",position.X,position.Y,position.Z)
+	}
+}
+
+//hp component
+type HealthPoint struct {
+	ComponentBase
+	HP int
+}
+
+//damage system
+type DamageSystemData struct {
+	movement *Movement
+	position *Position
+}
+
+type DamageSystem struct {
+	SystemBase
+	components map[uint64]DamageSystemData
+}
+
+func (p *DamageSystem)Init(runtime *Runtime)  {
+	p.SystemBase.Init(runtime)
+	p.SetType(reflect.TypeOf(p))
+	p.SetRequirements(&Position{},&HealthPoint{})
+	p.components = map[uint64]DamageSystemData{}
+}
+
+func (p *DamageSystem) Filter() {
+	comInfos:=p.runtime.GetComponentsNew()
+	for _, comInfo := range comInfos {
+		if p.IsConcerned(comInfo.com) {
+			owner:=comInfo.com.GetOwner()
+			switch comInfo.op   {
+			case COLLECTION_OPERATE_ADD :
+				p.components[owner.ID] = DamageSystemData{
+					movement:owner.GetComponent(&HealthPoint{}).(*Movement),
+					position:owner.GetComponent(&Position{}).(*Position),
+				}
+			case COLLECTION_OPERATE_DELETE:
+				delete(p.components, owner.ID)
+			}
+		}
+	}
+}
+
+func (p *DamageSystem) SystemUpdate(delta time.Duration) {
+
+}
+
+//main function
+func TestRuntime(t *testing.T)  {
+	rt:=NewRuntime()
+	go rt.Run()
+
+	rt.Register(&MoveSystem{})
+	rt.Register(&DamageSystem{})
+
+	entity1:=NewEntity(rt)
+	entity1.AddComponent(
+		&Position{X:100, Y:100, Z:100},
+		&Movement{
+			v:             1000,
+			dir:           []int{1,0,0},
+		},
+	)
+	entity2:=NewEntity(rt)
+	entity2.AddComponent(
+		&Position{X:100, Y:100, Z:100},
+		&Movement{
+			v:             2000,
+			dir:           []int{0,1,0},
+		},
+	)
+	time.Sleep(time.Second * 10)
+}

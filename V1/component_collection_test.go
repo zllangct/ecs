@@ -2,7 +2,6 @@ package main
 
 import (
 	"reflect"
-	"strconv"
 	"testing"
 )
 
@@ -30,10 +29,10 @@ func TestComponentCollection(t *testing.T) {
 		&TestComponent3{ID: 5},
 		&TestComponent3{ID: 6},
 	}
-	cc := ComponentCollection{}
+	cc := NewComponentCollection()
 
 	for index, value := range tests {
-		cc.push(value,strconv.Itoa(index))
+		cc.push(value,uint64(index))
 	}
 	//test GetComponents
 	com1:=cc.GetComponents(&TestComponent1{})
@@ -41,7 +40,7 @@ func TestComponentCollection(t *testing.T) {
 		println(value.(*TestComponent1).ID)
 	}
 	//test GetComponent
-	com2:=cc.GetComponent(&TestComponent3{},"4")
+	com2:=cc.GetComponent(&TestComponent3{},4)
 	if com2 != nil {
 		println(reflect.TypeOf(com2).String())
 	}

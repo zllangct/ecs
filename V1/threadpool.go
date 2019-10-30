@@ -1,7 +1,8 @@
-package theadpool
+package main
 
 import (
 	"math/rand"
+	"runtime"
 	"sync"
 )
 
@@ -26,6 +27,12 @@ func GetGlobalPool(numWorkers int, jobQueueLen int) *Pool {
 
 //NewPool news goroutine pool
 func NewPool(numWorkers int, jobQueueLen int) *Pool {
+	if numWorkers == 0{
+		numWorkers = 2 * runtime.NumCPU()
+	}
+	if jobQueueLen == 0 {
+		jobQueueLen = 20
+	}
 	jobQueue := make(chan *Job, jobQueueLen)
 	workerQueue := make([]*Worker, numWorkers)
 
@@ -41,7 +48,7 @@ func NewPool(numWorkers int, jobQueueLen int) *Pool {
 }
 
 //random worker, task will run in a random worker
-func (p *Pool) AddJob(handler func([]interface{},...interface{}), args []interface{},typ ... JobType){
+func (p *Pool) AddJob(handler func([]interface{},...interface{}), args []interface{},typ ...JobType){
 	job := p.jobPool.Get().(*Job)
 	job.Job = handler
 	job.Args = args

@@ -1,4 +1,4 @@
-package theadpool
+package main
 
 import (
 	"runtime"

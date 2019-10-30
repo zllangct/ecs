@@ -1,6 +1,9 @@
 package main
 
-import "reflect"
+import (
+	"reflect"
+	"time"
+)
 
 type Start struct {
 	SystemBase
@@ -8,9 +11,9 @@ type Start struct {
 	components []IEventStart
 }
 
-func (p *Start) Init() {
+func (p *Start) Init(runtime *Runtime) {
 	//base init
-	p.SystemBase.Init()
+	p.SystemBase.Init(runtime)
 	//inject system type info
 	p.SetType(reflect.TypeOf(p))
 	//initialise interest components
@@ -19,7 +22,7 @@ func (p *Start) Init() {
 	p.SetOrder(ORDER_DEFAULT,PERIOD_PRE_START)
 }
 
-func (p *Start) SystemUpdate() {
+func (p *Start) SystemUpdate(delta time.Duration) {
 	interval := len(p.components) / p.runtime.config.CpuNum
 	remainder := len(p.components) % p.runtime.config.CpuNum
 	offset := 0
@@ -43,10 +46,12 @@ func (p *Start) Filter() {
 	//clear old data
 	p.components = p.components[0:0]
 	//update new component
-	coms:=p.runtime.components.GetComponentsAdded()
+	coms:=p.runtime.GetComponentsNew()
 	for _, com := range coms {
-		if v,ok:=com.(IEventStart);ok {
-			p.components = append(p.components, v)
+		if com.op == COLLECTION_OPERATE_ADD {
+			if v,ok:=com.com.(IEventStart); ok {
+				p.components = append(p.components, v)
+			}
 		}
 	}
 }
