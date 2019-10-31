@@ -109,9 +109,9 @@ func (p *SystemGroup)pop()[]ISystem {
 
 //get all systems
 func (p *SystemGroup)all()[]ISystem {
-	systems := make([]ISystem,0)
-	for _, n := range p.systems {
-		systems = append(systems, n.val)
+	systems := make([]ISystem,len(p.systems))
+	for i, n := range p.systems {
+		systems[i] = n.val
 	}
 	return systems
 }

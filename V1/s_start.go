@@ -40,18 +40,14 @@ func (p *Start) SystemUpdate(delta time.Duration) {
 		},[]interface{}{p.components[offset]})
 		offset+=1
 	}
-}
-
-func (p *Start) Filter() {
 	//clear old data
 	p.components = p.components[0:0]
-	//update new component
-	coms:=p.runtime.GetComponentsNew()
-	for _, com := range coms {
-		if com.op == COLLECTION_OPERATE_ADD {
-			if v,ok:=com.com.(IEventStart); ok {
-				p.components = append(p.components, v)
-			}
+}
+
+func (p *Start) Filter(com IComponent,op CollectionOperate) {
+	if op == COLLECTION_OPERATE_ADD {
+		if v,ok:=com.(IEventStart); ok {
+			p.components = append(p.components, v)
 		}
 	}
 }

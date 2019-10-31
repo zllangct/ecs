@@ -111,6 +111,21 @@ func (p *ComponentCollection) GetComponents(com IComponent) []IComponent {
 	return []IComponent{}
 }
 
+func (p *ComponentCollection) GetAllComponents() []IComponent {
+	length:=0
+	for _, value := range p.collection {
+		length+=len(value.data)
+	}
+	components:=make([]IComponent,length)
+	index := 0
+	for _, value := range p.collection {
+		l:=len(value.data)
+		copy(components[index:index+l], value.data)
+		index+=l
+	}
+	return components
+}
+
 func (p *ComponentCollection) GetComponent(com IComponent, id uint64) interface{} {
 	v, ok := p.collection[reflect.TypeOf(com)]
 	if ok {
@@ -122,9 +137,11 @@ func (p *ComponentCollection) GetComponent(com IComponent, id uint64) interface{
 }
 
 func (p *ComponentCollection) GetIterator() *ComponentCollectionIter {
-	ls := make([]*componentData, 0)
+	ls := make([]*componentData, len(p.collection))
+	i:=0
 	for _, value := range p.collection {
-		ls = append(ls, value)
+		ls[i]=value
+		i+=1
 	}
 	return newComponentCollectionIter(ls)
 }

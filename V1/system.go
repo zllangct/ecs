@@ -26,7 +26,7 @@ type ISystem interface {
 	GetType() reflect.Type
 	GetOrder() (SystemPeriod, Order)
 	GetRequirements() []reflect.Type
-	Filter()       //interest filter of component
+	Filter(component IComponent,op CollectionOperate)       //interest filter of component
 	SystemUpdate(delta time.Duration) //update every frame
 	Call(label int) interface{}
 }
@@ -37,6 +37,7 @@ type SystemBase struct {
 	order        SystemOrder
 	runtime      *Runtime
 	typ          reflect.Type
+	isInit		 bool
 }
 
 func (p *SystemBase) Call(label int) interface{} {

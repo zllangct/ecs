@@ -48,18 +48,22 @@ func NewPool(numWorkers int, jobQueueLen int) *Pool {
 }
 
 //random worker, task will run in a random worker
-func (p *Pool) AddJob(handler func([]interface{},...interface{}), args []interface{},typ ...JobType){
+func (p *Pool) AddJob(handler func([]interface{},...interface{}), args ...interface{}){
 	job := p.jobPool.Get().(*Job)
 	job.Job = handler
 	job.Args = args
 	job.WorkerID = WORKER_ID_RANDOM
+	p.jobQueue <- job
+}
 
-	if len(typ)>0 && (typ[0] == JOB_TYPE_SERIAL){
-		job.WorkerID = rand.Int31() % p.numWorkers
-		p.workerQueue[job.WorkerID].jobQueue <- job
-	}else{
-		p.jobQueue <- job
-	}
+//random worker, task will run in a random worker and record the worker id
+func (p *Pool) AddJob2(handler func([]interface{},...interface{}), args ...interface{}){
+	job := p.jobPool.Get().(*Job)
+	job.Job = handler
+	job.Args = args
+
+	job.WorkerID = rand.Int31() % p.numWorkers
+	p.workerQueue[job.WorkerID].jobQueue <- job
 }
 
 //fixed worker,task with the same worker id will push into the same goroutine
@@ -68,7 +72,7 @@ func (p *Pool) AddJobFixed(handler func([]interface{}, ...interface{}), args []i
 	job.Job = handler
 	job.Args = args
 
-	if wid <= -1 || wid >= p.numWorkers {
+	if wid <= WORKER_ID_RANDOM || wid >= p.numWorkers {
 		job.WorkerID = rand.Int31() % p.numWorkers
 		p.workerQueue[job.WorkerID].jobQueue <- job
 	} else {

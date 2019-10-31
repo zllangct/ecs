@@ -106,3 +106,7 @@ func (p *Runtime) ComponentRemove(com IComponent) {
 func (p *Runtime) GetComponentsNew() []*CollectionOperateInfo {
 	return p.components.GetComponentsNew()
 }
+
+func (p *Runtime) GetAllComponents() []IComponent {
+	return p.components.GetAllComponents()
+}

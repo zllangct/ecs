@@ -55,7 +55,7 @@ func (p *TestSystem)Call(label int)interface{}  {
 	return nil
 }
 
-func (t TestSystem) Filter() {
+func (t TestSystem) Filter(component IComponent,op CollectionOperate) {
 
 }
 

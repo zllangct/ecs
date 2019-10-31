@@ -37,14 +37,18 @@ type OrderSequence []*SystemGroup
 
 //system execute flow
 type systemFlow struct {
+	sync.Mutex
 	runtime *Runtime
 	systemPeriod map[SystemPeriod]OrderSequence
 	periodList []SystemPeriod
+	systemTemp []ISystem
+	wg sync.WaitGroup
 }
 
 func newSystemFlow(runtime *Runtime) *systemFlow {
 	sf:= &systemFlow{
 		runtime: runtime,
+		wg:sync.WaitGroup{},
 	}
 	sf.init()
 	return sf
@@ -80,7 +84,6 @@ func (p * systemFlow)run(delta time.Duration)  {
 		sq = p.systemPeriod[period]
 		for _, sl := range sq {
 			sl.iterInit()
-			wg:= sync.WaitGroup{}
 			for ss:=sl.pop(); len(ss) >0 ;ss=sl.pop() {
 				//work balance
 				if len(ss) != 0 {
@@ -88,28 +91,28 @@ func (p * systemFlow)run(delta time.Duration)  {
 					remainder := len(ss) % p.runtime.config.CpuNum
 					offset := 0
 					if interval != 0{
-						wg.Add(p.runtime.config.CpuNum)
+						p.wg.Add(p.runtime.config.CpuNum)
 						for i := 0; i < p.runtime.config.CpuNum; i++ {
 							p.runtime.workPool.AddJob(func(ctx []interface{}, args ...interface{}) {
 								for _, sys := range args[0].([]ISystem) {
 									sys.SystemUpdate(delta)
 								}
-								wg.Done()
-							}, []interface{}{ss[offset : offset+interval]})
+								p.wg.Done()
+							}, ss[offset : offset+interval])
 							offset += interval
 						}
 					}
-					wg.Add(remainder)
+					p.wg.Add(remainder)
 					for i := 0; i < remainder; i++ {
 						p.runtime.workPool.AddJob(func(ctx []interface{}, args ...interface{}) {
 							args[0].(ISystem).SystemUpdate(delta)
-							wg.Done()
-						}, []interface{}{ss[offset]})
+							p.wg.Done()
+						}, ss[offset])
 						offset += 1
 					}
 				}
 				//waiting for all complete
-				wg.Wait()
+				p.wg.Wait()
 			}
 
 		}
@@ -123,10 +126,10 @@ func (p * systemFlow)run(delta time.Duration)  {
 
 func (p *systemFlow) FilterExecute()  {
 	var sq OrderSequence
+	comInfos:=p.runtime.GetComponentsNew()
 	for _,period := range p.periodList {
 		sq = p.systemPeriod[period]
 		for _, sl := range sq {
-			wg:= sync.WaitGroup{}
 			ss:=sl.all()
 			//work balance
 			if len(ss) != 0 {
@@ -134,28 +137,45 @@ func (p *systemFlow) FilterExecute()  {
 				remainder := len(ss) % p.runtime.config.CpuNum
 				offset := 0
 				if interval != 0{
-					wg.Add(p.runtime.config.CpuNum)
+					p.wg.Add(p.runtime.config.CpuNum)
 					for i := 0; i < p.runtime.config.CpuNum; i++ {
 						p.runtime.workPool.AddJob(func(ctx []interface{}, args ...interface{}) {
 							for _, sys := range args[0].([]ISystem) {
-								sys.Filter()
+								if !sys.GetBase().isInit {
+									coms:= p.runtime.GetAllComponents()
+									for _, com := range coms {
+										sys.Filter(com,COLLECTION_OPERATE_ADD)
+									}
+								}
+								for _, comInfo := range comInfos {
+									sys.Filter(comInfo.com,comInfo.op)
+								}
 							}
-							wg.Done()
-						}, []interface{}{ss[offset : offset+interval]})
+							p.wg.Done()
+						}, ss[offset : offset+interval])
 						offset += interval
 					}
 				}
-				wg.Add(remainder)
+				p.wg.Add(remainder)
 				for i := 0; i < remainder; i++ {
 					p.runtime.workPool.AddJob(func(ctx []interface{}, args ...interface{}) {
-						args[0].(ISystem).Filter()
-						wg.Done()
-					}, []interface{}{ss[offset]})
+						sys:=args[0].(ISystem)
+						if !sys.GetBase().isInit {
+							coms:= p.runtime.GetAllComponents()
+							for _, com := range coms {
+								sys.Filter(com,COLLECTION_OPERATE_ADD)
+							}
+						}
+						for _, comInfo := range comInfos {
+							sys.Filter(comInfo.com,comInfo.op)
+						}
+						p.wg.Done()
+					}, ss[offset])
 					offset += 1
 				}
 			}
 			//waiting for all complete
-			wg.Wait()
+			p.wg.Wait()
 		}
 	}
 }

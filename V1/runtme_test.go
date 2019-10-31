@@ -1,6 +1,9 @@
 package main
 
 import (
+	"log"
+	"net/http"
+	_ "net/http/pprof"
 	"reflect"
 	"testing"
 	"time"
@@ -39,20 +42,17 @@ func (p *MoveSystem)Init(runtime *Runtime)  {
 	p.components = map[uint64]MoveSystemData{}
 }
 
-func (p *MoveSystem) Filter() {
-	comInfos:=p.runtime.GetComponentsNew()
-	for _, comInfo := range comInfos {
-		if p.IsConcerned(comInfo.com) {
-			owner:=comInfo.com.GetOwner()
-			switch comInfo.op   {
-			case COLLECTION_OPERATE_ADD :
-				p.components[owner.ID] = MoveSystemData{
-					movement:owner.GetComponent(&Movement{}).(*Movement),
-					position:owner.GetComponent(&Position{}).(*Position),
-				}
-			case COLLECTION_OPERATE_DELETE:
-				delete(p.components, owner.ID)
+func (p *MoveSystem) Filter(com IComponent,op CollectionOperate) {
+	if p.IsConcerned(com) {
+		owner:=com.GetOwner()
+		switch op   {
+		case COLLECTION_OPERATE_ADD :
+			p.components[owner.ID] = MoveSystemData{
+				movement:owner.GetComponent(&Movement{}).(*Movement),
+				position:owner.GetComponent(&Position{}).(*Position),
 			}
+		case COLLECTION_OPERATE_DELETE:
+			delete(p.components, owner.ID)
 		}
 	}
 }
@@ -64,7 +64,8 @@ func (p *MoveSystem) SystemUpdate(delta time.Duration) {
 		position.X = position.X + int(float64(move.dir[0] * move.v) *delta.Seconds())
 		position.Y = position.Y + int(float64(move.dir[1] * move.v) *delta.Seconds())
 		position.Z = position.Z + int(float64(move.dir[2] * move.v) *delta.Seconds())
-		//println("current position:",position.X,position.Y,position.Z)
+
+		println("current position:",position.X,position.Y,position.Z)
 	}
 }
 
@@ -92,20 +93,17 @@ func (p *DamageSystem)Init(runtime *Runtime)  {
 	p.components = map[uint64]DamageSystemData{}
 }
 
-func (p *DamageSystem) Filter() {
-	comInfos:=p.runtime.GetComponentsNew()
-	for _, comInfo := range comInfos {
-		if p.IsConcerned(comInfo.com) {
-			owner:=comInfo.com.GetOwner()
-			switch comInfo.op   {
-			case COLLECTION_OPERATE_ADD :
-				p.components[owner.ID] = DamageSystemData{
-					movement:owner.GetComponent(&HealthPoint{}).(*Movement),
-					position:owner.GetComponent(&Position{}).(*Position),
-				}
-			case COLLECTION_OPERATE_DELETE:
-				delete(p.components, owner.ID)
+func (p *DamageSystem) Filter(com IComponent,op CollectionOperate) {
+	if p.IsConcerned(com) {
+		owner:=com.GetOwner()
+		switch op   {
+		case COLLECTION_OPERATE_ADD :
+			p.components[owner.ID] = DamageSystemData{
+				movement:owner.GetComponent(&HealthPoint{}).(*Movement),
+				position:owner.GetComponent(&Position{}).(*Position),
 			}
+		case COLLECTION_OPERATE_DELETE:
+			delete(p.components, owner.ID)
 		}
 	}
 }
@@ -116,6 +114,10 @@ func (p *DamageSystem) SystemUpdate(delta time.Duration) {
 
 //main function
 func TestRuntime(t *testing.T)  {
+	go func() {
+		log.Println(http.ListenAndServe("localhost:8888", nil))
+	}()
+
 	rt:=NewRuntime()
 	go rt.Run()
 
@@ -138,5 +140,6 @@ func TestRuntime(t *testing.T)  {
 			dir:           []int{0,1,0},
 		},
 	)
-	time.Sleep(time.Second * 10)
+	//time.Sleep(time.Second * 30)
+	<-make(chan struct{})
 }
