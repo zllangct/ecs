@@ -44,8 +44,8 @@ func (p *Start) SystemUpdate(delta time.Duration) {
 	p.components = p.components[0:0]
 }
 
-func (p *Start) Filter(com IComponent,op CollectionOperate) {
-	if op == COLLECTION_OPERATE_ADD {
+func (p *Start) Filter(com IComponent,op ComponentOperate) {
+	if op == COMPONENT_OPERATE_ADD {
 		if v,ok:=com.(IEventStart); ok {
 			p.components = append(p.components, v)
 		}

@@ -41,7 +41,6 @@ type systemFlow struct {
 	runtime *Runtime
 	systemPeriod map[SystemPeriod]OrderSequence
 	periodList []SystemPeriod
-	systemTemp []ISystem
 	wg sync.WaitGroup
 }
 
@@ -141,11 +140,12 @@ func (p *systemFlow) FilterExecute()  {
 					for i := 0; i < p.runtime.config.CpuNum; i++ {
 						p.runtime.workPool.AddJob(func(ctx []interface{}, args ...interface{}) {
 							for _, sys := range args[0].([]ISystem) {
-								if !sys.GetBase().isInit {
+								if !sys.GetBase().isPreFilter {
 									coms:= p.runtime.GetAllComponents()
 									for _, com := range coms {
 										sys.Filter(com,COLLECTION_OPERATE_ADD)
 									}
+									sys.GetBase().isPreFilter = true
 								}
 								for _, comInfo := range comInfos {
 									sys.Filter(comInfo.com,comInfo.op)
@@ -160,11 +160,12 @@ func (p *systemFlow) FilterExecute()  {
 				for i := 0; i < remainder; i++ {
 					p.runtime.workPool.AddJob(func(ctx []interface{}, args ...interface{}) {
 						sys:=args[0].(ISystem)
-						if !sys.GetBase().isInit {
+						if !sys.GetBase().isPreFilter {
 							coms:= p.runtime.GetAllComponents()
 							for _, com := range coms {
 								sys.Filter(com,COLLECTION_OPERATE_ADD)
 							}
+							sys.GetBase().isPreFilter = true
 						}
 						for _, comInfo := range comInfos {
 							sys.Filter(comInfo.com,comInfo.op)

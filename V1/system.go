@@ -37,7 +37,7 @@ type SystemBase struct {
 	order        SystemOrder
 	runtime      *Runtime
 	typ          reflect.Type
-	isInit		 bool
+	isPreFilter  bool
 }
 
 func (p *SystemBase) Call(label int) interface{} {

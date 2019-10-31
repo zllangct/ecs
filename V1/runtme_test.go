@@ -42,16 +42,16 @@ func (p *MoveSystem)Init(runtime *Runtime)  {
 	p.components = map[uint64]MoveSystemData{}
 }
 
-func (p *MoveSystem) Filter(com IComponent,op CollectionOperate) {
+func (p *MoveSystem) Filter(com IComponent,op ComponentOperate) {
 	if p.IsConcerned(com) {
 		owner:=com.GetOwner()
 		switch op   {
-		case COLLECTION_OPERATE_ADD :
+		case COMPONENT_OPERATE_ADD :
 			p.components[owner.ID] = MoveSystemData{
 				movement:owner.GetComponent(&Movement{}).(*Movement),
 				position:owner.GetComponent(&Position{}).(*Position),
 			}
-		case COLLECTION_OPERATE_DELETE:
+		case COMPONENT_OPERATE_DELETE:
 			delete(p.components, owner.ID)
 		}
 	}
@@ -93,16 +93,16 @@ func (p *DamageSystem)Init(runtime *Runtime)  {
 	p.components = map[uint64]DamageSystemData{}
 }
 
-func (p *DamageSystem) Filter(com IComponent,op CollectionOperate) {
+func (p *DamageSystem) Filter(com IComponent,op ComponentOperate) {
 	if p.IsConcerned(com) {
 		owner:=com.GetOwner()
 		switch op   {
-		case COLLECTION_OPERATE_ADD :
+		case COMPONENT_OPERATE_ADD :
 			p.components[owner.ID] = DamageSystemData{
 				movement:owner.GetComponent(&HealthPoint{}).(*Movement),
 				position:owner.GetComponent(&Position{}).(*Position),
 			}
-		case COLLECTION_OPERATE_DELETE:
+		case COMPONENT_OPERATE_DELETE:
 			delete(p.components, owner.ID)
 		}
 	}

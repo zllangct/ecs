@@ -40,6 +40,13 @@ const (
 	COLLECTION_OPERATE_DELETE                   //delete component operation
 )
 
+type ComponentOperate = CollectionOperate
+
+const (
+	COMPONENT_OPERATE_ADD    = COLLECTION_OPERATE_ADD    //add component operation
+	COMPONENT_OPERATE_DELETE = COLLECTION_OPERATE_DELETE //delete component operation
+)
+
 type CollectionOperateInfo struct {
 	com IComponent
 	op  CollectionOperate
@@ -52,9 +59,9 @@ func NewCollectionOperateInfo(com IComponent, op CollectionOperate) *CollectionO
 type ComponentCollection struct {
 	collection map[reflect.Type]*componentData
 	//new component cache
-	lockInput        sync.Mutex
-	componentsTemp   []*CollectionOperateInfo
-	componentsNew   []*CollectionOperateInfo
+	lockInput      sync.Mutex
+	componentsTemp []*CollectionOperateInfo
+	componentsNew  []*CollectionOperateInfo
 }
 
 func NewComponentCollection() *ComponentCollection {
@@ -62,7 +69,7 @@ func NewComponentCollection() *ComponentCollection {
 		collection:     map[reflect.Type]*componentData{},
 		lockInput:      sync.Mutex{},
 		componentsTemp: make([]*CollectionOperateInfo, 0, 10),
-		componentsNew: make([]*CollectionOperateInfo, 0),
+		componentsNew:  make([]*CollectionOperateInfo, 0),
 	}
 }
 
@@ -78,7 +85,7 @@ func (p *ComponentCollection) TempFlush() {
 	p.lockInput.Lock()
 	defer p.lockInput.Unlock()
 	p.componentsNew = p.componentsNew[0:0]
-	p.componentsNew,p.componentsTemp = p.componentsTemp,p.componentsNew
+	p.componentsNew, p.componentsTemp = p.componentsTemp, p.componentsNew
 }
 
 func (p *ComponentCollection) push(com IComponent, id uint64) {
@@ -112,16 +119,16 @@ func (p *ComponentCollection) GetComponents(com IComponent) []IComponent {
 }
 
 func (p *ComponentCollection) GetAllComponents() []IComponent {
-	length:=0
+	length := 0
 	for _, value := range p.collection {
-		length+=len(value.data)
+		length += len(value.data)
 	}
-	components:=make([]IComponent,length)
+	components := make([]IComponent, length)
 	index := 0
 	for _, value := range p.collection {
-		l:=len(value.data)
+		l := len(value.data)
 		copy(components[index:index+l], value.data)
-		index+=l
+		index += l
 	}
 	return components
 }
@@ -138,10 +145,10 @@ func (p *ComponentCollection) GetComponent(com IComponent, id uint64) interface{
 
 func (p *ComponentCollection) GetIterator() *ComponentCollectionIter {
 	ls := make([]*componentData, len(p.collection))
-	i:=0
+	i := 0
 	for _, value := range p.collection {
-		ls[i]=value
-		i+=1
+		ls[i] = value
+		i += 1
 	}
 	return newComponentCollectionIter(ls)
 }
