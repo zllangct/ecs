@@ -1,4 +1,4 @@
-package main
+package ecs
 
 import (
 	"log"
@@ -44,9 +44,9 @@ func (p *MoveSystem)Init(runtime *Runtime)  {
 
 func (p *MoveSystem) Filter(com IComponent,op ComponentOperate) {
 	if p.IsConcerned(com) {
-		owner:=com.GetOwner()
+		owner:= GetOwner()
 		switch op   {
-		case COMPONENT_OPERATE_ADD :
+		case COMPONENT_OPERATE_ADD:
 			p.components[owner.ID] = MoveSystemData{
 				movement:owner.GetComponent(&Movement{}).(*Movement),
 				position:owner.GetComponent(&Position{}).(*Position),
@@ -95,9 +95,9 @@ func (p *DamageSystem)Init(runtime *Runtime)  {
 
 func (p *DamageSystem) Filter(com IComponent,op ComponentOperate) {
 	if p.IsConcerned(com) {
-		owner:=com.GetOwner()
+		owner:= GetOwner()
 		switch op   {
-		case COMPONENT_OPERATE_ADD :
+		case COMPONENT_OPERATE_ADD:
 			p.components[owner.ID] = DamageSystemData{
 				movement:owner.GetComponent(&HealthPoint{}).(*Movement),
 				position:owner.GetComponent(&Position{}).(*Position),
@@ -118,13 +118,13 @@ func TestRuntime(t *testing.T)  {
 		log.Println(http.ListenAndServe("localhost:8888", nil))
 	}()
 
-	rt:=NewRuntime()
+	rt:= NewRuntime()
 	go rt.Run()
 
 	rt.Register(&MoveSystem{})
 	rt.Register(&DamageSystem{})
 
-	entity1:=NewEntity(rt)
+	entity1:= NewEntity(rt)
 	entity1.AddComponent(
 		&Position{X:100, Y:100, Z:100},
 		&Movement{
@@ -132,7 +132,7 @@ func TestRuntime(t *testing.T)  {
 			dir:           []int{1,0,0},
 		},
 	)
-	entity2:=NewEntity(rt)
+	entity2:= NewEntity(rt)
 	entity2.AddComponent(
 		&Position{X:100, Y:100, Z:100},
 		&Movement{

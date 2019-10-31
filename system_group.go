@@ -1,4 +1,4 @@
-package main
+package ecs
 
 import (
 	"reflect"
@@ -7,14 +7,14 @@ import (
 )
 // system tree node
 type Node struct {
-	parent *Node
+	parent   *Node
 	children []*Node
-	val ISystem
+	val      ISystem
 }
 
 func (p *Node)isFriend(node *Node) bool {
-	for _, com := range p.val.GetRequirements() {
-		for _, comTarget := range node.val.GetRequirements() {
+	for _, com := range GetRequirements() {
+		for _, comTarget := range GetRequirements() {
 			if comTarget.String() == com.String() {
 				return true
 			}
@@ -70,8 +70,8 @@ func (p *SystemGroup) iterInit()  {
 	//need resort
 	if !p.ordered{
 		sort.Slice(p.systems, func(i, j int) bool {
-			 return p.refCount(p.systems[i].val.GetRequirements()) >
-			 	p.refCount(p.systems[j].val.GetRequirements())
+			 return p.refCount(GetRequirements()) >
+			 	p.refCount(GetRequirements())
 		})
 
 		for _, node := range p.systems {
@@ -121,7 +121,7 @@ func (p *SystemGroup) insert(sys ISystem) {
 	//set cluster no ordered
 	p.ordered = false
 	//get system's required components
-	rqs := sys.GetRequirements()
+	rqs := GetRequirements()
 	if len(rqs) == 0 {
 		panic("invalid system")
 	}

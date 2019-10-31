@@ -1,4 +1,4 @@
-package main
+package ecs
 
 import (
 	"sync"
@@ -94,7 +94,7 @@ func (p * systemFlow)run(delta time.Duration)  {
 						for i := 0; i < p.runtime.config.CpuNum; i++ {
 							p.runtime.workPool.AddJob(func(ctx []interface{}, args ...interface{}) {
 								for _, sys := range args[0].([]ISystem) {
-									sys.SystemUpdate(delta)
+									SystemUpdate(delta)
 								}
 								p.wg.Done()
 							}, ss[offset : offset+interval])
@@ -104,7 +104,7 @@ func (p * systemFlow)run(delta time.Duration)  {
 					p.wg.Add(remainder)
 					for i := 0; i < remainder; i++ {
 						p.runtime.workPool.AddJob(func(ctx []interface{}, args ...interface{}) {
-							args[0].(ISystem).SystemUpdate(delta)
+							SystemUpdate(delta)
 							p.wg.Done()
 						}, ss[offset])
 						offset += 1
@@ -140,15 +140,15 @@ func (p *systemFlow) FilterExecute()  {
 					for i := 0; i < p.runtime.config.CpuNum; i++ {
 						p.runtime.workPool.AddJob(func(ctx []interface{}, args ...interface{}) {
 							for _, sys := range args[0].([]ISystem) {
-								if !sys.GetBase().isPreFilter {
+								if !GetBase().isPreFilter {
 									coms:= p.runtime.GetAllComponents()
 									for _, com := range coms {
-										sys.Filter(com,COLLECTION_OPERATE_ADD)
+										Filter(com, COLLECTION_OPERATE_ADD)
 									}
-									sys.GetBase().isPreFilter = true
+									GetBase().isPreFilter = true
 								}
 								for _, comInfo := range comInfos {
-									sys.Filter(comInfo.com,comInfo.op)
+									Filter(comInfo.com,comInfo.op)
 								}
 							}
 							p.wg.Done()
@@ -160,15 +160,15 @@ func (p *systemFlow) FilterExecute()  {
 				for i := 0; i < remainder; i++ {
 					p.runtime.workPool.AddJob(func(ctx []interface{}, args ...interface{}) {
 						sys:=args[0].(ISystem)
-						if !sys.GetBase().isPreFilter {
+						if !GetBase().isPreFilter {
 							coms:= p.runtime.GetAllComponents()
 							for _, com := range coms {
-								sys.Filter(com,COLLECTION_OPERATE_ADD)
+								Filter(com, COLLECTION_OPERATE_ADD)
 							}
-							sys.GetBase().isPreFilter = true
+							GetBase().isPreFilter = true
 						}
 						for _, comInfo := range comInfos {
-							sys.Filter(comInfo.com,comInfo.op)
+							Filter(comInfo.com,comInfo.op)
 						}
 						p.wg.Done()
 					}, ss[offset])
@@ -183,8 +183,8 @@ func (p *systemFlow) FilterExecute()  {
 
 //register method only in runtime init or func init(){}
 func (p *systemFlow)register(system ISystem)  {
-	system.Init(p.runtime)
-	period,order:= system.GetOrder()
+	Init(p.runtime)
+	period,order:= GetOrder()
 	sl:= p.systemPeriod[period]
 	if order == ORDER_FRONT {
 		sl[0].insert(system)

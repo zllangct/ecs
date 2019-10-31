@@ -1,4 +1,4 @@
-package main
+package ecs
 
 import (
 	"runtime"
@@ -97,10 +97,10 @@ func (p *Runtime) DeleteEntityByID(id uint64) {
 }
 
 func (p *Runtime) ComponentAttach(com IComponent) {
-	p.components.TempComponentOperate(com,COLLECTION_OPERATE_ADD)
+	p.components.TempComponentOperate(com, COLLECTION_OPERATE_ADD)
 }
 func (p *Runtime) ComponentRemove(com IComponent) {
-	p.components.TempComponentOperate(com,COLLECTION_OPERATE_DELETE)
+	p.components.TempComponentOperate(com, COLLECTION_OPERATE_DELETE)
 }
 
 func (p *Runtime) GetComponentsNew() []*CollectionOperateInfo {

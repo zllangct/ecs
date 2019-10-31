@@ -1,4 +1,4 @@
-package main
+package ecs
 
 type ComponentCollectionIter struct {
 	ls []*componentData
