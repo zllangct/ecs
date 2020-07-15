@@ -1,3 +1,3 @@
-module github.com/zllangct/RockGO
+module ecs
 
-go 1.12
+go 1.14

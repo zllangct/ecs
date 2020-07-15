@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="4e334e1f-dbad-4116-b364-527eab0b63dc" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/.idea/ecs.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/ComponentExperiment_2.iml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/V1/.keep" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/V1/common.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/V1/component.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/V1/component_collection.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/V1/component_collection_iter.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/V1/component_collection_test.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/V1/entity.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/V1/entity_collection.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/V1/entity_id.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/V1/entity_id_test.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/V1/event.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/V1/runtime.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/V1/runtme_test.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/V1/s_start.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/V1/system.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/V1/system_flow.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/V1/system_group.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/V1/system_group_test.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/V1/threadpool.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/V1/threadpool_benchmark_test.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/V1/threadpool_job.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/V1/threadpool_test.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/V1/threadpool_worker.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/go.mod" beforeDir="false" afterPath="$PROJECT_DIR$/go.mod" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/go.sum" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/main.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/test.go" beforeDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Go File" />
+      </list>
+    </option>
+  </component>
+  <component name="GOROOT" path="C:\Go" />
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="ProjectId" id="1eihJmQmeg1hMELZDpPzj2TAecv" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">
+    <property name="DefaultGoTemplateProperty" value="Go File" />
+    <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
+    <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
+    <property name="SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
+    <property name="WebServerToolWindowFactoryState" value="false" />
+    <property name="go.import.settings.migrated" value="true" />
+    <property name="go.sdk.automatically.set" value="true" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
+    <property name="nodejs_package_manager_path" value="npm" />
+    <property name="settings.editor.selected.configurable" value="go.vgo" />
+  </component>
+  <component name="RunManager" selected="Go Test.TestRuntime in runtme_test.go">
+    <configuration name="TestRuntime in ecs" type="GoTestRunConfiguration" factoryName="Go Test" temporary="true" nameIsGenerated="true">
+      <module name="ecs" />
+      <working_directory value="$PROJECT_DIR$" />
+      <framework value="gobench" />
+      <kind value="PACKAGE" />
+      <package value="ecs" />
+      <directory value="$PROJECT_DIR$/" />
+      <filePath value="$PROJECT_DIR$/runtme_test.go" />
+      <pattern value="^TestRuntime$" />
+      <method v="2" />
+    </configuration>
+    <configuration name="TestRuntime in runtme_test.go" type="GoTestRunConfiguration" factoryName="Go Test" temporary="true" nameIsGenerated="true">
+      <module name="ecs" />
+      <working_directory value="$PROJECT_DIR$" />
+      <framework value="gotest" />
+      <kind value="FILE" />
+      <directory value="$PROJECT_DIR$/" />
+      <filePath value="$PROJECT_DIR$/runtme_test.go" />
+      <pattern value="^TestRuntime$" />
+      <method v="2" />
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Go Test.TestRuntime in runtme_test.go" />
+        <item itemvalue="Go Test.TestRuntime in ecs" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="2" />
+  </component>
+  <component name="VgoProject">
+    <integration-enabled>true</integration-enabled>
+    <auto-vendoring-mode>false</auto-vendoring-mode>
+  </component>
+  <component name="WindowStateProjectService">
+    <state x="414" y="175" key="#com.intellij.execution.impl.EditConfigurationsDialog" timestamp="1594810444348">
+      <screen x="0" y="0" width="1920" height="1040" />
+    </state>
+    <state x="414" y="175" key="#com.intellij.execution.impl.EditConfigurationsDialog/0.0.1920.1040@0.0.1920.1040" timestamp="1594810444348" />
+    <state width="1877" height="143" key="GridCell.Tab.0.bottom" timestamp="1594811906320">
+      <screen x="0" y="0" width="1920" height="1040" />
+    </state>
+    <state width="1877" height="143" key="GridCell.Tab.0.bottom/0.0.1920.1040@0.0.1920.1040" timestamp="1594811906320" />
+    <state width="1877" height="143" key="GridCell.Tab.0.center" timestamp="1594811906320">
+      <screen x="0" y="0" width="1920" height="1040" />
+    </state>
+    <state width="1877" height="143" key="GridCell.Tab.0.center/0.0.1920.1040@0.0.1920.1040" timestamp="1594811906320" />
+    <state width="1877" height="143" key="GridCell.Tab.0.left" timestamp="1594811906319">
+      <screen x="0" y="0" width="1920" height="1040" />
+    </state>
+    <state width="1877" height="143" key="GridCell.Tab.0.left/0.0.1920.1040@0.0.1920.1040" timestamp="1594811906319" />
+    <state width="1877" height="143" key="GridCell.Tab.0.right" timestamp="1594811906320">
+      <screen x="0" y="0" width="1920" height="1040" />
+    </state>
+    <state width="1877" height="143" key="GridCell.Tab.0.right/0.0.1920.1040@0.0.1920.1040" timestamp="1594811906320" />
+    <state x="461" y="164" key="SettingsEditor" timestamp="1594811650728">
+      <screen x="0" y="0" width="1920" height="1040" />
+    </state>
+    <state x="461" y="164" key="SettingsEditor/0.0.1920.1040@0.0.1920.1040" timestamp="1594811650728" />
+  </component>
+</project>
