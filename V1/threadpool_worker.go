@@ -1,4 +1,4 @@
-package ecs
+package main
 
 const WORKER_ID_RANDOM int32 = -1
 

@@ -1,4 +1,4 @@
-package ecs
+package main
 
 import (
 	"reflect"
@@ -19,7 +19,7 @@ func (p *Start) Init(runtime *Runtime) {
 	//initialise interest components
 	p.components = make([]IEventStart,0,10)
 	//set order
-	p.SetOrder(ORDER_DEFAULT, PERIOD_PRE_START)
+	p.SetOrder(ORDER_DEFAULT,PERIOD_PRE_START)
 }
 
 func (p *Start) SystemUpdate(delta time.Duration) {
@@ -29,14 +29,14 @@ func (p *Start) SystemUpdate(delta time.Duration) {
 	for i := 0; i<p.runtime.config.CpuNum;i++  {
 		p.runtime.workPool.AddJob(func(ctx []interface{}, args ...interface{}) {
 			for _, event := range args[0].([]IEventStart) {
-				Start()
+				event.Start()
 			}
 		},[]interface{}{p.components[offset:offset+interval]})
 		offset += interval
 	}
 	for i := 0; i<remainder;i++  {
 		p.runtime.workPool.AddJob(func(ctx []interface{}, args ...interface{}) {
-			Start()
+			args[0].(IEventStart).Start()
 		},[]interface{}{p.components[offset]})
 		offset+=1
 	}

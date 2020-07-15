@@ -1,4 +1,4 @@
-package ecs
+package main
 
 //job type: Parallel;Serial
 type JobType int

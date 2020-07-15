@@ -1,4 +1,4 @@
-package ecs
+package main
 
 import (
 	"testing"
@@ -41,7 +41,7 @@ type TestSystem struct {
 	ID int
 }
 
-func NewTestSystem(ID int,rqs ...IComponent) *TestSystem {
+func NewTestSystem(ID int,rqs ... IComponent) *TestSystem {
 	s := &TestSystem{ID: ID}
 	s.SetRequirements(rqs...)
 	return s
@@ -73,7 +73,7 @@ func TestNewSystemGroup(t *testing.T) {
 		NewTestSystem(6,&Com9{},&Com10{}),
 		NewTestSystem(7,&Com6{}),
 	}
-	sg:= NewSystemGroup()
+	sg:=NewSystemGroup()
 	for _, test := range tests {
 		sg.insert(test)
 	}
@@ -83,7 +83,7 @@ func TestNewSystemGroup(t *testing.T) {
 	for ss:=sg.pop(); len(ss) >0 ;ss=sg.pop() {
 		println("========== batch:")
 		for _, s := range ss {
-			Call(1)
+			s.Call(1)
 		}
 	}
 }

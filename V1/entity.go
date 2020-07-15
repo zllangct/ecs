@@ -1,4 +1,4 @@
-package ecs
+package main
 
 import (
 	"errors"
@@ -45,20 +45,20 @@ func (p *Entity) Has(typ reflect.Type) bool {
 	return false
 }
 
-func (p *Entity) AddComponent(com ...IComponent)  {
+func (p *Entity) AddComponent(com ... IComponent)  {
 	p.Lock()
 	defer p.Unlock()
 	for _, c := range com {
-		if GetOwner() != nil {
+		if c.GetOwner() != nil {
 			panic(ErrComponentInvalid)
 		}
 		p.components = append(p.components, c)
-		setOwner(p)
+		c.setOwner(p)
 		p.runtime.ComponentAttach(c)
 	}
 }
 
-func (p *Entity) RemoveComponent(com ...IComponent)  {
+func (p *Entity) RemoveComponent(com ... IComponent)  {
 	p.Lock()
 	defer p.Unlock()
 	for _, c := range com {
