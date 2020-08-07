@@ -32,7 +32,7 @@ func TestComponentCollection(t *testing.T) {
 	cc := NewComponentCollection()
 
 	for index, value := range tests {
-		cc.push(value,uint64(index))
+		cc.Push(value,uint64(index))
 	}
 	//test GetComponents
 	com1:=cc.GetComponents(&TestComponent1{})

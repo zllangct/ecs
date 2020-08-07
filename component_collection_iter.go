@@ -6,7 +6,7 @@ type ComponentCollectionIter struct {
 	indexInner int
 }
 
-func newComponentCollectionIter(ls []*componentData) *ComponentCollectionIter {
+func NewComponentCollectionIter(ls []*componentData) *ComponentCollectionIter {
 	return &ComponentCollectionIter{ls: ls}
 }
 

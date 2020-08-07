@@ -88,7 +88,7 @@ func (p *ComponentCollection) TempFlush() {
 	p.componentsNew, p.componentsTemp = p.componentsTemp, p.componentsNew
 }
 
-func (p *ComponentCollection) push(com IComponent, id uint64) {
+func (p *ComponentCollection) Push(com IComponent, id uint64) {
 	typ := reflect.TypeOf(com)
 	if v, ok := p.collection[typ]; ok {
 		v.push(com, id)
@@ -99,7 +99,7 @@ func (p *ComponentCollection) push(com IComponent, id uint64) {
 	}
 }
 
-func (p *ComponentCollection) pop(com IComponent, id uint64) {
+func (p *ComponentCollection) Pop(com IComponent, id uint64) {
 	typ := reflect.TypeOf(com)
 	if v, ok := p.collection[typ]; ok {
 		v.pop(id)
@@ -150,5 +150,5 @@ func (p *ComponentCollection) GetIterator() *ComponentCollectionIter {
 		ls[i] = value
 		i += 1
 	}
-	return newComponentCollectionIter(ls)
+	return NewComponentCollectionIter(ls)
 }

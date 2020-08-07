@@ -5,37 +5,50 @@ import (
 	"sync"
 )
 
+var _2n =[]uint64{16,32,64,128,256,512,1024}
+var base uint64
+
 type EntityCollection struct {
 	collection []map[uint64]*Entity
-	cpuCount int
-	lock []sync.RWMutex
+	cpuCount   uint64
+	locks      []sync.RWMutex
 }
 
 func NewEntityCollection() *EntityCollection {
 	ec:=&EntityCollection{}
-	ec.cpuCount = runtime2.NumCPU()
+	numCpu:=runtime2.NumCPU()
+
+	ec.cpuCount = _2n[len(_2n)-1]
+	for _, i := range _2n {
+		if uint64(numCpu * 2) < i{
+			ec.cpuCount = i
+			break
+		}
+	}
+	base = ec.cpuCount - 1
+
 	ec.collection = make([]map[uint64]*Entity,ec.cpuCount,ec.cpuCount)
-	ec.lock = make([]sync.RWMutex,ec.cpuCount,ec.cpuCount)
+	ec.locks = make([]sync.RWMutex,ec.cpuCount,ec.cpuCount)
 	for index, _ := range ec.collection {
 		ec.collection[index] = map[uint64]*Entity{}
-		ec.lock[index] = sync.RWMutex{}
+		ec.locks[index] = sync.RWMutex{}
 	}
 	return ec
 }
 
 func (p *EntityCollection)Get(id uint64)*Entity {
-	hash := id % uint64(p.cpuCount)
-	p.lock[hash].RLock()
-	defer p.lock[hash].RUnlock()
+	hash := id & base
+	p.locks[hash].RLock()
+	defer p.locks[hash].RUnlock()
 	return p.collection[hash][id]
 }
 
 func (p *EntityCollection)Add(entity *Entity) {
 	id:=entity.ID
-	hash := id % uint64(p.cpuCount)
-	p.lock[hash].Lock()
+	hash := id & base
+	p.locks[hash].Lock()
 	p.collection[hash][id]=entity
-	p.lock[hash].Unlock()
+	p.locks[hash].Unlock()
 }
 
 func (p *EntityCollection) Delete(entity *Entity) {
@@ -44,10 +57,10 @@ func (p *EntityCollection) Delete(entity *Entity) {
 }
 
 func (p *EntityCollection) DeleteByID(id uint64) {
-	hash := id % uint64(p.cpuCount)
-	p.lock[hash].Lock()
+	hash := id & base
+	p.locks[hash].Lock()
 	 delete(p.collection[hash],id)
-	p.lock[hash].Unlock()
+	p.locks[hash].Unlock()
 }
 
 

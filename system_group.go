@@ -93,7 +93,7 @@ func (p *SystemGroup) iterInit()  {
 	}
 }
 
-//pop a batch of independent system array
+//Pop a batch of independent system array
 func (p *SystemGroup)pop()[]ISystem {
 	temp := make([]*Node,0)
 	systems := make([]ISystem,0)
