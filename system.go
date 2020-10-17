@@ -21,13 +21,13 @@ var (
 )
 
 type ISystem interface {
-	Init(runtime *Runtime)                           //init
-	GetBase() *SystemBase            //get system base data
+	Init(runtime *Runtime) //init
+	GetBase() *SystemBase  //get system base data
 	GetType() reflect.Type
 	GetOrder() (SystemPeriod, Order)
 	GetRequirements() []reflect.Type
-	Filter(component IComponent,op CollectionOperate)       //interest filter of component
-	SystemUpdate(delta time.Duration) //update every frame
+	Filter(component IComponent, op CollectionOperate) //interest filter of component
+	SystemUpdate(delta time.Duration)                  //update every frame
 	Call(label int) interface{}
 }
 
@@ -98,8 +98,8 @@ func (p *SystemBase) IsConcerned(com IComponent) bool {
 	concerned := true
 	ctyp := reflect.TypeOf(com)
 	for _, typ := range p.requirements {
-		if typ != ctyp && !com.GetOwner().Has(typ){
-			concerned =false
+		if typ != ctyp && !com.GetOwner().Has(typ) {
+			concerned = false
 			break
 		}
 	}

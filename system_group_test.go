@@ -41,13 +41,13 @@ type TestSystem struct {
 	ID int
 }
 
-func NewTestSystem(ID int,rqs ... IComponent) *TestSystem {
+func NewTestSystem(ID int, rqs ...IComponent) *TestSystem {
 	s := &TestSystem{ID: ID}
 	s.SetRequirements(rqs...)
 	return s
 }
 
-func (p *TestSystem)Call(label int)interface{}  {
+func (p *TestSystem) Call(label int) interface{} {
 	switch label {
 	case 1:
 		println(p.ID)
@@ -55,7 +55,7 @@ func (p *TestSystem)Call(label int)interface{}  {
 	return nil
 }
 
-func (t TestSystem) Filter(component IComponent,op CollectionOperate) {
+func (t TestSystem) Filter(component IComponent, op CollectionOperate) {
 
 }
 
@@ -64,23 +64,26 @@ func (t TestSystem) SystemUpdate(delta time.Duration) {
 }
 
 func TestNewSystemGroup(t *testing.T) {
-	tests:=[]ISystem{
-		NewTestSystem(1,&Com1{},&Com2{}),
-		NewTestSystem(2,&Com1{},&Com3{}),
-		NewTestSystem(3,&Com2{},&Com5{}),
-		NewTestSystem(4,&Com2{},&Com3{},&Com6{}),
-		NewTestSystem(5,&Com7{}),
-		NewTestSystem(6,&Com9{},&Com10{}),
-		NewTestSystem(7,&Com6{}),
+	tests := []ISystem{
+		NewTestSystem(1, &Com1{}, &Com2{}),
+		NewTestSystem(2, &Com1{}, &Com3{}),
+		NewTestSystem(3, &Com2{}, &Com5{}),
+		NewTestSystem(4, &Com2{}, &Com3{}, &Com6{}),
+		NewTestSystem(5, &Com7{}),
+		NewTestSystem(6, &Com9{}, &Com10{}),
+		NewTestSystem(7, &Com6{}),
+		NewTestSystem(8, &Com1{}, &Com5{}),
+		NewTestSystem(9, &Com4{}, &Com6{}),
+		NewTestSystem(10, &Com7{}, &Com5{}),
 	}
-	sg:=NewSystemGroup()
+	sg := NewSystemGroup()
 	for _, test := range tests {
 		sg.insert(test)
 	}
 
-	sg.iterInit()
+	sg.reset()
 
-	for ss:=sg.pop(); len(ss) >0 ;ss=sg.pop() {
+	for ss := sg.next(); len(ss) > 0; ss = sg.next() {
 		println("========== batch:")
 		for _, s := range ss {
 			s.Call(1)

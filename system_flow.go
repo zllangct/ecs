@@ -6,11 +6,12 @@ import (
 )
 
 //system execute Order, 32bit + 32bit: period + suborder
-type SystemOrder  uint64
+type SystemOrder uint64
 
 //system execute period:start->pre_update->update->pre_destroy->destroy
-type SystemPeriod  uint32
-const(
+type SystemPeriod uint32
+
+const (
 	PERIOD_PRE_START SystemPeriod = iota
 	PERIOD_START
 	PERIOD_POST_START
@@ -21,15 +22,17 @@ const(
 	PERIOD_DESTROY
 	PERIOD_POST_DESTROY
 )
+
 //default system execute period
 const PERIOD_DEFAULT = PERIOD_UPDATE
 
 // default suborder of system
 type Order int32
-const(
-	ORDER_FRONT  Order = -1
-	ORDER_APPEND Order = 999999
-	ORDER_DEFAULT  Order = ORDER_APPEND
+
+const (
+	ORDER_FRONT   Order = -1
+	ORDER_APPEND  Order = 999999
+	ORDER_DEFAULT Order = ORDER_APPEND
 )
 
 //extension of system group slice
@@ -38,23 +41,23 @@ type OrderSequence []*SystemGroup
 //system execute flow
 type systemFlow struct {
 	sync.Mutex
-	runtime *Runtime
+	runtime      *Runtime
 	systemPeriod map[SystemPeriod]OrderSequence
-	periodList []SystemPeriod
-	wg sync.WaitGroup
+	periodList   []SystemPeriod
+	wg           sync.WaitGroup
 }
 
 func newSystemFlow(runtime *Runtime) *systemFlow {
-	sf:= &systemFlow{
+	sf := &systemFlow{
 		runtime: runtime,
-		wg:sync.WaitGroup{},
+		wg:      sync.WaitGroup{},
 	}
 	sf.init()
 	return sf
 }
 
 //initialize the system flow
-func (p *systemFlow)init()  {
+func (p *systemFlow) init() {
 	p.periodList = []SystemPeriod{
 		PERIOD_PRE_START,
 		PERIOD_START,
@@ -69,27 +72,27 @@ func (p *systemFlow)init()  {
 	p.systemPeriod = make(map[SystemPeriod]OrderSequence)
 	for _, value := range p.periodList {
 		p.systemPeriod[value] = OrderSequence{}
-		sgFront:= NewSystemGroup()
+		sgFront := NewSystemGroup()
 		sgFront.order = ORDER_FRONT
-		sgAppend:= NewSystemGroup()
+		sgAppend := NewSystemGroup()
 		sgAppend.order = ORDER_APPEND
 		p.systemPeriod[value] = append(p.systemPeriod[value], sgFront, sgAppend)
 	}
 }
 
-func (p * systemFlow)run(delta time.Duration)  {
+func (p *systemFlow) run(delta time.Duration) {
 	var sq OrderSequence
-	for _,period := range p.periodList {
+	for _, period := range p.periodList {
 		sq = p.systemPeriod[period]
 		for _, sl := range sq {
-			sl.iterInit()
-			for ss:=sl.pop(); len(ss) >0 ;ss=sl.pop() {
+			sl.reset()
+			for ss := sl.next(); len(ss) > 0; ss = sl.next() {
 				//work balance
 				if len(ss) != 0 {
 					interval := len(ss) / p.runtime.config.CpuNum
 					remainder := len(ss) % p.runtime.config.CpuNum
 					offset := 0
-					if interval != 0{
+					if interval != 0 {
 						p.wg.Add(p.runtime.config.CpuNum)
 						for i := 0; i < p.runtime.config.CpuNum; i++ {
 							p.runtime.workPool.AddJob(func(ctx []interface{}, args ...interface{}) {
@@ -97,7 +100,7 @@ func (p * systemFlow)run(delta time.Duration)  {
 									sys.SystemUpdate(delta)
 								}
 								p.wg.Done()
-							}, ss[offset : offset+interval])
+							}, ss[offset:offset+interval])
 							offset += interval
 						}
 					}
@@ -118,57 +121,57 @@ func (p * systemFlow)run(delta time.Duration)  {
 		//filter execute in post destroy period
 		if period == PERIOD_POST_DESTROY {
 			p.runtime.components.TempFlush()
-			p.FilterExecute()
+			p.filterExecute()
 		}
 	}
 }
 
-func (p *systemFlow) FilterExecute()  {
+func (p *systemFlow) filterExecute() {
 	var sq OrderSequence
-	comInfos:=p.runtime.GetComponentsNew()
-	for _,period := range p.periodList {
+	comInfos := p.runtime.GetComponentsNew()
+	for _, period := range p.periodList {
 		sq = p.systemPeriod[period]
 		for _, sl := range sq {
-			ss:=sl.all()
+			ss := sl.all()
 			//work balance
 			if len(ss) != 0 {
 				interval := len(ss) / p.runtime.config.CpuNum
 				remainder := len(ss) % p.runtime.config.CpuNum
 				offset := 0
-				if interval != 0{
+				if interval != 0 {
 					p.wg.Add(p.runtime.config.CpuNum)
 					for i := 0; i < p.runtime.config.CpuNum; i++ {
 						p.runtime.workPool.AddJob(func(ctx []interface{}, args ...interface{}) {
 							for _, sys := range args[0].([]ISystem) {
 								if !sys.GetBase().isPreFilter {
-									coms:= p.runtime.GetAllComponents()
+									coms := p.runtime.GetAllComponents()
 									for _, com := range coms {
-										sys.Filter(com,COLLECTION_OPERATE_ADD)
+										sys.Filter(com, COLLECTION_OPERATE_ADD)
 									}
 									sys.GetBase().isPreFilter = true
 								}
 								for _, comInfo := range comInfos {
-									sys.Filter(comInfo.com,comInfo.op)
+									sys.Filter(comInfo.com, comInfo.op)
 								}
 							}
 							p.wg.Done()
-						}, ss[offset : offset+interval])
+						}, ss[offset:offset+interval])
 						offset += interval
 					}
 				}
 				p.wg.Add(remainder)
 				for i := 0; i < remainder; i++ {
 					p.runtime.workPool.AddJob(func(ctx []interface{}, args ...interface{}) {
-						sys:=args[0].(ISystem)
+						sys := args[0].(ISystem)
 						if !sys.GetBase().isPreFilter {
-							coms:= p.runtime.GetAllComponents()
+							coms := p.runtime.GetAllComponents()
 							for _, com := range coms {
-								sys.Filter(com,COLLECTION_OPERATE_ADD)
+								sys.Filter(com, COLLECTION_OPERATE_ADD)
 							}
 							sys.GetBase().isPreFilter = true
 						}
 						for _, comInfo := range comInfos {
-							sys.Filter(comInfo.com,comInfo.op)
+							sys.Filter(comInfo.com, comInfo.op)
 						}
 						p.wg.Done()
 					}, ss[offset])
@@ -182,24 +185,24 @@ func (p *systemFlow) FilterExecute()  {
 }
 
 //register method only in runtime init or func init(){}
-func (p *systemFlow)register(system ISystem)  {
+func (p *systemFlow) register(system ISystem) {
 	system.Init(p.runtime)
-	period,order:= system.GetOrder()
-	sl:= p.systemPeriod[period]
+	period, order := system.GetOrder()
+	sl := p.systemPeriod[period]
 	if order == ORDER_FRONT {
 		sl[0].insert(system)
-	}else if order == ORDER_APPEND {
+	} else if order == ORDER_APPEND {
 		sl[len(sl)-1].insert(system)
-	}else{
+	} else {
 		for i, v := range sl {
 			if order == v.order {
 				v.insert(system)
 				break
-			}else if order < v.order {
-				sg:= NewSystemGroup()
+			} else if order < v.order {
+				sg := NewSystemGroup()
 				sg.order = order
 				sg.insert(system)
-				temp := append(OrderSequence{},sl[i-1:]...)
+				temp := append(OrderSequence{}, sl[i-1:]...)
 				sl = append(append(sl[:i-1], sg), temp...)
 				break
 			}

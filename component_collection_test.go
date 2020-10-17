@@ -21,7 +21,7 @@ type TestComponent3 struct {
 }
 
 func TestComponentCollection(t *testing.T) {
-	tests:=[]IComponent{
+	tests := []IComponent{
 		&TestComponent1{ID: 1},
 		&TestComponent1{ID: 2},
 		&TestComponent2{ID: 3},
@@ -32,21 +32,21 @@ func TestComponentCollection(t *testing.T) {
 	cc := NewComponentCollection()
 
 	for index, value := range tests {
-		cc.Push(value,uint64(index))
+		cc.Push(value, uint64(index))
 	}
 	//test GetComponents
-	com1:=cc.GetComponents(&TestComponent1{})
+	com1 := cc.GetComponents(&TestComponent1{})
 	for _, value := range com1 {
 		println(value.(*TestComponent1).ID)
 	}
 	//test GetComponent
-	com2:=cc.GetComponent(&TestComponent3{},4)
+	com2 := cc.GetComponent(&TestComponent3{}, 4)
 	if com2 != nil {
 		println(reflect.TypeOf(com2).String())
 	}
 	//test iterator
-	cIter:= cc.GetIterator()
-	for i:= cIter.First(); i!=nil ; i = cIter.Next() {
+	cIter := cc.GetIterator()
+	for i := cIter.first(); i != nil; i = cIter.next() {
 		println(reflect.TypeOf(i).String())
 	}
 }

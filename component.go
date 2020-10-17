@@ -8,7 +8,6 @@ type IComponent interface {
 	setOwner(*Entity)
 }
 
-
 type ComponentBase struct {
 	sync.Mutex
 	owner *Entity
@@ -25,7 +24,3 @@ func (p *ComponentBase) GetOwner() *Entity {
 func (p *ComponentBase) GetBase() *ComponentBase {
 	return p
 }
-
-
-
-

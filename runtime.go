@@ -85,22 +85,25 @@ func (p *Runtime) Register(system ISystem) {
 
 //entity operate : add
 func (p *Runtime) AddEntity(entity *Entity) {
-	p.entities.Add(entity)
+	p.entities.add(entity)
 }
+
 //entity operate : delete
 func (p *Runtime) DeleteEntity(entity *Entity) {
-	p.entities.Delete(entity)
+	p.entities.delete(entity)
 }
+
 //entity operate : delete
 func (p *Runtime) DeleteEntityByID(id uint64) {
-	p.entities.DeleteByID(id)
+	p.entities.deleteByID(id)
 }
 
 func (p *Runtime) ComponentAttach(com IComponent) {
-	p.components.TempComponentOperate(com,COLLECTION_OPERATE_ADD)
+	p.components.TempComponentOperate(com, COLLECTION_OPERATE_ADD)
 }
+
 func (p *Runtime) ComponentRemove(com IComponent) {
-	p.components.TempComponentOperate(com,COLLECTION_OPERATE_DELETE)
+	p.components.TempComponentOperate(com, COLLECTION_OPERATE_DELETE)
 }
 
 func (p *Runtime) GetComponentsNew() []*CollectionOperateInfo {

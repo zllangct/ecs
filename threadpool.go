@@ -27,7 +27,7 @@ func GetGlobalPool(numWorkers int, jobQueueLen int) *Pool {
 
 //NewPool news goroutine pool
 func NewPool(numWorkers int, jobQueueLen int) *Pool {
-	if numWorkers == 0{
+	if numWorkers == 0 {
 		numWorkers = 2 * runtime.NumCPU()
 	}
 	if jobQueueLen == 0 {
@@ -48,7 +48,7 @@ func NewPool(numWorkers int, jobQueueLen int) *Pool {
 }
 
 //random worker, task will run in a random worker
-func (p *Pool) AddJob(handler func([]interface{},...interface{}), args ...interface{}){
+func (p *Pool) AddJob(handler func([]interface{}, ...interface{}), args ...interface{}) {
 	job := p.jobPool.Get().(*Job)
 	job.Job = handler
 	job.Args = args
@@ -57,7 +57,7 @@ func (p *Pool) AddJob(handler func([]interface{},...interface{}), args ...interf
 }
 
 //random worker, task will run in a random worker and record the worker id
-func (p *Pool) AddJob2(handler func([]interface{},...interface{}), args ...interface{}){
+func (p *Pool) AddJob2(handler func([]interface{}, ...interface{}), args ...interface{}) {
 	job := p.jobPool.Get().(*Job)
 	job.Job = handler
 	job.Args = args

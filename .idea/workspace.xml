@@ -21,13 +21,26 @@
   <component name="ChangeListManager">
     <list default="true" id="4e334e1f-dbad-4116-b364-527eab0b63dc" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/component.go" beforeDir="false" afterPath="$PROJECT_DIR$/component.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/component_collection.go" beforeDir="false" afterPath="$PROJECT_DIR$/component_collection.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/component_collection_iter.go" beforeDir="false" afterPath="$PROJECT_DIR$/component_collection_iter.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/component_collection_test.go" beforeDir="false" afterPath="$PROJECT_DIR$/component_collection_test.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/entity.go" beforeDir="false" afterPath="$PROJECT_DIR$/entity.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/entity_collection.go" beforeDir="false" afterPath="$PROJECT_DIR$/entity_collection.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/runtme_test.go" beforeDir="false" afterPath="$PROJECT_DIR$/runtme_test.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/s_start.go" beforeDir="false" afterPath="$PROJECT_DIR$/s_evnet_start.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/entity_id.go" beforeDir="false" afterPath="$PROJECT_DIR$/entity_id.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/entity_id_test.go" beforeDir="false" afterPath="$PROJECT_DIR$/entity_id_test.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/event.go" beforeDir="false" afterPath="$PROJECT_DIR$/event.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/runtime.go" beforeDir="false" afterPath="$PROJECT_DIR$/runtime.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/s_evnet_start.go" beforeDir="false" afterPath="$PROJECT_DIR$/s_evnet_start.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/system.go" beforeDir="false" afterPath="$PROJECT_DIR$/system.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/system_flow.go" beforeDir="false" afterPath="$PROJECT_DIR$/system_flow.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/system_group.go" beforeDir="false" afterPath="$PROJECT_DIR$/system_group.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/system_group_test.go" beforeDir="false" afterPath="$PROJECT_DIR$/system_group_test.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/threadpool.go" beforeDir="false" afterPath="$PROJECT_DIR$/threadpool.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/threadpool_benchmark_test.go" beforeDir="false" afterPath="$PROJECT_DIR$/threadpool_benchmark_test.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/threadpool_job.go" beforeDir="false" afterPath="$PROJECT_DIR$/threadpool_job.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/threadpool_test.go" beforeDir="false" afterPath="$PROJECT_DIR$/threadpool_test.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/threadpool_worker.go" beforeDir="false" afterPath="$PROJECT_DIR$/threadpool_worker.go" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -44,6 +57,9 @@
   <component name="GOROOT" path="C:\Go" />
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="MacroExpansionManager">
+    <option name="directoryName" value="vz8pk286" />
   </component>
   <component name="ProjectId" id="1eihJmQmeg1hMELZDpPzj2TAecv" />
   <component name="ProjectViewState">
@@ -62,7 +78,7 @@
     <property name="nodejs_package_manager_path" value="npm" />
     <property name="settings.editor.selected.configurable" value="go.vgo" />
   </component>
-  <component name="RunManager" selected="Go Test.TestComponentCollection in ecs">
+  <component name="RunManager">
     <configuration name="TestComponentCollection in ecs" type="GoTestRunConfiguration" factoryName="Go Test" temporary="true" nameIsGenerated="true">
       <module name="ecs" />
       <working_directory value="$PROJECT_DIR$" />
@@ -72,6 +88,17 @@
       <directory value="$PROJECT_DIR$/" />
       <filePath value="$PROJECT_DIR$/" />
       <pattern value="^TestComponentCollection$" />
+      <method v="2" />
+    </configuration>
+    <configuration name="TestNewSystemGroup in ecs" type="GoTestRunConfiguration" factoryName="Go Test" temporary="true" nameIsGenerated="true">
+      <module name="ecs" />
+      <working_directory value="$PROJECT_DIR$" />
+      <framework value="gotest" />
+      <kind value="PACKAGE" />
+      <package value="ecs" />
+      <directory value="$PROJECT_DIR$" />
+      <filePath value="$PROJECT_DIR$" />
+      <pattern value="^\QTestNewSystemGroup\E$" />
       <method v="2" />
     </configuration>
     <configuration name="TestRuntime in ecs (1)" type="GoTestRunConfiguration" factoryName="Go Test" temporary="true" nameIsGenerated="true">
@@ -85,16 +112,6 @@
       <pattern value="^TestRuntime$" />
       <method v="2" />
     </configuration>
-    <configuration name="TestRuntime in runtme_test.go" type="GoTestRunConfiguration" factoryName="Go Test" temporary="true" nameIsGenerated="true">
-      <module name="ecs" />
-      <working_directory value="$PROJECT_DIR$" />
-      <framework value="gotest" />
-      <kind value="FILE" />
-      <directory value="$PROJECT_DIR$/" />
-      <filePath value="$PROJECT_DIR$/runtme_test.go" />
-      <pattern value="^TestRuntime$" />
-      <method v="2" />
-    </configuration>
     <configuration name="TestRuntime0 in ecs" type="GoTestRunConfiguration" factoryName="Go Test" temporary="true" nameIsGenerated="true">
       <module name="ecs" />
       <working_directory value="$PROJECT_DIR$" />
@@ -104,6 +121,17 @@
       <directory value="$PROJECT_DIR$/" />
       <filePath value="$PROJECT_DIR$/" />
       <pattern value="^TestRuntime0$" />
+      <method v="2" />
+    </configuration>
+    <configuration name="TestRuntime1 in ecs (1)" type="GoTestRunConfiguration" factoryName="Go Test" temporary="true" nameIsGenerated="true">
+      <module name="ecs" />
+      <working_directory value="$PROJECT_DIR$" />
+      <framework value="gotest" />
+      <kind value="PACKAGE" />
+      <package value="ecs" />
+      <directory value="$PROJECT_DIR$" />
+      <filePath value="$PROJECT_DIR$" />
+      <pattern value="^\QTestRuntime1\E$" />
       <method v="2" />
     </configuration>
     <configuration name="TestRuntime1 in ecs" type="GoTestRunConfiguration" factoryName="Go Test" temporary="true" nameIsGenerated="true">
@@ -119,16 +147,13 @@
     </configuration>
     <recent_temporary>
       <list>
-        <item itemvalue="Go Test.TestComponentCollection in ecs" />
-        <item itemvalue="Go Test.TestRuntime1 in ecs" />
-        <item itemvalue="Go Test.TestRuntime0 in ecs" />
-        <item itemvalue="Go Test.TestRuntime in ecs (1)" />
-        <item itemvalue="Go Test.TestRuntime in runtme_test.go" />
+        <item itemvalue="Go Test.TestNewSystemGroup in ecs" />
       </list>
     </recent_temporary>
   </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
   <component name="TypeScriptGeneratedFilesManager">
-    <option name="version" value="2" />
+    <option name="version" value="3" />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
     <option name="TAB_STATES">
@@ -140,52 +165,70 @@
         </entry>
       </map>
     </option>
+    <option name="oldMeFiltersMigrated" value="true" />
   </component>
   <component name="VgoProject">
     <integration-enabled>true</integration-enabled>
     <auto-vendoring-mode>false</auto-vendoring-mode>
   </component>
   <component name="WindowStateProjectService">
-    <state x="414" y="175" key="#com.intellij.execution.impl.EditConfigurationsDialog" timestamp="1594810444348">
-      <screen x="0" y="0" width="1920" height="1040" />
+    <state x="552" y="236" key="#com.intellij.execution.impl.EditConfigurationsDialog" timestamp="1602642834644">
+      <screen x="0" y="0" width="2560" height="1400" />
     </state>
     <state x="414" y="175" key="#com.intellij.execution.impl.EditConfigurationsDialog/0.0.1920.1040@0.0.1920.1040" timestamp="1594810444348" />
-    <state width="2500" height="283" key="GridCell.Tab.0.bottom" timestamp="1596803945501">
+    <state x="552" y="236" key="#com.intellij.execution.impl.EditConfigurationsDialog/2560.0.2560.1400/0.0.2560.1400@0.0.2560.1400" timestamp="1602642834644" />
+    <state x="960" y="435" key="#com.intellij.openapi.updateSettings.impl.PluginUpdateInfoDialog" timestamp="1602469187401">
+      <screen x="0" y="0" width="2560" height="1400" />
+    </state>
+    <state x="960" y="435" key="#com.intellij.openapi.updateSettings.impl.PluginUpdateInfoDialog/2560.0.2560.1400/0.0.2560.1400@0.0.2560.1400" timestamp="1602469187401" />
+    <state width="511" height="466" key="DebuggerActiveHint" timestamp="1602643822728">
+      <screen x="0" y="0" width="2560" height="1400" />
+    </state>
+    <state width="511" height="466" key="DebuggerActiveHint/2560.0.2560.1400/0.0.2560.1400@0.0.2560.1400" timestamp="1602643822728" />
+    <state width="2500" height="258" key="GridCell.Tab.0.bottom" timestamp="1602905267859">
       <screen x="0" y="0" width="2560" height="1400" />
     </state>
     <state width="1877" height="143" key="GridCell.Tab.0.bottom/0.0.1920.1040@0.0.1920.1040" timestamp="1594811906320" />
     <state width="2500" height="283" key="GridCell.Tab.0.bottom/0.0.2560.1400@0.0.2560.1400" timestamp="1596803945501" />
-    <state width="2500" height="283" key="GridCell.Tab.0.center" timestamp="1596803945501">
+    <state width="2500" height="258" key="GridCell.Tab.0.bottom/2560.0.2560.1400/0.0.2560.1400@0.0.2560.1400" timestamp="1602905267859" />
+    <state width="2500" height="258" key="GridCell.Tab.0.center" timestamp="1602905267858">
       <screen x="0" y="0" width="2560" height="1400" />
     </state>
     <state width="1877" height="143" key="GridCell.Tab.0.center/0.0.1920.1040@0.0.1920.1040" timestamp="1594811906320" />
     <state width="2500" height="283" key="GridCell.Tab.0.center/0.0.2560.1400@0.0.2560.1400" timestamp="1596803945501" />
-    <state width="2500" height="283" key="GridCell.Tab.0.left" timestamp="1596803945501">
+    <state width="2500" height="258" key="GridCell.Tab.0.center/2560.0.2560.1400/0.0.2560.1400@0.0.2560.1400" timestamp="1602905267858" />
+    <state width="2500" height="258" key="GridCell.Tab.0.left" timestamp="1602905267858">
       <screen x="0" y="0" width="2560" height="1400" />
     </state>
     <state width="1877" height="143" key="GridCell.Tab.0.left/0.0.1920.1040@0.0.1920.1040" timestamp="1594811906319" />
     <state width="2500" height="283" key="GridCell.Tab.0.left/0.0.2560.1400@0.0.2560.1400" timestamp="1596803945501" />
-    <state width="2500" height="283" key="GridCell.Tab.0.right" timestamp="1596803945501">
+    <state width="2500" height="258" key="GridCell.Tab.0.left/2560.0.2560.1400/0.0.2560.1400@0.0.2560.1400" timestamp="1602905267858" />
+    <state width="2500" height="258" key="GridCell.Tab.0.right" timestamp="1602905267859">
       <screen x="0" y="0" width="2560" height="1400" />
     </state>
     <state width="1877" height="143" key="GridCell.Tab.0.right/0.0.1920.1040@0.0.1920.1040" timestamp="1594811906320" />
     <state width="2500" height="283" key="GridCell.Tab.0.right/0.0.2560.1400@0.0.2560.1400" timestamp="1596803945501" />
-    <state width="2500" height="283" key="GridCell.Tab.1.bottom" timestamp="1596803945501">
+    <state width="2500" height="258" key="GridCell.Tab.0.right/2560.0.2560.1400/0.0.2560.1400@0.0.2560.1400" timestamp="1602905267859" />
+    <state width="2500" height="258" key="GridCell.Tab.1.bottom" timestamp="1602905266139">
       <screen x="0" y="0" width="2560" height="1400" />
     </state>
     <state width="2500" height="283" key="GridCell.Tab.1.bottom/0.0.2560.1400@0.0.2560.1400" timestamp="1596803945501" />
-    <state width="2500" height="283" key="GridCell.Tab.1.center" timestamp="1596803945501">
+    <state width="2500" height="258" key="GridCell.Tab.1.bottom/2560.0.2560.1400/0.0.2560.1400@0.0.2560.1400" timestamp="1602905266139" />
+    <state width="2500" height="258" key="GridCell.Tab.1.center" timestamp="1602905266139">
       <screen x="0" y="0" width="2560" height="1400" />
     </state>
     <state width="2500" height="283" key="GridCell.Tab.1.center/0.0.2560.1400@0.0.2560.1400" timestamp="1596803945501" />
-    <state width="2500" height="283" key="GridCell.Tab.1.left" timestamp="1596803945501">
+    <state width="2500" height="258" key="GridCell.Tab.1.center/2560.0.2560.1400/0.0.2560.1400@0.0.2560.1400" timestamp="1602905266139" />
+    <state width="2500" height="258" key="GridCell.Tab.1.left" timestamp="1602905266139">
       <screen x="0" y="0" width="2560" height="1400" />
     </state>
     <state width="2500" height="283" key="GridCell.Tab.1.left/0.0.2560.1400@0.0.2560.1400" timestamp="1596803945501" />
-    <state width="2500" height="283" key="GridCell.Tab.1.right" timestamp="1596803945501">
+    <state width="2500" height="258" key="GridCell.Tab.1.left/2560.0.2560.1400/0.0.2560.1400@0.0.2560.1400" timestamp="1602905266139" />
+    <state width="2500" height="258" key="GridCell.Tab.1.right" timestamp="1602905266139">
       <screen x="0" y="0" width="2560" height="1400" />
     </state>
     <state width="2500" height="283" key="GridCell.Tab.1.right/0.0.2560.1400@0.0.2560.1400" timestamp="1596803945501" />
+    <state width="2500" height="258" key="GridCell.Tab.1.right/2560.0.2560.1400/0.0.2560.1400@0.0.2560.1400" timestamp="1602905266139" />
     <state x="461" y="164" key="SettingsEditor" timestamp="1594811650728">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>

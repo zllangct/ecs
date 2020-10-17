@@ -5,14 +5,15 @@ import (
 	"sort"
 	"sync"
 )
+
 // system tree node
 type Node struct {
-	parent *Node
+	parent   *Node
 	children []*Node
-	val ISystem
+	val      ISystem
 }
 
-func (p *Node)isFriend(node *Node) bool {
+func (p *Node) isFriend(node *Node) bool {
 	for _, com := range p.val.GetRequirements() {
 		for _, comTarget := range node.val.GetRequirements() {
 			if comTarget.String() == com.String() {
@@ -23,9 +24,9 @@ func (p *Node)isFriend(node *Node) bool {
 	return false
 }
 
-func (p *Node)attach(node *Node) {
+func (p *Node) attach(node *Node) {
 	isAttached := false
-	for i := 0; i<len(p.children);i++ {
+	for i := 0; i < len(p.children); i++ {
 		if p.children[i].isFriend(node) {
 			p.children[i].attach(node)
 			isAttached = true
@@ -50,53 +51,52 @@ type SystemGroup struct {
 
 func NewSystemGroup() *SystemGroup {
 	return &SystemGroup{
-		lock: sync.Mutex{},
-		systems: make([]*Node,0),
-		ref: map[string]int{},
+		lock:    sync.Mutex{},
+		systems: make([]*Node, 0),
+		ref:     map[string]int{},
 		ordered: false,
 	}
 }
 
-func (p *SystemGroup)refCount(rqs []reflect.Type) int {
-	ref:=0
+func (p *SystemGroup) refCount(rqs []reflect.Type) int {
+	ref := 0
 	for _, com := range rqs {
-		ref += p.ref[com.String()]-1
+		ref += p.ref[com.String()] - 1
 	}
 	return ref
 }
 
 //initialise system group iterator
-func (p *SystemGroup) iterInit()  {
+func (p *SystemGroup) reset() {
 	//need resort
-	if !p.ordered{
+	if !p.ordered {
 		sort.Slice(p.systems, func(i, j int) bool {
-			 return p.refCount(p.systems[i].val.GetRequirements()) >
-			 	p.refCount(p.systems[j].val.GetRequirements())
+			return p.refCount(p.systems[i].val.GetRequirements()) >
+				p.refCount(p.systems[j].val.GetRequirements())
 		})
-
-		for _, node := range p.systems {
-			if p.root == nil {
-				p.root = &Node{
-					parent:   nil,
-					children: []*Node{},
-					val:      nil,
-				}
+		if p.root == nil {
+			p.root = &Node{
+				parent:   nil,
+				children: []*Node{},
+				val:      nil,
 			}
+		}
+		for _, node := range p.systems {
 			p.root.attach(node)
 		}
 		p.ordered = true
 	}
 	// initialise the iterator
-	p.top = make([]*Node,0)
-	if p.root!=nil {
+	p.top = make([]*Node, 0)
+	if p.root != nil {
 		p.top = append(p.top, p.root)
 	}
 }
 
 //Pop a batch of independent system array
-func (p *SystemGroup)pop()[]ISystem {
-	temp := make([]*Node,0)
-	systems := make([]ISystem,0)
+func (p *SystemGroup) next() []ISystem {
+	temp := make([]*Node, 0)
+	systems := make([]ISystem, 0)
 	for _, n := range p.top {
 		temp = append(temp, n.children...)
 		for _, sys := range n.children {
@@ -108,8 +108,8 @@ func (p *SystemGroup)pop()[]ISystem {
 }
 
 //get all systems
-func (p *SystemGroup)all()[]ISystem {
-	systems := make([]ISystem,len(p.systems))
+func (p *SystemGroup) all() []ISystem {
+	systems := make([]ISystem, len(p.systems))
 	for i, n := range p.systems {
 		systems[i] = n.val
 	}
@@ -127,16 +127,16 @@ func (p *SystemGroup) insert(sys ISystem) {
 	}
 	//reference count
 	for _, com := range rqs {
-		if _,ok:=p.ref[com.String()];ok{
+		if _, ok := p.ref[com.String()]; ok {
 			p.ref[com.String()] += 1
-		}else{
+		} else {
 			p.ref[com.String()] = 1
 		}
 	}
 	//add system
 	node := &Node{
-		children:make([]*Node,0),
-		val:sys,
+		children: make([]*Node, 0),
+		val:      sys,
 	}
 	p.systems = append(p.systems, node)
 }

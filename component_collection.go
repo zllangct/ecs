@@ -80,7 +80,7 @@ func (p *ComponentCollection) TempComponentOperate(com IComponent, op Collection
 	p.lockInput.Unlock()
 }
 
-//handle and flush new components,should called before destroy period
+//handle and flush new components,should be called before destroy period
 func (p *ComponentCollection) TempFlush() {
 	p.lockInput.Lock()
 	defer p.lockInput.Unlock()

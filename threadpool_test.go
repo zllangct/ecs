@@ -25,7 +25,7 @@ func TestNewPool(t *testing.T) {
 	wg.Add(iterations)
 	for i := 0; i < iterations; i++ {
 		arg := uint64(1)
-		pool.AddJob(func(ctx []interface{},args ...interface{}) {
+		pool.AddJob(func(ctx []interface{}, args ...interface{}) {
 			defer wg.Done()
 			atomic.AddUint64(&counter, arg)
 		}, nil)

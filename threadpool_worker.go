@@ -29,7 +29,7 @@ func (w *Worker) Start() {
 				return
 			}
 			//TODO handle Error
-			job.Job([]interface{}{job.WorkerID},job.Args...)
+			job.Job([]interface{}{job.WorkerID}, job.Args...)
 			w.p.jobPool.Put(job.Init())
 		}
 	}()
