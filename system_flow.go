@@ -151,24 +151,28 @@ func (p *systemFlow) register(system ISystem) {
 	order := system.GetOrder()
 
 	//todo ssss
-	sl := p.systemPeriod[period]
-	if order == ORDER_FRONT {
-		p.systemPeriod[period][0].insert(system)
-	} else if order == ORDER_APPEND {
-		p.systemPeriod[period][len(sl)-1].insert(system)
-	} else {
-		for i, v := range sl {
-			if order == v.order {
-				v.insert(system)
-				break
-			} else if order < v.order {
-				sg := NewSystemGroup()
-				sg.order = order
-				sg.insert(system)
-				temp := append(OrderSequence{}, sl[i-1:]...)
-				p.systemPeriod[period] = append(append(sl[:i-1], sg), temp...)
-				break
+	for _, period := range p.periodList {
+
+		sl := p.systemPeriod[period]
+		if order == ORDER_FRONT {
+			p.systemPeriod[period][0].insert(system)
+		} else if order == ORDER_APPEND {
+			p.systemPeriod[period][len(sl)-1].insert(system)
+		} else {
+			for i, v := range sl {
+				if order == v.order {
+					v.insert(system)
+					break
+				} else if order < v.order {
+					sg := NewSystemGroup()
+					sg.order = order
+					sg.insert(system)
+					temp := append(OrderSequence{}, sl[i-1:]...)
+					p.systemPeriod[period] = append(append(sl[:i-1], sg), temp...)
+					break
+				}
 			}
 		}
+
 	}
 }
