@@ -11,7 +11,7 @@ const JOB_TYPE_DEFAULT = JOB_TYPE_PARALLEL
 type Job struct {
 	WorkerID int32
 	Args     []interface{}
-	Job      func(ctx []interface{}, args ...interface{})
+	Job      func(ctx *JobContext, args ...interface{})
 }
 
 //initialize the job

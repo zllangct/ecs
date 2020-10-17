@@ -2,7 +2,7 @@ package ecs
 
 import (
 	"math/rand"
-	"runtime"
+	runtime2 "runtime"
 	"sync"
 )
 
@@ -15,20 +15,21 @@ type Pool struct {
 	jobPool     *sync.Pool
 	jobQueue    chan *Job
 	workerQueue []*Worker
+	runtime 	*Runtime
 }
 
 //get the singleton pool
-func GetGlobalPool(numWorkers int, jobQueueLen int) *Pool {
+func GetGlobalPool(runtime *Runtime, numWorkers int, jobQueueLen int) *Pool {
 	if globalPool == nil {
-		globalPool = NewPool(numWorkers, jobQueueLen)
+		globalPool = NewPool(runtime, numWorkers, jobQueueLen)
 	}
 	return globalPool
 }
 
 //NewPool news goroutine pool
-func NewPool(numWorkers int, jobQueueLen int) *Pool {
+func NewPool(runtime *Runtime,numWorkers int, jobQueueLen int) *Pool {
 	if numWorkers == 0 {
-		numWorkers = 2 * runtime.NumCPU()
+		numWorkers = 2 * runtime2.NumCPU()
 	}
 	if jobQueueLen == 0 {
 		jobQueueLen = 20
@@ -37,18 +38,19 @@ func NewPool(numWorkers int, jobQueueLen int) *Pool {
 	workerQueue := make([]*Worker, numWorkers)
 
 	pool := &Pool{
+		runtime: runtime,
 		numWorkers:  int32(numWorkers),
 		jobQueueLen: int32(jobQueueLen),
 		jobQueue:    jobQueue,
 		workerQueue: workerQueue,
-		jobPool:     &sync.Pool{New: func() interface{} { return &Job{WorkerID: int32(-1)} }},
+		jobPool:     &sync.Pool{New: func() interface{} {return &Job{WorkerID: int32(-1)}}},
 	}
 	pool.Start()
 	return pool
 }
 
 //random worker, task will run in a random worker
-func (p *Pool) AddJob(handler func([]interface{}, ...interface{}), args ...interface{}) {
+func (p *Pool) AddJob(handler func(*JobContext, ...interface{}), args ...interface{}) {
 	job := p.jobPool.Get().(*Job)
 	job.Job = handler
 	job.Args = args
@@ -57,7 +59,7 @@ func (p *Pool) AddJob(handler func([]interface{}, ...interface{}), args ...inter
 }
 
 //random worker, task will run in a random worker and record the worker id
-func (p *Pool) AddJob2(handler func([]interface{}, ...interface{}), args ...interface{}) {
+func (p *Pool) AddJob2(handler func(*JobContext, ...interface{}), args ...interface{}) {
 	job := p.jobPool.Get().(*Job)
 	job.Job = handler
 	job.Args = args
@@ -67,7 +69,7 @@ func (p *Pool) AddJob2(handler func([]interface{}, ...interface{}), args ...inte
 }
 
 //fixed worker,task with the same worker id will push into the same goroutine
-func (p *Pool) AddJobFixed(handler func([]interface{}, ...interface{}), args []interface{}, wid int32) {
+func (p *Pool) AddJobFixed(handler func(*JobContext, ...interface{}), args []interface{}, wid int32) {
 	job := p.jobPool.Get().(*Job)
 	job.Job = handler
 	job.Args = args
@@ -85,6 +87,7 @@ func (p *Pool) AddJobFixed(handler func([]interface{}, ...interface{}), args []i
 func (p *Pool) Start() {
 	for i := 0; i < cap(p.workerQueue); i++ {
 		worker := &Worker{
+			runtime: p.runtime,
 			id:       int32(i),
 			p:        p,
 			jobQueue: make(chan *Job, 10),

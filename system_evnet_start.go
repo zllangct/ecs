@@ -27,7 +27,7 @@ func (p *Start) SystemUpdate(delta time.Duration) {
 	remainder := len(p.components) % p.runtime.config.CpuNum
 	offset := 0
 	for i := 0; i < p.runtime.config.CpuNum; i++ {
-		p.runtime.workPool.AddJob(func(ctx []interface{}, args ...interface{}) {
+		p.runtime.workPool.AddJob(func(ctx *JobContext, args ...interface{}) {
 			for _, event := range args[0].([]IEventStart) {
 				event.Start()
 			}
@@ -35,7 +35,7 @@ func (p *Start) SystemUpdate(delta time.Duration) {
 		offset += interval
 	}
 	for i := 0; i < remainder; i++ {
-		p.runtime.workPool.AddJob(func(ctx []interface{}, args ...interface{}) {
+		p.runtime.workPool.AddJob(func(ctx *JobContext, args ...interface{}) {
 			args[0].(IEventStart).Start()
 		}, []interface{}{p.components[offset]})
 		offset += 1

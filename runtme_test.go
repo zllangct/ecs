@@ -47,12 +47,12 @@ func (p *MoveSystem) Filter(com IComponent, op ComponentOperate) {
 		owner := com.GetOwner()
 		switch op {
 		case COMPONENT_OPERATE_ADD:
-			p.components[owner.ID] = MoveSystemData{
+			p.components[owner.ID()] = MoveSystemData{
 				movement: owner.GetComponent(&Movement{}).(*Movement),
 				position: owner.GetComponent(&Position{}).(*Position),
 			}
 		case COMPONENT_OPERATE_DELETE:
-			delete(p.components, owner.ID)
+			delete(p.components, owner.ID())
 		}
 	}
 }
@@ -98,12 +98,12 @@ func (p *DamageSystem) Filter(com IComponent, op ComponentOperate) {
 		owner := com.GetOwner()
 		switch op {
 		case COMPONENT_OPERATE_ADD:
-			p.components[owner.ID] = DamageSystemData{
+			p.components[owner.ID()] = DamageSystemData{
 				movement: owner.GetComponent(&HealthPoint{}).(*Movement),
 				position: owner.GetComponent(&Position{}).(*Position),
 			}
 		case COMPONENT_OPERATE_DELETE:
-			delete(p.components, owner.ID)
+			delete(p.components, owner.ID())
 		}
 	}
 }

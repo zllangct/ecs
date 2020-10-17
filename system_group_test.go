@@ -55,11 +55,11 @@ func (p *TestSystem) Call(label int) interface{} {
 	return nil
 }
 
-func (t TestSystem) Filter(component IComponent, op CollectionOperate) {
+func (p *TestSystem) Filter(component IComponent, op CollectionOperate) {
 
 }
 
-func (t TestSystem) SystemUpdate(delta time.Duration) {
+func (p *TestSystem) SystemUpdate(delta time.Duration) {
 
 }
 

@@ -1,29 +1,24 @@
 package ecs
 
 import (
-	"errors"
 	"reflect"
 	"sync"
-)
-
-var (
-	ErrComponentInvalid = errors.New("component invalid")
 )
 
 type Entity struct {
 	sync.RWMutex
 	//private
 	runtime    *Runtime
-	components []IComponent
+	components map[reflect.Type]IComponent
 	//public
-	ID uint64
+	id uint64
 }
 
 func NewEntity(runtime *Runtime) *Entity {
 	entity := &Entity{
 		runtime:    runtime,
-		components: make([]IComponent, 0),
-		ID:         UniqueID(),
+		components: make(map[reflect.Type]IComponent),
+		id:         UniqueID(),
 	}
 	runtime.AddEntity(entity)
 	return entity
@@ -31,18 +26,20 @@ func NewEntity(runtime *Runtime) *Entity {
 
 func (p *Entity) Destroy() {
 	p.runtime.DeleteEntity(p)
+	for _, c := range p.components {
+		p.runtime.ComponentRemove(c)
+	}
+}
+
+func (p *Entity)ID() uint64 {
+	return p.id
 }
 
 func (p *Entity) Has(typ reflect.Type) bool {
 	p.RLock()
-	for _, value := range p.components {
-		if reflect.TypeOf(value) == typ {
-			return true
-		}
-	}
-	p.RUnlock()
-
-	return false
+	defer p.RUnlock()
+	_,ok:=p.components[typ]
+	return ok
 }
 
 func (p *Entity) AddComponent(com ...IComponent) {
@@ -50,9 +47,9 @@ func (p *Entity) AddComponent(com ...IComponent) {
 	defer p.Unlock()
 	for _, c := range com {
 		if c.GetOwner() != nil {
-			panic(ErrComponentInvalid)
+			continue
 		}
-		p.components = append(p.components, c)
+		p.components[reflect.TypeOf(c)] = c
 		c.setOwner(p)
 		p.runtime.ComponentAttach(c)
 	}
@@ -62,25 +59,13 @@ func (p *Entity) RemoveComponent(com ...IComponent) {
 	p.Lock()
 	defer p.Unlock()
 	for _, c := range com {
-		for i := 0; i < len(p.components); i++ {
-			if reflect.TypeOf(p.components[i]) == reflect.TypeOf(c) {
-				p.components[i] = p.components[len(p.components)-1]
-				p.components = p.components[:len(p.components)-1]
-				p.runtime.ComponentRemove(c)
-				break
-			}
-		}
+		delete(p.components, reflect.TypeOf(c))
+		p.runtime.ComponentRemove(c)
 	}
 }
 
 func (p *Entity) GetComponent(com IComponent) IComponent {
-	typ := reflect.TypeOf(com)
 	p.RLock()
-	for _, value := range p.components {
-		if reflect.TypeOf(value) == typ {
-			return value
-		}
-	}
-	p.RUnlock()
-	return nil
+	defer p.RUnlock()
+	return p.components[reflect.TypeOf(com)]
 }

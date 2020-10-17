@@ -24,7 +24,7 @@ type ISystem interface {
 	Init(runtime *Runtime) //init
 	GetBase() *SystemBase  //get system base data
 	GetType() reflect.Type
-	GetOrder() (SystemPeriod, Order)
+	GetOrder() Order
 	GetRequirements() []reflect.Type
 	Filter(component IComponent, op CollectionOperate) //interest filter of component
 	SystemUpdate(delta time.Duration)                  //update every frame
@@ -34,7 +34,7 @@ type ISystem interface {
 type SystemBase struct {
 	sync.Mutex
 	requirements []reflect.Type
-	order        SystemOrder
+	order        Order
 	runtime      *Runtime
 	typ          reflect.Type
 	isPreFilter  bool
@@ -60,7 +60,7 @@ func (p *SystemBase) GetRequirements() []reflect.Type {
 
 func (p *SystemBase) Init(runtime *Runtime) {
 	p.requirements = []reflect.Type{}
-	p.SetOrder(ORDER_DEFAULT, PERIOD_DEFAULT)
+	p.SetOrder(ORDER_DEFAULT)
 	p.runtime = runtime
 }
 
@@ -78,20 +78,16 @@ func (p *SystemBase) GetType() reflect.Type {
 	return reflect.TypeOf(p)
 }
 
-func (p *SystemBase) SetOrder(order Order, period ...SystemPeriod) {
-	mPeriod := PERIOD_DEFAULT
-	if len(period) > 0 {
-		mPeriod = period[0]
-	}
+func (p *SystemBase) SetOrder(order Order) {
 	p.Lock()
-	p.order = SystemOrder(mPeriod)<<32 + SystemOrder(order)
+	p.order = order
 	p.Unlock()
 }
 
-func (p *SystemBase) GetOrder() (SystemPeriod, Order) {
+func (p *SystemBase) GetOrder() Order {
 	p.Lock()
 	defer p.Unlock()
-	return SystemPeriod(p.order >> 32), Order(p.order & 0xFFFFFFFF)
+	return p.order
 }
 
 func (p *SystemBase) IsConcerned(com IComponent) bool {

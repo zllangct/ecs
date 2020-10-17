@@ -4,6 +4,7 @@ const WORKER_ID_RANDOM int32 = -1
 
 //Worker goroutine struct.
 type Worker struct {
+	runtime *Runtime
 	id       int32
 	p        *Pool
 	jobQueue chan *Job
@@ -29,7 +30,11 @@ func (w *Worker) Start() {
 				return
 			}
 			//TODO handle Error
-			job.Job([]interface{}{job.WorkerID}, job.Args...)
+			ctx:=&JobContext{
+				WorkerID: job.WorkerID,
+				Runtime: w.runtime,
+			}
+			job.Job(ctx, job.Args...)
 			w.p.jobPool.Put(job.Init())
 		}
 	}()

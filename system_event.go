@@ -1,7 +1,7 @@
 package ecs
 
 type IEventInit interface {
-	Initialise()
+	Initialize()
 }
 
 type IEventStart interface {
