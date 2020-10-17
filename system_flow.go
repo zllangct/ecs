@@ -150,8 +150,32 @@ func (p *systemFlow) register(system ISystem) {
 	system.Init(p.runtime)
 	order := system.GetOrder()
 
-	//todo ssss
 	for _, period := range p.periodList {
+		imp := false
+		switch period {
+		case PERIOD_PRE_START :
+			_, imp = system.(IEventPreStart)
+		case PERIOD_START :
+			_, imp = system.(IEventStart)
+		case PERIOD_POST_START :
+			_, imp = system.(IEventPostStart)
+		case PERIOD_PRE_UPDATE :
+			_, imp = system.(IEventPreUpdate)
+		case PERIOD_UPDATE :
+			_, imp = system.(IEventUpdate)
+		case PERIOD_POST_UPDATE :
+			_, imp = system.(IEventPostUpdate)
+		case PERIOD_PER_DESTROY :
+			_, imp = system.(IEventPreDestroy)
+		case PERIOD_DESTROY :
+			_, imp = system.(IEventDestroy)
+		case PERIOD_POST_DESTROY :
+			_, imp = system.(IEventPostDestroy)
+		}
+
+		if !imp {
+			continue
+		}
 
 		sl := p.systemPeriod[period]
 		if order == ORDER_FRONT {
