@@ -79,7 +79,6 @@ func (p *Runtime) DeleteEntity(entity *Entity) {
 //entity operate : delete
 func (p *Runtime) DeleteEntityByID(id uint64) {
 	p.entities.deleteByID(id)
-
 }
 
 func (p *Runtime) ComponentAttach(com IComponent) {

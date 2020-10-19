@@ -19,7 +19,7 @@ func (p *Start) Init(runtime *Runtime) {
 	//initialise interest components
 	p.components = make([]IEventStart, 0, 10)
 	//set order
-	p.SetOrder(ORDER_DEFAULT, PERIOD_PRE_START)
+	p.SetOrder(ORDER_DEFAULT)
 }
 
 func (p *Start) SystemUpdate(delta time.Duration) {

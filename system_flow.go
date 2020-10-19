@@ -87,7 +87,6 @@ func (p *systemFlow) run(delta time.Duration) {
 		for _, sl := range sq {
 			sl.reset()
 			for ss := sl.next(); len(ss) > 0; ss = sl.next() {
-				//work balance
 				if systemCount := len(ss); systemCount != 0 {
 					p.wg.Add(p.runtime.config.CpuNum)
 					for i := 0; i < systemCount; i++ {
