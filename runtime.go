@@ -96,7 +96,7 @@ func (p *Runtime) ComponentRemove(com IComponent) {
 	p.components.TempComponentOperate(com, COLLECTION_OPERATE_DELETE)
 }
 
-func (p *Runtime) GetComponentsNew() []*CollectionOperateInfo {
+func (p *Runtime) GetComponentsNew() map[CollectionOperate][]CollectionOperateInfo {
 	return p.components.GetComponentsNew()
 }
 
