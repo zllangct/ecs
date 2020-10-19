@@ -16,7 +16,7 @@ func NewEntityCollection() *EntityCollection {
 	numCpu := runtime2.NumCPU()
 
 	for i := 1; ; i++ {
-		if c := uint64(1 << i); uint64(numCpu * 4) < c {
+		if c := uint64(1 << i); uint64(numCpu*4) < c {
 			ec.base = c - 1
 			break
 		}

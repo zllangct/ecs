@@ -17,6 +17,8 @@ type Runtime struct {
 	entities *EntityCollection
 	//runtime worker pool
 	workPool *Pool
+	//logger
+	logger ILogger
 }
 
 func NewRuntime() *Runtime {
@@ -39,6 +41,11 @@ func NewRuntime() *Runtime {
 //config the runtime
 func (p *Runtime) SetConfig(config *RuntimeConfig) {
 	p.config = config
+}
+
+//set logger
+func (p *Runtime) SetLogger(logger ILogger) {
+	p.logger = logger
 }
 
 //start ecs world

@@ -9,7 +9,7 @@ type IComponent interface {
 }
 
 type ComponentBase struct {
-	sync.Mutex
+	lock  sync.Mutex
 	owner *Entity
 }
 

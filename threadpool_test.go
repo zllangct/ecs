@@ -15,7 +15,7 @@ func init() {
 
 //TestNewPool test new goroutine pool
 func TestNewPool(t *testing.T) {
-	pool := NewPool(nil,1000, 10000)
+	pool := NewPool(nil, 1000, 10000)
 	defer pool.Release()
 
 	iterations := 1000000

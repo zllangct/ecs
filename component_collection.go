@@ -2,6 +2,7 @@ package ecs
 
 import (
 	"reflect"
+	runtime2 "runtime"
 	"sync"
 )
 
@@ -59,33 +60,57 @@ func NewCollectionOperateInfo(com IComponent, op CollectionOperate) *CollectionO
 type ComponentCollection struct {
 	collection map[reflect.Type]*componentData
 	//new component cache
-	lockInput      sync.Mutex
-	componentsTemp []*CollectionOperateInfo
-	componentsNew  []*CollectionOperateInfo
+	base           uint64
+	locks          []sync.Mutex
+	componentsTemp [][]*CollectionOperateInfo
+	componentsNew  map[CollectionOperate][]*CollectionOperateInfo
 }
 
 func NewComponentCollection() *ComponentCollection {
-	return &ComponentCollection{
-		collection:     map[reflect.Type]*componentData{},
-		lockInput:      sync.Mutex{},
-		componentsTemp: make([]*CollectionOperateInfo, 0, 10),
-		componentsNew:  make([]*CollectionOperateInfo, 0),
+	cc := &ComponentCollection{
+		collection:    map[reflect.Type]*componentData{},
+		componentsNew: make(map[CollectionOperate][]*CollectionOperateInfo),
 	}
+
+	numCpu := runtime2.NumCPU()
+
+	for i := 1; ; i++ {
+		if c := uint64(1 << i); uint64(numCpu*4) < c {
+			cc.base = c - 1
+			break
+		}
+	}
+
+	cc.locks = make([]sync.Mutex, cc.base)
+	cc.componentsTemp = make([][]*CollectionOperateInfo, cc.base)
+	for index := range cc.componentsTemp {
+		cc.componentsTemp[index] = make([]*CollectionOperateInfo, 0)
+		cc.locks[index] = sync.Mutex{}
+	}
+	return cc
 }
 
 //new component temp
 func (p *ComponentCollection) TempComponentOperate(com IComponent, op CollectionOperate) {
-	p.lockInput.Lock()
-	p.componentsTemp = append(p.componentsTemp, NewCollectionOperateInfo(com, op))
-	p.lockInput.Unlock()
+	hash := com.GetOwner().ID() & p.base
+	p.locks[hash].Lock()
+	p.componentsTemp[hash] = append(p.componentsTemp[hash], NewCollectionOperateInfo(com, op))
+	p.locks[hash].Unlock()
 }
 
 //handle and flush new components,should be called before destroy period
 func (p *ComponentCollection) TempFlush() {
-	p.lockInput.Lock()
-	defer p.lockInput.Unlock()
-	p.componentsNew = p.componentsNew[0:0]
-	p.componentsNew, p.componentsTemp = p.componentsTemp, p.componentsNew
+	var temp []*CollectionOperateInfo
+	for index, item := range p.componentsTemp {
+		p.locks[index].Lock()
+		temp = append(temp, item...)
+		p.componentsTemp[index] = p.componentsTemp[index][0:0]
+		p.locks[index].Unlock()
+	}
+	for _, info := range temp{
+		p.componentsNew[info.op] = make([]*CollectionOperateInfo, 0)
+		p.componentsNew[info.op]
+	}
 }
 
 func (p *ComponentCollection) Push(com IComponent, id uint64) {
