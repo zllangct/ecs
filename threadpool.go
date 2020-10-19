@@ -15,7 +15,7 @@ type Pool struct {
 	jobPool     *sync.Pool
 	jobQueue    chan *Job
 	workerQueue []*Worker
-	runtime 	*Runtime
+	runtime     *Runtime
 }
 
 //get the singleton pool
@@ -27,7 +27,7 @@ func GetGlobalPool(runtime *Runtime, numWorkers int, jobQueueLen int) *Pool {
 }
 
 //NewPool news goroutine pool
-func NewPool(runtime *Runtime,numWorkers int, jobQueueLen int) *Pool {
+func NewPool(runtime *Runtime, numWorkers int, jobQueueLen int) *Pool {
 	if numWorkers == 0 {
 		numWorkers = 2 * runtime2.NumCPU()
 	}
@@ -38,12 +38,12 @@ func NewPool(runtime *Runtime,numWorkers int, jobQueueLen int) *Pool {
 	workerQueue := make([]*Worker, numWorkers)
 
 	pool := &Pool{
-		runtime: runtime,
+		runtime:     runtime,
 		numWorkers:  int32(numWorkers),
 		jobQueueLen: int32(jobQueueLen),
 		jobQueue:    jobQueue,
 		workerQueue: workerQueue,
-		jobPool:     &sync.Pool{New: func() interface{} {return &Job{WorkerID: int32(-1)}}},
+		jobPool:     &sync.Pool{New: func() interface{} { return &Job{WorkerID: int32(-1)} }},
 	}
 	pool.Start()
 	return pool
@@ -87,7 +87,7 @@ func (p *Pool) AddJobFixed(handler func(*JobContext, ...interface{}), args []int
 func (p *Pool) Start() {
 	for i := 0; i < cap(p.workerQueue); i++ {
 		worker := &Worker{
-			runtime: p.runtime,
+			runtime:  p.runtime,
 			id:       int32(i),
 			p:        p,
 			jobQueue: make(chan *Job, 10),

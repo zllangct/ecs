@@ -1,43 +1,35 @@
 package ecs
 
+import "time"
+
+type Event struct {
+	Delta time.Duration
+}
+
 type IEventInit interface {
 	Initialize()
 }
 
-type IEventPreStart interface {
-	PreStart()
-}
-
 type IEventStart interface {
-	Start()
+	Start(event Event)
 }
 
 type IEventPostStart interface {
-	PostStart()
-}
-
-type IEventPreUpdate interface {
-	PreUpdate()
+	PostStart(event Event)
 }
 
 type IEventUpdate interface {
-	Update()
+	Update(event Event)
 }
 
 type IEventPostUpdate interface {
-	PostUpdate()
-}
-
-type IEventPreDestroy interface {
-	PreDestroy()
+	PostUpdate(event Event)
 }
 
 type IEventDestroy interface {
-	Destroy()
+	Destroy(event Event)
 }
 
 type IEventPostDestroy interface {
-	PostDestroy()
+	PostDestroy(event Event)
 }
-
-//TODO 事件系统，事件需要分发到其他系统，实现系统间互通

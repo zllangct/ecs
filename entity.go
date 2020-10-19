@@ -31,14 +31,14 @@ func (p *Entity) Destroy() {
 	}
 }
 
-func (p *Entity)ID() uint64 {
+func (p *Entity) ID() uint64 {
 	return p.id
 }
 
 func (p *Entity) Has(typ reflect.Type) bool {
 	p.RLock()
 	defer p.RUnlock()
-	_,ok:=p.components[typ]
+	_, ok := p.components[typ]
 	return ok
 }
 

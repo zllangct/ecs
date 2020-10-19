@@ -87,16 +87,49 @@ func (p *systemFlow) run(delta time.Duration) {
 		for _, sl := range sq {
 			sl.reset()
 			for ss := sl.next(); len(ss) > 0; ss = sl.next() {
-				//work balance
 				if systemCount := len(ss); systemCount != 0 {
 					p.wg.Add(p.runtime.config.CpuNum)
 					for i := 0; i < systemCount; i++ {
+						imp := false
+						var fn func(event Event)
+						switch period {
+						case PERIOD_START:
+							system, ok := ss[i].(IEventStart)
+							fn = system.Start
+							imp = ok
+						case PERIOD_POST_START:
+							system, ok := ss[i].(IEventPostStart)
+							fn = system.PostStart
+							imp = ok
+						case PERIOD_UPDATE:
+							system, ok := ss[i].(IEventUpdate)
+							fn = system.Update
+							imp = ok
+						case PERIOD_POST_UPDATE:
+							system, ok := ss[i].(IEventPostUpdate)
+							fn = system.PostUpdate
+							imp = ok
+						case PERIOD_DESTROY:
+							system, ok := ss[i].(IEventDestroy)
+							fn = system.Destroy
+							imp = ok
+						case PERIOD_POST_DESTROY:
+							system, ok := ss[i].(IEventPostDestroy)
+							fn = system.PostDestroy
+							imp = ok
+						}
+
+						if !imp {
+							continue
+						}
+
 						p.runtime.workPool.AddJob(func(ctx *JobContext, args ...interface{}) {
-							sys := args[0].(ISystem)
+							fn := args[0].(func(event Event))
+							delta := args[1].(time.Duration)
 							wg := args[1].(*sync.WaitGroup)
-							sys.SystemUpdate(delta)
+							fn(Event{Delta: delta})
 							wg.Done()
-						}, ss[i], p.wg)
+						}, fn, delta, p.wg)
 					}
 				}
 			}
@@ -104,12 +137,10 @@ func (p *systemFlow) run(delta time.Duration) {
 			p.wg.Wait()
 		}
 
-		//filter execute in post destroy period
-		if period == PERIOD_POST_DESTROY {
-			p.runtime.components.TempFlush()
-			p.filterExecute()
-		}
 	}
+	//do filter
+	p.runtime.components.TempFlush()
+	p.filterExecute()
 }
 
 func (p *systemFlow) filterExecute() {
@@ -126,8 +157,8 @@ func (p *systemFlow) filterExecute() {
 						sys := args[0].(ISystem)
 						wg := args[1].(*sync.WaitGroup)
 						if !sys.GetBase().isPreFilter {
-							coms := ctx.Runtime.GetAllComponents()
-							for _, com := range coms {
+							cpts := ctx.Runtime.GetAllComponents()
+							for _, com := range cpts {
 								sys.Filter(com, COLLECTION_OPERATE_ADD)
 							}
 							sys.GetBase().isPreFilter = true
@@ -136,7 +167,7 @@ func (p *systemFlow) filterExecute() {
 							sys.Filter(comInfo.com, comInfo.op)
 						}
 						wg.Done()
-					}, ss[i],p.wg)
+					}, ss[i], p.wg)
 				}
 			}
 			//waiting for all complete
@@ -153,23 +184,17 @@ func (p *systemFlow) register(system ISystem) {
 	for _, period := range p.periodList {
 		imp := false
 		switch period {
-		case PERIOD_PRE_START :
-			_, imp = system.(IEventPreStart)
-		case PERIOD_START :
+		case PERIOD_START:
 			_, imp = system.(IEventStart)
-		case PERIOD_POST_START :
+		case PERIOD_POST_START:
 			_, imp = system.(IEventPostStart)
-		case PERIOD_PRE_UPDATE :
-			_, imp = system.(IEventPreUpdate)
-		case PERIOD_UPDATE :
+		case PERIOD_UPDATE:
 			_, imp = system.(IEventUpdate)
-		case PERIOD_POST_UPDATE :
+		case PERIOD_POST_UPDATE:
 			_, imp = system.(IEventPostUpdate)
-		case PERIOD_PER_DESTROY :
-			_, imp = system.(IEventPreDestroy)
-		case PERIOD_DESTROY :
+		case PERIOD_DESTROY:
 			_, imp = system.(IEventDestroy)
-		case PERIOD_POST_DESTROY :
+		case PERIOD_POST_DESTROY:
 			_, imp = system.(IEventPostDestroy)
 		}
 
@@ -197,6 +222,13 @@ func (p *systemFlow) register(system ISystem) {
 				}
 			}
 		}
-
+		if sys, ok := system.(IEventInit); ok {
+			err := Try(func() {
+				sys.Initialize()
+			})
+			if err != nil && p.runtime.logger != nil {
+				p.runtime.logger.Error(err)
+			}
+		}
 	}
 }
