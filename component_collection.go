@@ -53,8 +53,8 @@ type CollectionOperateInfo struct {
 	op  CollectionOperate
 }
 
-func NewCollectionOperateInfo(com IComponent, op CollectionOperate) *CollectionOperateInfo {
-	return &CollectionOperateInfo{com: com, op: op}
+func NewCollectionOperateInfo(com IComponent, op CollectionOperate) CollectionOperateInfo {
+	return CollectionOperateInfo{com: com, op: op}
 }
 
 type ComponentCollection struct {
@@ -62,14 +62,14 @@ type ComponentCollection struct {
 	//new component cache
 	base           uint64
 	locks          []sync.Mutex
-	componentsTemp [][]*CollectionOperateInfo
-	componentsNew  map[CollectionOperate][]*CollectionOperateInfo
+	componentsTemp [][]CollectionOperateInfo
+	componentsNew  map[CollectionOperate][]CollectionOperateInfo
 }
 
 func NewComponentCollection() *ComponentCollection {
 	cc := &ComponentCollection{
 		collection:    map[reflect.Type]*componentData{},
-		componentsNew: make(map[CollectionOperate][]*CollectionOperateInfo),
+		componentsNew: make(map[CollectionOperate][]CollectionOperateInfo),
 	}
 
 	numCpu := runtime2.NumCPU()
@@ -82,9 +82,9 @@ func NewComponentCollection() *ComponentCollection {
 	}
 
 	cc.locks = make([]sync.Mutex, cc.base)
-	cc.componentsTemp = make([][]*CollectionOperateInfo, cc.base)
+	cc.componentsTemp = make([][]CollectionOperateInfo, cc.base)
 	for index := range cc.componentsTemp {
-		cc.componentsTemp[index] = make([]*CollectionOperateInfo, 0)
+		cc.componentsTemp[index] = make([]CollectionOperateInfo, 0)
 		cc.locks[index] = sync.Mutex{}
 	}
 	return cc
@@ -100,17 +100,22 @@ func (p *ComponentCollection) TempComponentOperate(com IComponent, op Collection
 
 //handle and flush new components,should be called before destroy period
 func (p *ComponentCollection) TempFlush() {
-	var temp []*CollectionOperateInfo
+	var temp []CollectionOperateInfo
 	for index, item := range p.componentsTemp {
 		p.locks[index].Lock()
 		temp = append(temp, item...)
 		p.componentsTemp[index] = p.componentsTemp[index][0:0]
 		p.locks[index].Unlock()
 	}
-	for _, info := range temp{
-		p.componentsNew[info.op] = make([]*CollectionOperateInfo, 0)
-		p.componentsNew[info.op]
+	tempNew := map[CollectionOperate][]CollectionOperateInfo{}
+	for _, operate := range temp{
+		if _, ok := tempNew[operate.op]; !ok {
+			tempNew[operate.op] = make([]CollectionOperateInfo, 0)
+		}
+		tempNew[operate.op] = append(tempNew[operate.op], operate)
 	}
+	p.componentsNew = tempNew
+
 }
 
 func (p *ComponentCollection) Push(com IComponent, id uint64) {
@@ -131,7 +136,7 @@ func (p *ComponentCollection) Pop(com IComponent, id uint64) {
 	}
 }
 
-func (p *ComponentCollection) GetComponentsNew() []*CollectionOperateInfo {
+func (p *ComponentCollection) GetComponentsNew() map[CollectionOperate][]CollectionOperateInfo {
 	return p.componentsNew
 }
 

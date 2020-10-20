@@ -86,7 +86,6 @@ func (p *Runtime) DeleteEntity(entity *Entity) {
 //entity operate : delete
 func (p *Runtime) DeleteEntityByID(id uint64) {
 	p.entities.deleteByID(id)
-
 }
 
 func (p *Runtime) ComponentAttach(com IComponent) {
@@ -97,7 +96,7 @@ func (p *Runtime) ComponentRemove(com IComponent) {
 	p.components.TempComponentOperate(com, COLLECTION_OPERATE_DELETE)
 }
 
-func (p *Runtime) GetComponentsNew() []*CollectionOperateInfo {
+func (p *Runtime) GetComponentsNew() map[CollectionOperate][]CollectionOperateInfo {
 	return p.components.GetComponentsNew()
 }
 

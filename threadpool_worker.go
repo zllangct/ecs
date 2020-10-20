@@ -4,7 +4,7 @@ const WORKER_ID_RANDOM int32 = -1
 
 //Worker goroutine struct.
 type Worker struct {
-	runtime  *Runtime
+	runtime *Runtime
 	id       int32
 	p        *Pool
 	jobQueue chan *Job
@@ -29,20 +29,12 @@ func (w *Worker) Start() {
 			case <-w.stop:
 				return
 			}
-			ctx := &JobContext{
+			//TODO handle Error
+			ctx:=&JobContext{
 				WorkerID: job.WorkerID,
-				Runtime:  w.runtime,
+				Runtime: w.runtime,
 			}
-			if w.runtime.config.Debug {
-				job.Job(ctx, job.Args...)
-			} else {
-				err := Try(func() {
-					job.Job(ctx, job.Args...)
-				})
-				if err != nil && w.runtime.logger != nil {
-					w.runtime.logger.Error(err)
-				}
-			}
+			job.Job(ctx, job.Args...)
 			w.p.jobPool.Put(job.Init())
 		}
 	}()
