@@ -1,7 +1,6 @@
 package ecs
 
 import (
-	runtime2 "runtime"
 	"sync"
 )
 
@@ -11,12 +10,11 @@ type EntityCollection struct {
 	locks      []sync.RWMutex
 }
 
-func NewEntityCollection() *EntityCollection {
+func NewEntityCollection(k int ) *EntityCollection {
 	ec := &EntityCollection{}
-	numCpu := runtime2.NumCPU()
 
 	for i := 1; ; i++ {
-		if c := uint64(1 << i); uint64(numCpu*4) < c {
+		if c := uint64(1 << i); uint64(k) < c {
 			ec.base = c - 1
 			break
 		}

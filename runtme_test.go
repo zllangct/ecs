@@ -6,7 +6,6 @@ import (
 	_ "net/http/pprof"
 	"reflect"
 	"testing"
-	"time"
 )
 
 //position component
@@ -57,7 +56,8 @@ func (p *MoveSystem) Filter(com IComponent, op ComponentOperate) {
 	}
 }
 
-func (p *MoveSystem) SystemUpdate(delta time.Duration) {
+func (p *MoveSystem) Update(event Event) {
+	delta := event.Delta
 	for _, comInfos := range p.components {
 		position := comInfos.position
 		move := comInfos.movement
@@ -65,7 +65,7 @@ func (p *MoveSystem) SystemUpdate(delta time.Duration) {
 		position.Y = position.Y + int(float64(move.dir[1]*move.v)*delta.Seconds())
 		position.Z = position.Z + int(float64(move.dir[2]*move.v)*delta.Seconds())
 
-		//println("current position:", position.X, position.Y, position.Z)
+		println("current position:", position.X, position.Y, position.Z)
 	}
 }
 
@@ -108,7 +108,7 @@ func (p *DamageSystem) Filter(com IComponent, op ComponentOperate) {
 	}
 }
 
-func (p *DamageSystem) SystemUpdate(delta time.Duration) {
+func (p *DamageSystem) Update(event Event) {
 
 }
 

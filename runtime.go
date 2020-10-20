@@ -1,6 +1,7 @@
 package ecs
 
 import (
+	"reflect"
 	"sync"
 	"time"
 )
@@ -27,8 +28,8 @@ func NewRuntime() *Runtime {
 	rt := &Runtime{
 		config:     config,
 		systemFlow: nil,
-		components: NewComponentCollection(),
-		entities:   NewEntityCollection(),
+		components: NewComponentCollection(config.HashCount),
+		entities:   NewEntityCollection(config.HashCount),
 	}
 	rt.workPool = NewPool(rt, config.MaxPoolThread, config.MaxPoolJobQueue)
 	//initialise system flow
@@ -50,6 +51,7 @@ func (p *Runtime) SetLogger(logger ILogger) {
 
 //start ecs world
 func (p *Runtime) Run() {
+	println("runtime running")
 	//start the work pool
 	p.workPool.Start()
 
@@ -96,10 +98,21 @@ func (p *Runtime) ComponentRemove(com IComponent) {
 	p.components.TempComponentOperate(com, COLLECTION_OPERATE_DELETE)
 }
 
-func (p *Runtime) GetComponentsNew() map[CollectionOperate][]CollectionOperateInfo {
-	return p.components.GetComponentsNew()
-}
-
 func (p *Runtime) GetAllComponents() []IComponent {
 	return p.components.GetAllComponents()
 }
+
+func (p *Runtime) Error(err error)  {
+	if p.logger != nil {
+		p.logger.Error(err)
+	}
+}
+
+func (p *Runtime) getNewComponentsAll() []CollectionOperateInfo {
+	return p.components.GetNewComponentsAll()
+}
+
+func (p *Runtime) getNewComponents(op CollectionOperate, typ reflect.Type) []CollectionOperateInfo {
+	return p.components.GetNewComponents(op, typ)
+}
+

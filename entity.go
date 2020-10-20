@@ -1,6 +1,7 @@
 package ecs
 
 import (
+	"errors"
 	"reflect"
 	"sync"
 )
@@ -43,15 +44,20 @@ func (p *Entity) Has(typ reflect.Type) bool {
 }
 
 func (p *Entity) AddComponent(com ...IComponent) {
-	p.Lock()
-	defer p.Unlock()
 	for _, c := range com {
 		if c.GetOwner() != nil {
 			continue
 		}
-		p.components[reflect.TypeOf(c)] = c
+		typ := reflect.TypeOf(c)
+		if p.Has(typ) {
+			p.runtime.Error(errors.New("repeat component:"+typ.Name()))
+			continue
+		}
+		p.Lock()
+		p.components[typ] = c
 		c.setOwner(p)
 		p.runtime.ComponentAttach(c)
+		p.Unlock()
 	}
 }
 
@@ -59,7 +65,12 @@ func (p *Entity) RemoveComponent(com ...IComponent) {
 	p.Lock()
 	defer p.Unlock()
 	for _, c := range com {
-		delete(p.components, reflect.TypeOf(c))
+		typ := reflect.TypeOf(c)
+		if !p.Has(typ) {
+			p.runtime.Error(errors.New("repeat component:"+typ.Name()))
+			continue
+		}
+		delete(p.components, typ)
 		p.runtime.ComponentRemove(c)
 	}
 }

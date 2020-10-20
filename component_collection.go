@@ -2,7 +2,6 @@ package ecs
 
 import (
 	"reflect"
-	runtime2 "runtime"
 	"sync"
 )
 
@@ -31,6 +30,10 @@ func (p *componentData) pop(id uint64) {
 			p.data = p.data[:length-1]
 		}
 	}
+}
+
+func (p *componentData)Len() int {
+	return len(p.data)
 }
 
 type CollectionOperate int
@@ -63,19 +66,17 @@ type ComponentCollection struct {
 	base           uint64
 	locks          []sync.Mutex
 	componentsTemp [][]CollectionOperateInfo
-	componentsNew  map[CollectionOperate][]CollectionOperateInfo
+	componentsNew  map[CollectionOperate]map[reflect.Type][]CollectionOperateInfo
 }
 
-func NewComponentCollection() *ComponentCollection {
+func NewComponentCollection(k int) *ComponentCollection {
 	cc := &ComponentCollection{
 		collection:    map[reflect.Type]*componentData{},
-		componentsNew: make(map[CollectionOperate][]CollectionOperateInfo),
+		componentsNew: make(map[CollectionOperate]map[reflect.Type][]CollectionOperateInfo),
 	}
 
-	numCpu := runtime2.NumCPU()
-
 	for i := 1; ; i++ {
-		if c := uint64(1 << i); uint64(numCpu*4) < c {
+		if c := uint64(1 << i); uint64(k) < c {
 			cc.base = c - 1
 			break
 		}
@@ -107,12 +108,19 @@ func (p *ComponentCollection) TempFlush() {
 		p.componentsTemp[index] = p.componentsTemp[index][0:0]
 		p.locks[index].Unlock()
 	}
-	tempNew := map[CollectionOperate][]CollectionOperateInfo{}
+	tempNew := map[CollectionOperate]map[reflect.Type][]CollectionOperateInfo{
+		COLLECTION_OPERATE_ADD: make(map[reflect.Type][]CollectionOperateInfo),
+		COLLECTION_OPERATE_DELETE: make(map[reflect.Type][]CollectionOperateInfo),
+	}
 	for _, operate := range temp{
-		if _, ok := tempNew[operate.op]; !ok {
-			tempNew[operate.op] = make([]CollectionOperateInfo, 0)
+		typ := reflect.TypeOf(operate.com)
+		//add to component container
+		p.push(typ, operate.com, operate.com.GetOwner().ID())
+		//add to new component list
+		if _, ok := tempNew[operate.op][typ]; !ok {
+			tempNew[operate.op][typ] = make([]CollectionOperateInfo, 0)
 		}
-		tempNew[operate.op] = append(tempNew[operate.op], operate)
+		tempNew[operate.op][typ] = append(tempNew[operate.op][typ], operate)
 	}
 	p.componentsNew = tempNew
 
@@ -120,6 +128,10 @@ func (p *ComponentCollection) TempFlush() {
 
 func (p *ComponentCollection) Push(com IComponent, id uint64) {
 	typ := reflect.TypeOf(com)
+	p.push(typ, com, id)
+}
+
+func (p *ComponentCollection) push(typ reflect.Type,com IComponent, id uint64) {
 	if v, ok := p.collection[typ]; ok {
 		v.push(com, id)
 	} else {
@@ -136,8 +148,18 @@ func (p *ComponentCollection) Pop(com IComponent, id uint64) {
 	}
 }
 
-func (p *ComponentCollection) GetComponentsNew() map[CollectionOperate][]CollectionOperateInfo {
-	return p.componentsNew
+func (p *ComponentCollection) GetNewComponentsAll() []CollectionOperateInfo {
+	var temp []CollectionOperateInfo
+	for _, m := range p.componentsNew {
+		for _, mm := range m {
+			temp = append(temp, mm...)
+		}
+	}
+	return temp
+}
+
+func (p *ComponentCollection) GetNewComponents(op CollectionOperate, typ reflect.Type) []CollectionOperateInfo {
+	return p.componentsNew[op][typ]
 }
 
 func (p *ComponentCollection) GetComponents(com IComponent) []IComponent {

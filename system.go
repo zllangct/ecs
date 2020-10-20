@@ -4,7 +4,6 @@ import (
 	"errors"
 	"reflect"
 	"sync"
-	"time"
 )
 
 type SystemLifeCircleType int
@@ -27,7 +26,6 @@ type ISystem interface {
 	GetOrder() Order
 	GetRequirements() []reflect.Type
 	Filter(component IComponent, op CollectionOperate) //interest filter of component
-	SystemUpdate(delta time.Duration)                  //update every frame
 	Call(label int) interface{}
 }
 
@@ -92,12 +90,19 @@ func (p *SystemBase) GetOrder() Order {
 
 func (p *SystemBase) IsConcerned(com IComponent) bool {
 	concerned := true
-	ctyp := reflect.TypeOf(com)
+	cType := reflect.TypeOf(com)
 	for _, typ := range p.requirements {
-		if typ != ctyp && !com.GetOwner().Has(typ) {
+		if typ != cType && !com.GetOwner().Has(typ) {
 			concerned = false
 			break
 		}
 	}
 	return concerned
+}
+
+func (p *SystemBase) GetNewComponent(op CollectionOperate)  {
+	temp := map[reflect.Type][]CollectionOperateInfo{}
+	for _, typ := range p.requirements {
+		temp[typ] = p.runtime.getNewComponents(op, typ)
+	}
 }

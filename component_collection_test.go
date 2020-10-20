@@ -29,7 +29,7 @@ func TestComponentCollection(t *testing.T) {
 		&TestComponent3{ID: 5},
 		&TestComponent3{ID: 6},
 	}
-	cc := NewComponentCollection()
+	cc := NewComponentCollection(16 * 4)
 
 	for index, value := range tests {
 		cc.Push(value, uint64(index))

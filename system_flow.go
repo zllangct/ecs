@@ -23,9 +23,6 @@ const (
 	PERIOD_POST_DESTROY
 )
 
-//default system execute period
-const PERIOD_DEFAULT = PERIOD_UPDATE
-
 // default suborder of system
 type Order int32
 
@@ -59,13 +56,10 @@ func newSystemFlow(runtime *Runtime) *systemFlow {
 //initialize the system flow
 func (p *systemFlow) init() {
 	p.periodList = []SystemPeriod{
-		PERIOD_PRE_START,
 		PERIOD_START,
 		PERIOD_POST_START,
-		PERIOD_PRE_UPDATE,
 		PERIOD_UPDATE,
 		PERIOD_POST_UPDATE,
-		PERIOD_PER_DESTROY,
 		PERIOD_DESTROY,
 		PERIOD_POST_DESTROY,
 	}
@@ -126,7 +120,7 @@ func (p *systemFlow) run(delta time.Duration) {
 						p.runtime.workPool.AddJob(func(ctx *JobContext, args ...interface{}) {
 							fn := args[0].(func(event Event))
 							delta := args[1].(time.Duration)
-							wg := args[1].(*sync.WaitGroup)
+							wg := args[2].(*sync.WaitGroup)
 							fn(Event{Delta: delta})
 							wg.Done()
 						}, fn, delta, p.wg)
@@ -145,7 +139,7 @@ func (p *systemFlow) run(delta time.Duration) {
 
 func (p *systemFlow) filterExecute() {
 	var sq OrderSequence
-	comInfos := p.runtime.GetComponentsNew()
+	comInfos := p.runtime.components.GetNewComponentsAll()
 	for _, period := range p.periodList {
 		sq = p.systemPeriod[period]
 		for _, sl := range sq {
@@ -157,8 +151,8 @@ func (p *systemFlow) filterExecute() {
 						sys := args[0].(ISystem)
 						wg := args[1].(*sync.WaitGroup)
 						if !sys.GetBase().isPreFilter {
-							cpts := ctx.Runtime.GetAllComponents()
-							for _, com := range cpts {
+							components := ctx.Runtime.GetAllComponents()
+							for _, com := range components {
 								sys.Filter(com, COLLECTION_OPERATE_ADD)
 							}
 							sys.GetBase().isPreFilter = true
