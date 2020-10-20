@@ -82,7 +82,6 @@ func (p *systemFlow) run(delta time.Duration) {
 			sl.reset()
 			for ss := sl.next(); len(ss) > 0; ss = sl.next() {
 				if systemCount := len(ss); systemCount != 0 {
-					p.wg.Add(p.runtime.config.CpuNum)
 					for i := 0; i < systemCount; i++ {
 						imp := false
 						var fn func(event Event)
@@ -117,6 +116,7 @@ func (p *systemFlow) run(delta time.Duration) {
 							continue
 						}
 
+						p.wg.Add(1)
 						p.runtime.workPool.AddJob(func(ctx *JobContext, args ...interface{}) {
 							fn := args[0].(func(event Event))
 							delta := args[1].(time.Duration)
