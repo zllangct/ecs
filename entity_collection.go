@@ -20,8 +20,8 @@ func NewEntityCollection(k int ) *EntityCollection {
 		}
 	}
 
-	ec.collection = make([]map[uint64]*Entity, ec.base)
-	ec.locks = make([]sync.RWMutex, ec.base)
+	ec.collection = make([]map[uint64]*Entity, ec.base + 1)
+	ec.locks = make([]sync.RWMutex, ec.base + 1)
 	for index := range ec.collection {
 		ec.collection[index] = map[uint64]*Entity{}
 		ec.locks[index] = sync.RWMutex{}

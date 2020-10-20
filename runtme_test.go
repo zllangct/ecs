@@ -6,6 +6,7 @@ import (
 	_ "net/http/pprof"
 	"reflect"
 	"testing"
+	"time"
 )
 
 //position component
@@ -65,7 +66,7 @@ func (p *MoveSystem) Update(event Event) {
 		position.Y = position.Y + int(float64(move.dir[1]*move.v)*delta.Seconds())
 		position.Z = position.Z + int(float64(move.dir[2]*move.v)*delta.Seconds())
 
-		println("current position:", position.X, position.Y, position.Z)
+		//println("current position:", position.X, position.Y, position.Z)
 	}
 }
 
@@ -140,8 +141,8 @@ func TestRuntime0(t *testing.T) {
 			dir: []int{0, 1, 0},
 		},
 	)
-	//time.Sleep(time.Second * 30)
-	<-make(chan struct{})
+	time.Sleep(time.Second * 20)
+	//<-make(chan struct{})
 }
 
 func TestRuntime1(t *testing.T) {
@@ -156,7 +157,7 @@ func TestRuntime1(t *testing.T) {
 	rt.Register(&DamageSystem{})
 
 	//初始化实体
-	for i := 0; i < 100000000; i++ {
+	for i := 0; i < 100000; i++ {
 		NewEntity(rt).AddComponent(
 			&Position{X: 100, Y: 100, Z: 100},
 			&Movement{

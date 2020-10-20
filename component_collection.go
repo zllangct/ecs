@@ -82,8 +82,8 @@ func NewComponentCollection(k int) *ComponentCollection {
 		}
 	}
 
-	cc.locks = make([]sync.Mutex, cc.base)
-	cc.componentsTemp = make([][]CollectionOperateInfo, cc.base)
+	cc.locks = make([]sync.Mutex, cc.base + 1)
+	cc.componentsTemp = make([][]CollectionOperateInfo, cc.base + 1)
 	for index := range cc.componentsTemp {
 		cc.componentsTemp[index] = make([]CollectionOperateInfo, 0)
 		cc.locks[index] = sync.Mutex{}
