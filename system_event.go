@@ -33,3 +33,7 @@ type IEventDestroy interface {
 type IEventPostDestroy interface {
 	PostDestroy(event Event)
 }
+
+type IEventFilter interface {
+	Filter(component IComponent, op CollectionOperate)
+}

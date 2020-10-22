@@ -2,7 +2,6 @@ package ecs
 
 import (
 	"testing"
-	"time"
 )
 
 type Com1 struct {
@@ -56,10 +55,6 @@ func (p *TestSystem) Call(label int) interface{} {
 }
 
 func (p *TestSystem) Filter(component IComponent, op CollectionOperate) {
-
-}
-
-func (p *TestSystem) SystemUpdate(delta time.Duration) {
 
 }
 

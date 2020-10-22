@@ -102,7 +102,7 @@ func (p *Runtime) GetAllComponents() []IComponent {
 	return p.components.GetAllComponents()
 }
 
-func (p *Runtime) Error(err error)  {
+func (p *Runtime) Error(err error) {
 	if p.logger != nil {
 		p.logger.Error(err)
 	}
@@ -115,4 +115,3 @@ func (p *Runtime) getNewComponentsAll() []CollectionOperateInfo {
 func (p *Runtime) getNewComponents(op CollectionOperate, typ reflect.Type) []CollectionOperateInfo {
 	return p.components.GetNewComponents(op, typ)
 }
-

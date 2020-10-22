@@ -25,7 +25,6 @@ type ISystem interface {
 	GetType() reflect.Type
 	GetOrder() Order
 	GetRequirements() []reflect.Type
-	Filter(component IComponent, op CollectionOperate) //interest filter of component
 	Call(label int) interface{}
 }
 
@@ -100,9 +99,14 @@ func (p *SystemBase) IsConcerned(com IComponent) bool {
 	return concerned
 }
 
-func (p *SystemBase) GetNewComponent(op CollectionOperate)  {
+func (p *SystemBase) GetRuntime() *Runtime {
+	return p.runtime
+}
+
+func (p *SystemBase) GetNewComponent(op CollectionOperate) map[reflect.Type][]CollectionOperateInfo {
 	temp := map[reflect.Type][]CollectionOperateInfo{}
 	for _, typ := range p.requirements {
 		temp[typ] = p.runtime.getNewComponents(op, typ)
 	}
+	return temp
 }

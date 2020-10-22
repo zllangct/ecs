@@ -32,7 +32,7 @@ func (p *componentData) pop(id uint64) {
 	}
 }
 
-func (p *componentData)Len() int {
+func (p *componentData) Len() int {
 	return len(p.data)
 }
 
@@ -82,8 +82,8 @@ func NewComponentCollection(k int) *ComponentCollection {
 		}
 	}
 
-	cc.locks = make([]sync.Mutex, cc.base + 1)
-	cc.componentsTemp = make([][]CollectionOperateInfo, cc.base + 1)
+	cc.locks = make([]sync.Mutex, cc.base+1)
+	cc.componentsTemp = make([][]CollectionOperateInfo, cc.base+1)
 	for index := range cc.componentsTemp {
 		cc.componentsTemp[index] = make([]CollectionOperateInfo, 0)
 		cc.locks[index] = sync.Mutex{}
@@ -109,10 +109,10 @@ func (p *ComponentCollection) TempFlush() {
 		p.locks[index].Unlock()
 	}
 	tempNew := map[CollectionOperate]map[reflect.Type][]CollectionOperateInfo{
-		COLLECTION_OPERATE_ADD: make(map[reflect.Type][]CollectionOperateInfo),
+		COLLECTION_OPERATE_ADD:    make(map[reflect.Type][]CollectionOperateInfo),
 		COLLECTION_OPERATE_DELETE: make(map[reflect.Type][]CollectionOperateInfo),
 	}
-	for _, operate := range temp{
+	for _, operate := range temp {
 		typ := reflect.TypeOf(operate.com)
 		//add to component container
 		p.push(typ, operate.com, operate.com.GetOwner().ID())
@@ -131,7 +131,7 @@ func (p *ComponentCollection) Push(com IComponent, id uint64) {
 	p.push(typ, com, id)
 }
 
-func (p *ComponentCollection) push(typ reflect.Type,com IComponent, id uint64) {
+func (p *ComponentCollection) push(typ reflect.Type, com IComponent, id uint64) {
 	if v, ok := p.collection[typ]; ok {
 		v.push(com, id)
 	} else {

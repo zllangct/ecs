@@ -117,7 +117,7 @@ func (p *systemFlow) run(delta time.Duration) {
 						}
 
 						p.wg.Add(1)
-						p.runtime.workPool.AddJob(func(ctx *JobContext, args ...interface{}) {
+						p.runtime.workPool.AddJob(func(ctx JobContext, args ...interface{}) {
 							fn := args[0].(func(event Event))
 							delta := args[1].(time.Duration)
 							wg := args[2].(*sync.WaitGroup)
@@ -147,21 +147,26 @@ func (p *systemFlow) filterExecute() {
 			if systemCount := len(ss); systemCount != 0 {
 				p.wg.Add(systemCount)
 				for i := 0; i < systemCount; i++ {
-					p.runtime.workPool.AddJob(func(ctx *JobContext, args ...interface{}) {
+					filter, ok := ss[i].(IEventFilter)
+					if !ok {
+						continue
+					}
+					p.runtime.workPool.AddJob(func(ctx JobContext, args ...interface{}) {
 						sys := args[0].(ISystem)
-						wg := args[1].(*sync.WaitGroup)
+						filter := args[1].(IEventFilter)
+						wg := args[2].(*sync.WaitGroup)
 						if !sys.GetBase().isPreFilter {
 							components := ctx.Runtime.GetAllComponents()
 							for _, com := range components {
-								sys.Filter(com, COLLECTION_OPERATE_ADD)
+								filter.Filter(com, COLLECTION_OPERATE_ADD)
 							}
 							sys.GetBase().isPreFilter = true
 						}
 						for _, comInfo := range comInfos {
-							sys.Filter(comInfo.com, comInfo.op)
+							filter.Filter(comInfo.com, comInfo.op)
 						}
 						wg.Done()
-					}, ss[i], p.wg)
+					}, ss[i], filter, p.wg)
 				}
 			}
 			//waiting for all complete

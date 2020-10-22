@@ -9,11 +9,13 @@ import (
 var seq uint32
 var timestamp uint64
 
+type EntityID = uint64
+
 func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
-func UniqueID() uint64 {
+func UniqueID() EntityID {
 	tNow := uint64(time.Now().UnixNano()) << 32
 	tTemp := atomic.LoadUint64(&timestamp)
 	if tTemp != tNow {

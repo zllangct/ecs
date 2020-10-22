@@ -12,8 +12,8 @@ var globalPool *Pool
 type Pool struct {
 	numWorkers  int32
 	jobQueueLen int32
-	jobPool     *sync.Pool
-	jobQueue    chan *Job
+	jobPool     sync.Pool
+	jobQueue    chan Job
 	workerQueue []*Worker
 	runtime     *Runtime
 }
@@ -34,7 +34,7 @@ func NewPool(runtime *Runtime, numWorkers int, jobQueueLen int) *Pool {
 	if jobQueueLen == 0 {
 		jobQueueLen = 20
 	}
-	jobQueue := make(chan *Job, jobQueueLen)
+	jobQueue := make(chan Job, jobQueueLen)
 	workerQueue := make([]*Worker, numWorkers)
 
 	pool := &Pool{
@@ -43,15 +43,15 @@ func NewPool(runtime *Runtime, numWorkers int, jobQueueLen int) *Pool {
 		jobQueueLen: int32(jobQueueLen),
 		jobQueue:    jobQueue,
 		workerQueue: workerQueue,
-		jobPool:     &sync.Pool{New: func() interface{} { return &Job{WorkerID: int32(-1)} }},
+		jobPool:     sync.Pool{New: func() interface{} { return Job{WorkerID: int32(-1)} }},
 	}
 	pool.Start()
 	return pool
 }
 
 //random worker, task will run in a random worker
-func (p *Pool) AddJob(handler func(*JobContext, ...interface{}), args ...interface{}) {
-	job := p.jobPool.Get().(*Job)
+func (p *Pool) AddJob(handler func(JobContext, ...interface{}), args ...interface{}) {
+	job := p.jobPool.Get().(Job)
 	job.Job = handler
 	job.Args = args
 	job.WorkerID = WORKER_ID_RANDOM
@@ -59,8 +59,8 @@ func (p *Pool) AddJob(handler func(*JobContext, ...interface{}), args ...interfa
 }
 
 //random worker, task will run in a random worker and record the worker id
-func (p *Pool) AddJob2(handler func(*JobContext, ...interface{}), args ...interface{}) {
-	job := p.jobPool.Get().(*Job)
+func (p *Pool) AddJob2(handler func(JobContext, ...interface{}), args ...interface{}) {
+	job := p.jobPool.Get().(Job)
 	job.Job = handler
 	job.Args = args
 
@@ -69,8 +69,8 @@ func (p *Pool) AddJob2(handler func(*JobContext, ...interface{}), args ...interf
 }
 
 //fixed worker,task with the same worker id will push into the same goroutine
-func (p *Pool) AddJobFixed(handler func(*JobContext, ...interface{}), args []interface{}, wid int32) {
-	job := p.jobPool.Get().(*Job)
+func (p *Pool) AddJobFixed(handler func(JobContext, ...interface{}), args []interface{}, wid int32) {
+	job := p.jobPool.Get().(Job)
 	job.Job = handler
 	job.Args = args
 
@@ -90,7 +90,7 @@ func (p *Pool) Start() {
 			runtime:  p.runtime,
 			id:       int32(i),
 			p:        p,
-			jobQueue: make(chan *Job, 10),
+			jobQueue: make(chan Job, p.jobQueueLen),
 			stop:     make(chan struct{}),
 		}
 		p.workerQueue[i] = worker
