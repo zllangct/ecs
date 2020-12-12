@@ -73,3 +73,7 @@ func (p *ContainerWithId) GetId(idx int) uint64 {
 	}
 	return 0
 }
+
+func (p *ContainerWithId) Len() int {
+	return p.len
+}

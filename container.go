@@ -50,30 +50,11 @@ func (p *Container) Get(idx int) unsafe.Pointer {
 	return unsafe.Pointer(p.head + uintptr(idx)*p.unit)
 }
 
-func (p Container) GetIterator() *iterator {
-	return &iterator{
+func (p Container) GetIterator() *Iterator {
+	return &Iterator{
 		memberSize: p.unit,
 		size:       p.len,
 		index:      -1,
 		head:       p.head,
 	}
-}
-
-type iterator struct {
-	memberSize uintptr
-	size       int
-	index      int
-	head       uintptr
-}
-
-func (p *iterator) End() unsafe.Pointer {
-	return nil
-}
-
-func (p *iterator) Next() (int, unsafe.Pointer) {
-	if p.index == p.size {
-		return -1, nil
-	}
-	p.index++
-	return p.index, unsafe.Pointer(p.head + uintptr(p.index)*p.memberSize)
 }

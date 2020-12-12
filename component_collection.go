@@ -3,40 +3,10 @@ package ecs
 import (
 	"reflect"
 	"sync"
+	"unsafe"
 )
 
-type componentData struct {
-	data  []IComponent
-	index map[uint64]int
-}
-
-func newComponentData() *componentData {
-	return &componentData{
-		data:  []IComponent{},
-		index: map[uint64]int{},
-	}
-}
-
-func (p *componentData) push(com IComponent, id uint64) {
-	p.data = append(p.data, com)
-	p.index[id] = len(p.data) - 1
-}
-
-func (p *componentData) pop(id uint64) {
-	if index, ok := p.index[id]; ok {
-		length := len(p.data)
-		p.data[index], p.data[length-1] = p.data[length-1], p.data[index]
-		if length > 0 {
-			p.data = p.data[:length-1]
-		}
-	}
-}
-
-func (p *componentData) Len() int {
-	return len(p.data)
-}
-
-type CollectionOperate int
+type CollectionOperate uint8
 
 const (
 	COLLECTION_OPERATE_NONE   CollectionOperate = iota
@@ -61,7 +31,7 @@ func NewCollectionOperateInfo(com IComponent, op CollectionOperate) CollectionOp
 }
 
 type ComponentCollection struct {
-	collection map[reflect.Type]*componentData
+	collection map[reflect.Type]*ContainerWithId
 	//new component cache
 	base           uint64
 	locks          []sync.Mutex
@@ -71,7 +41,7 @@ type ComponentCollection struct {
 
 func NewComponentCollection(k int) *ComponentCollection {
 	cc := &ComponentCollection{
-		collection:    map[reflect.Type]*componentData{},
+		collection:    map[reflect.Type]*ContainerWithId{},
 		componentsNew: make(map[CollectionOperate]map[reflect.Type][]CollectionOperateInfo),
 	}
 
@@ -131,25 +101,36 @@ func (p *ComponentCollection) Push(com IComponent, id uint64) {
 	p.push(typ, com, id)
 }
 
-func (p *ComponentCollection) push(typ reflect.Type, com IComponent, id uint64) {
-	if v, ok := p.collection[typ]; ok {
-		v.push(com, id)
-	} else {
-		cd := newComponentData()
-		cd.push(com, id)
-		p.collection[typ] = cd
+func (p *ComponentCollection) push(typ reflect.Type, com IComponent, id uint64) unsafe.Pointer {
+	efaceStruct := (*eface)(unsafe.Pointer(&com))
+	var v *ContainerWithId
+	var ok bool
+	v, ok = p.collection[typ]
+	if !ok {
+		v = NewContainerWithId(typ.Size())
+		p.collection[typ] = v
 	}
+	_, pointer := v.Add(unsafe.Pointer(*(**int)(efaceStruct.data)))
+	//TODO 检查正确性、检查是否造成外部内存泄漏
+	*(**[]byte)(efaceStruct.data) = (*[]byte)(pointer)
+	return pointer
 }
 
 func (p *ComponentCollection) Pop(com IComponent, id uint64) {
 	typ := reflect.TypeOf(com)
 	if v, ok := p.collection[typ]; ok {
-		v.pop(id)
+		v.RemoveById(id)
 	}
 }
 
 func (p *ComponentCollection) GetNewComponentsAll() []CollectionOperateInfo {
-	var temp []CollectionOperateInfo
+	size := 0
+	for _, m := range p.componentsNew {
+		for _, mm := range m {
+			size += len(mm)
+		}
+	}
+	temp := make([]CollectionOperateInfo, 0, size)
 	for _, m := range p.componentsNew {
 		for _, mm := range m {
 			temp = append(temp, mm...)
@@ -162,41 +143,43 @@ func (p *ComponentCollection) GetNewComponents(op CollectionOperate, typ reflect
 	return p.componentsNew[op][typ]
 }
 
-func (p *ComponentCollection) GetComponents(com IComponent) []IComponent {
+func (p *ComponentCollection) GetComponents(com IComponent) *Iterator {
 	v, ok := p.collection[reflect.TypeOf(com)]
 	if ok {
-		return v.data
+		return v.GetIterator()
 	}
-	return []IComponent{}
+	return EmptyIterator()
 }
 
-func (p *ComponentCollection) GetAllComponents() []IComponent {
+func (p *ComponentCollection) GetAllComponents() *ComponentCollectionIter {
 	length := 0
 	for _, value := range p.collection {
-		length += len(value.data)
+		length += value.Len()
 	}
-	components := make([]IComponent, length)
+	components := make([]*ContainerWithId, 0, length)
 	index := 0
 	for _, value := range p.collection {
-		l := len(value.data)
-		copy(components[index:index+l], value.data)
+		l := value.Len()
+		components = append(components, value)
 		index += l
 	}
-	return components
+	return NewComponentCollectionIter(components)
 }
 
-func (p *ComponentCollection) GetComponent(com IComponent, id uint64) interface{} {
+func (p *ComponentCollection) GetComponent(com IComponent, id uint64) IComponent {
 	v, ok := p.collection[reflect.TypeOf(com)]
 	if ok {
-		if c, ok := v.index[id]; ok {
-			return v.data[c]
+		if c := v.GetById(id); c != nil {
+			efaceStruct := (*eface)(unsafe.Pointer(&com))
+			efaceStruct.data = c
+			return com
 		}
 	}
 	return nil
 }
 
 func (p *ComponentCollection) GetIterator() *ComponentCollectionIter {
-	ls := make([]*componentData, len(p.collection))
+	ls := make([]*ContainerWithId, len(p.collection))
 	i := 0
 	for _, value := range p.collection {
 		ls[i] = value

@@ -36,9 +36,10 @@ func TestComponentCollection(t *testing.T) {
 	}
 	//test GetComponents
 	com1 := cc.GetComponents(&TestComponent1{})
-	for _, value := range com1 {
-		println(value.(*TestComponent1).ID)
+	for com := com1.Next(); com != com1.End(); com = com1.Next() {
+		println(((*TestComponent1)(com)).ID)
 	}
+
 	//test GetComponent
 	com2 := cc.GetComponent(&TestComponent3{}, 4)
 	if com2 != nil {
@@ -46,7 +47,7 @@ func TestComponentCollection(t *testing.T) {
 	}
 	//test iterator
 	cIter := cc.GetIterator()
-	for i := cIter.first(); i != nil; i = cIter.next() {
-		println(reflect.TypeOf(i).String())
+	for com := cIter.Next(); com != cIter.End(); com = cIter.Next() {
+		println(((*TestComponent1)(com)).ID)
 	}
 }
