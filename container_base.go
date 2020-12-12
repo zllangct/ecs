@@ -6,74 +6,74 @@ import (
 )
 
 type Container struct {
-	buf        []byte
-	len        int
-	memberSize uintptr
-	begin      uintptr
+	buf  []byte
+	len  int
+	unit uintptr
+	head uintptr
 }
 
 func NewContainer(size uintptr) *Container {
 	return &Container{
-		buf:        make([]byte, 0, size),
-		len:        -1,
-		memberSize: size,
+		buf:  make([]byte, 0, size),
+		len:  -1,
+		unit: size,
 	}
 }
 
-func (p *Container) add(pointer unsafe.Pointer) (int, unsafe.Pointer) {
+func (p *Container) Add(pointer unsafe.Pointer) (int, unsafe.Pointer) {
 	data := reflect.SliceHeader{
 		Data: uintptr(pointer),
-		Len:  int(p.memberSize),
-		Cap:  int(p.memberSize),
+		Len:  int(p.unit),
+		Cap:  int(p.unit),
 	}
 	p.buf = append(p.buf, *(*[]byte)(unsafe.Pointer(&data))...)
-	p.begin = (*reflect.SliceHeader)(unsafe.Pointer(&p.buf)).Data
+	p.head = (*reflect.SliceHeader)(unsafe.Pointer(&p.buf)).Data
 	p.len += 1
-	return p.len, unsafe.Pointer(p.begin + uintptr(p.len)*p.memberSize)
+	return p.len, unsafe.Pointer(p.head + uintptr(p.len)*p.unit)
 }
 
-func (p *Container) remove(idx int) {
+func (p *Container) Remove(idx int) {
 	if idx < 0 || idx >= p.len {
 		return
 	}
-	offsetDelete := p.begin + uintptr(idx)*p.memberSize
-	offsetEnd := p.begin + uintptr(p.len)*p.memberSize
-	copy(p.buf[offsetDelete:offsetDelete+uintptr(p.memberSize)], p.buf[offsetEnd:])
+	offsetDelete := p.head + uintptr(idx)*p.unit
+	offsetEnd := p.head + uintptr(p.len)*p.unit
+	copy(p.buf[offsetDelete:offsetDelete+uintptr(p.unit)], p.buf[offsetEnd:])
 	p.buf = p.buf[:offsetEnd]
 	p.len -= 1
 }
 
-func (p *Container) get(idx int) unsafe.Pointer {
+func (p *Container) Get(idx int) unsafe.Pointer {
 	if idx < 0 || idx >= p.len {
 		return nil
 	}
-	return unsafe.Pointer(p.begin + uintptr(idx)*p.memberSize)
+	return unsafe.Pointer(p.head + uintptr(idx)*p.unit)
 }
 
-type Iterator struct {
+func (p Container) GetIterator() *iterator {
+	return &iterator{
+		memberSize: p.unit,
+		size:       p.len,
+		index:      -1,
+		head:       p.head,
+	}
+}
+
+type iterator struct {
 	memberSize uintptr
 	size       int
 	index      int
-	begin      uintptr
+	head       uintptr
 }
 
-func NewIterator(container *Container) Iterator {
-	return Iterator{
-		memberSize: container.memberSize,
-		size:       container.len,
-		index:      -1,
-		begin:      container.begin,
-	}
-}
-
-func (p *Iterator) End() unsafe.Pointer {
+func (p *iterator) End() unsafe.Pointer {
 	return nil
 }
 
-func (p *Iterator) Next() unsafe.Pointer {
+func (p *iterator) Next() (int, unsafe.Pointer) {
 	if p.index == p.size {
-		return nil
+		return -1, nil
 	}
 	p.index++
-	return unsafe.Pointer(p.begin + uintptr(p.index)*p.memberSize)
+	return p.index, unsafe.Pointer(p.head + uintptr(p.index)*p.memberSize)
 }
