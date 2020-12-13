@@ -170,8 +170,6 @@ func (p *ComponentCollection) GetComponent(com IComponent, id uint64) IComponent
 	v, ok := p.collection[reflect.TypeOf(com)]
 	if ok {
 		if c := v.GetById(id); c != nil {
-			efaceStruct := (*eface)(unsafe.Pointer(&com))
-			efaceStruct.data = c
 			return com
 		}
 	}
