@@ -52,6 +52,9 @@ func TestComponentCollection(t *testing.T) {
 	sitc := unsafe.Sizeof(itc)
 	println(sitc)
 
+	println(t1.Bits())
+	println(t3.Bits())
+
 	ifs := (*iface)(unsafe.Pointer(&itc))
 
 	_ = ifs

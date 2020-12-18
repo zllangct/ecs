@@ -33,3 +33,8 @@ func (p *ComponentBase) GetBase() *ComponentBase {
 func (p *ComponentBase) setType(t reflect.Type) {
 	p.typ = t
 }
+
+func CreateComponent(com interface{}) uint64 {
+	//typ := reflect.TypeOf(com)
+	return 0
+}
