@@ -157,8 +157,8 @@ func (p *systemFlow) filterExecute() {
 						wg := args[2].(*sync.WaitGroup)
 						if !sys.GetBase().isPreFilter {
 							components := ctx.Runtime.GetAllComponents()
-							for _, com := range components {
-								filter.Filter(com, COLLECTION_OPERATE_ADD)
+							for com := components.Next(); com != components.End(); components.Next() {
+								filter.Filter(*com, COLLECTION_OPERATE_ADD)
 							}
 							sys.GetBase().isPreFilter = true
 						}

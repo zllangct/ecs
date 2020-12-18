@@ -98,7 +98,7 @@ func (p *Runtime) ComponentRemove(com IComponent) {
 	p.components.TempComponentOperate(com, COLLECTION_OPERATE_DELETE)
 }
 
-func (p *Runtime) GetAllComponents() []IComponent {
+func (p *Runtime) GetAllComponents() ComponentCollectionIter {
 	return p.components.GetAllComponents()
 }
 

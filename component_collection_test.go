@@ -3,6 +3,7 @@ package ecs
 import (
 	"reflect"
 	"testing"
+	"unsafe"
 )
 
 type TestComponent1 struct {
@@ -20,6 +21,10 @@ type TestComponent3 struct {
 	ID int
 }
 
+func inter(in interface{}) {
+
+}
+
 func TestComponentCollection(t *testing.T) {
 	tests := []IComponent{
 		&TestComponent1{ID: 1},
@@ -29,6 +34,28 @@ func TestComponentCollection(t *testing.T) {
 		&TestComponent3{ID: 5},
 		&TestComponent3{ID: 6},
 	}
+	tc := TestComponent1{}
+	itc := IComponent(&tc)
+	t1 := reflect.TypeOf(tc)
+	t2 := reflect.TypeOf(&tc)
+	t3 := reflect.TypeOf(itc)
+
+	_ = t1
+	_ = t2
+	_ = t3
+
+	println("src ptr:", &tc)
+	uptr := unsafe.Pointer(&tc)
+	println(uptr)
+	println(*(*int)(unsafe.Pointer(&tc)))
+
+	sitc := unsafe.Sizeof(itc)
+	println(sitc)
+
+	ifs := (*iface)(unsafe.Pointer(&itc))
+
+	_ = ifs
+
 	cc := NewComponentCollection(16 * 4)
 
 	for index, value := range tests {
@@ -46,8 +73,8 @@ func TestComponentCollection(t *testing.T) {
 		println(reflect.TypeOf(com2).String())
 	}
 	//test iterator
-	cIter := cc.GetIterator()
-	for com := cIter.Next(); com != cIter.End(); com = cIter.Next() {
-		println(((*TestComponent1)(com)).ID)
+	iter := cc.GetIterator()
+	for com := iter.Next(); com != iter.End(); iter.Next() {
+		println((*com).(*TestComponent1).ID)
 	}
 }

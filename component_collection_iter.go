@@ -2,21 +2,24 @@ package ecs
 
 import "unsafe"
 
-type ComponentCollectionIter struct {
+type ComponentCollectionIter = *componentCollectionIter
+
+type componentCollectionIter struct {
 	ls         []*ContainerWithId
 	index      int
 	indexInner int
+	temp       IComponent
 }
 
-func NewComponentCollectionIter(ls []*ContainerWithId) *ComponentCollectionIter {
-	return &ComponentCollectionIter{ls: ls}
+func NewComponentCollectionIter(ls []*ContainerWithId) ComponentCollectionIter {
+	return &componentCollectionIter{ls: ls}
 }
 
-func (p *ComponentCollectionIter) End() unsafe.Pointer {
+func (p *componentCollectionIter) End() *IComponent {
 	return nil
 }
 
-func (p *ComponentCollectionIter) Next() unsafe.Pointer {
+func (p *componentCollectionIter) Next() *IComponent {
 	if p.index == len(p.ls) {
 		return nil
 	}
@@ -27,5 +30,7 @@ func (p *ComponentCollectionIter) Next() unsafe.Pointer {
 	} else {
 		p.indexInner += 1
 	}
-	return c
+	efaceStruct := (*eface)(unsafe.Pointer(&p.temp))
+	efaceStruct.data = c
+	return &p.temp
 }

@@ -96,23 +96,22 @@ func (p *ComponentCollection) TempFlush() {
 
 }
 
-func (p *ComponentCollection) Push(com IComponent, id uint64) {
-	typ := reflect.TypeOf(com)
-	p.push(typ, com, id)
+func (p *ComponentCollection) Push(com IComponent, id uint64) unsafe.Pointer {
+	return p.push(reflect.TypeOf(com), com, id)
 }
 
 func (p *ComponentCollection) push(typ reflect.Type, com IComponent, id uint64) unsafe.Pointer {
-	efaceStruct := (*eface)(unsafe.Pointer(&com))
+	ifaceStruct := (*iface)(unsafe.Pointer(&com))
 	var v *ContainerWithId
 	var ok bool
 	v, ok = p.collection[typ]
 	if !ok {
-		v = NewContainerWithId(typ.Size())
+		v = NewContainerWithId(ifaceStruct.tab.inter.typ.size)
 		p.collection[typ] = v
 	}
-	_, pointer := v.Add(unsafe.Pointer(*(**int)(efaceStruct.data)))
-	//TODO 检查正确性、检查是否造成外部内存泄漏
-	*(**[]byte)(efaceStruct.data) = (*[]byte)(pointer)
+	_, pointer := v.Add(unsafe.Pointer(*(**int)(ifaceStruct.data)), id)
+	//TODO 检查正确性
+	*(**[]byte)(ifaceStruct.data) = (*[]byte)(pointer)
 	return pointer
 }
 
@@ -143,7 +142,7 @@ func (p *ComponentCollection) GetNewComponents(op CollectionOperate, typ reflect
 	return p.componentsNew[op][typ]
 }
 
-func (p *ComponentCollection) GetComponents(com IComponent) *Iterator {
+func (p *ComponentCollection) GetComponents(com IComponent) *iterator {
 	v, ok := p.collection[reflect.TypeOf(com)]
 	if ok {
 		return v.GetIterator()
@@ -151,7 +150,7 @@ func (p *ComponentCollection) GetComponents(com IComponent) *Iterator {
 	return EmptyIterator()
 }
 
-func (p *ComponentCollection) GetAllComponents() *ComponentCollectionIter {
+func (p *ComponentCollection) GetAllComponents() ComponentCollectionIter {
 	length := 0
 	for _, value := range p.collection {
 		length += value.Len()
@@ -176,7 +175,7 @@ func (p *ComponentCollection) GetComponent(com IComponent, id uint64) IComponent
 	return nil
 }
 
-func (p *ComponentCollection) GetIterator() *ComponentCollectionIter {
+func (p *ComponentCollection) GetIterator() *componentCollectionIter {
 	ls := make([]*ContainerWithId, len(p.collection))
 	i := 0
 	for _, value := range p.collection {

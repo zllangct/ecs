@@ -1,6 +1,8 @@
 package ecs
 
-import "unsafe"
+import (
+	"unsafe"
+)
 
 type eface struct {
 	_type *_type

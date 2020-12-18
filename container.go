@@ -50,8 +50,8 @@ func (p *Container) Get(idx int) unsafe.Pointer {
 	return unsafe.Pointer(p.head + uintptr(idx)*p.unit)
 }
 
-func (p Container) GetIterator() *Iterator {
-	return &Iterator{
+func (p Container) GetIterator() *iterator {
+	return &iterator{
 		memberSize: p.unit,
 		size:       p.len,
 		index:      -1,

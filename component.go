@@ -1,16 +1,21 @@
 package ecs
 
-import "sync"
+import (
+	"reflect"
+	"sync"
+)
 
 type IComponent interface {
+	setOwner(*Entity)
+	setType(reflect.Type)
 	GetOwner() *Entity
 	GetBase() *ComponentBase
-	setOwner(*Entity)
 }
 
 type ComponentBase struct {
 	lock  sync.Mutex
 	owner *Entity
+	typ   reflect.Type
 }
 
 func (p *ComponentBase) setOwner(entity *Entity) {
@@ -23,4 +28,8 @@ func (p *ComponentBase) GetOwner() *Entity {
 
 func (p *ComponentBase) GetBase() *ComponentBase {
 	return p
+}
+
+func (p *ComponentBase) setType(t reflect.Type) {
+	p.typ = t
 }
