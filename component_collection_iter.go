@@ -12,25 +12,31 @@ type componentCollectionIter struct {
 }
 
 func NewComponentCollectionIter(ls []*ContainerWithId) ComponentCollectionIter {
-	return &componentCollectionIter{ls: ls}
+	return &componentCollectionIter{
+		ls:         ls,
+		index:      0,
+		indexInner: -1,
+		temp:       &ComponentBase{},
+	}
 }
 
-func (p *componentCollectionIter) End() *IComponent {
+func (p *componentCollectionIter) End() IComponent {
 	return nil
 }
 
-func (p *componentCollectionIter) Next() *IComponent {
-	if p.index == len(p.ls) {
-		return nil
-	}
-	c := p.ls[p.index].Get(p.indexInner)
+func (p *componentCollectionIter) Next() IComponent {
 	if p.indexInner == p.ls[p.index].Len()-1 {
 		p.index += 1
 		p.indexInner = 0
 	} else {
 		p.indexInner += 1
 	}
-	efaceStruct := (*eface)(unsafe.Pointer(&p.temp))
+	if p.index == len(p.ls) {
+		p.temp = nil
+		return nil
+	}
+	c := p.ls[p.index].Get(p.indexInner)
+	efaceStruct := (*iface)(unsafe.Pointer(&p.temp))
 	efaceStruct.data = c
-	return &p.temp
+	return p.temp
 }

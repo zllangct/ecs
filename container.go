@@ -15,7 +15,7 @@ type Container struct {
 func NewContainer(size uintptr) *Container {
 	return &Container{
 		buf:  make([]byte, 0, size),
-		len:  -1,
+		len:  0,
 		unit: size,
 	}
 }
@@ -29,7 +29,7 @@ func (p *Container) Add(pointer unsafe.Pointer) (int, unsafe.Pointer) {
 	p.buf = append(p.buf, *(*[]byte)(unsafe.Pointer(&data))...)
 	p.head = (*reflect.SliceHeader)(unsafe.Pointer(&p.buf)).Data
 	p.len += 1
-	return p.len, unsafe.Pointer(p.head + uintptr(p.len)*p.unit)
+	return p.len - 1, unsafe.Pointer(p.head + uintptr(p.len)*p.unit)
 }
 
 func (p *Container) Remove(idx int) {

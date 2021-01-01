@@ -7,9 +7,13 @@ import (
 
 type IComponent interface {
 	setOwner(*Entity)
-	setType(reflect.Type)
 	GetOwner() *Entity
 	GetBase() *ComponentBase
+	GetType() reflect.Type
+}
+
+type IComponentType interface {
+	typeFlag()
 }
 
 type ComponentBase struct {
@@ -30,11 +34,13 @@ func (p *ComponentBase) GetBase() *ComponentBase {
 	return p
 }
 
-func (p *ComponentBase) setType(t reflect.Type) {
+func (p *ComponentBase) SetType(t reflect.Type) {
 	p.typ = t
 }
 
-func CreateComponent(com interface{}) uint64 {
-	//typ := reflect.TypeOf(com)
-	return 0
+func (p *ComponentBase) GetType() reflect.Type {
+	return p.typ
+}
+
+func (p ComponentBase) typeFlag() {
 }

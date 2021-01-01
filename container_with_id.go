@@ -12,7 +12,7 @@ func NewContainerWithId(size uintptr) *ContainerWithId {
 	return &ContainerWithId{
 		Container: Container{
 			buf:  make([]byte, 0, size),
-			len:  -1,
+			len:  0,
 			unit: size,
 		},
 		idx2id: map[int]uint64{},
@@ -29,8 +29,8 @@ func (p *ContainerWithId) Add(pointer unsafe.Pointer, id ...uint64) (int, unsafe
 	}
 	idx, ptr := p.Container.Add(pointer)
 	if len(id) > 0 {
-		p.id2idx[id[0]] = p.len
-		p.idx2id[p.len] = id[0]
+		p.id2idx[id[0]] = idx
+		p.idx2id[idx] = id[0]
 	}
 	return idx, ptr
 }

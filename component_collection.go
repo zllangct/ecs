@@ -97,7 +97,7 @@ func (p *ComponentCollection) TempFlush() {
 }
 
 func (p *ComponentCollection) Push(com IComponent, id uint64) unsafe.Pointer {
-	return p.push(reflect.TypeOf(com), com, id)
+	return p.push(com.GetType(), com, id)
 }
 
 func (p *ComponentCollection) push(typ reflect.Type, com IComponent, id uint64) unsafe.Pointer {
@@ -106,10 +106,10 @@ func (p *ComponentCollection) push(typ reflect.Type, com IComponent, id uint64) 
 	var ok bool
 	v, ok = p.collection[typ]
 	if !ok {
-		v = NewContainerWithId(ifaceStruct.tab.inter.typ.size)
+		v = NewContainerWithId(typ.Size())
 		p.collection[typ] = v
 	}
-	_, pointer := v.Add(unsafe.Pointer(*(**int)(ifaceStruct.data)), id)
+	_, pointer := v.Add(ifaceStruct.data, id)
 	//TODO 检查正确性
 	*(**[]byte)(ifaceStruct.data) = (*[]byte)(pointer)
 	return pointer
@@ -142,7 +142,7 @@ func (p *ComponentCollection) GetNewComponents(op CollectionOperate, typ reflect
 	return p.componentsNew[op][typ]
 }
 
-func (p *ComponentCollection) GetComponents(com IComponent) *iterator {
+func (p *ComponentCollection) GetComponents(com IComponentType) *iterator {
 	v, ok := p.collection[reflect.TypeOf(com)]
 	if ok {
 		return v.GetIterator()
@@ -165,12 +165,13 @@ func (p *ComponentCollection) GetAllComponents() ComponentCollectionIter {
 	return NewComponentCollectionIter(components)
 }
 
-func (p *ComponentCollection) GetComponent(com IComponent, id uint64) IComponent {
+func (p *ComponentCollection) GetComponent(com IComponentType, id uint64) unsafe.Pointer {
 	v, ok := p.collection[reflect.TypeOf(com)]
 	if ok {
 		if c := v.GetById(id); c != nil {
-			return com
+			return c
 		}
+		return nil
 	}
 	return nil
 }

@@ -32,7 +32,7 @@ func (p *iterator) End() unsafe.Pointer {
 }
 
 func (p *iterator) Next() unsafe.Pointer {
-	if p.index >= p.size || p.size == 0 {
+	if p.index >= p.size-1 || p.size == 0 {
 		return nil
 	}
 	p.index++

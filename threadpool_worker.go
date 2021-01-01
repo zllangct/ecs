@@ -7,14 +7,14 @@ type Worker struct {
 	runtime  *Runtime
 	id       int32
 	p        *Pool
-	jobQueue chan Job
+	jobQueue chan *Job
 	stop     chan struct{}
 }
 
 //Start start goroutine pool.
 func (w *Worker) Start() {
 	go func() {
-		var job Job
+		var job *Job
 		for {
 			select {
 			case job = <-w.jobQueue:

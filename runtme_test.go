@@ -141,7 +141,7 @@ func TestRuntime0(t *testing.T) {
 			dir: []int{0, 1, 0},
 		},
 	)
-	time.Sleep(time.Second * 20)
+	time.Sleep(time.Second * 10)
 	//<-make(chan struct{})
 }
 

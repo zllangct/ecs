@@ -21,63 +21,76 @@ type TestComponent3 struct {
 	ID int
 }
 
-func inter(in interface{}) {
+type ITest interface {
+	Test()
+	Test2()
+}
 
+type TestStruct struct {
+	Name   string
+	Field1 string
+	Field2 string
+}
+
+func (t TestStruct) Test() {
+	println(t.Name)
+}
+
+func (t TestStruct) Test2() {
+	println("test2")
+}
+func inter(in IComponent) {
+	ifaceStruct := (*iface)(unsafe.Pointer(&in))
+	_ = ifaceStruct
 }
 
 func TestComponentCollection(t *testing.T) {
-	tests := []IComponent{
-		&TestComponent1{ID: 1},
-		&TestComponent1{ID: 2},
-		&TestComponent2{ID: 3},
-		&TestComponent2{ID: 4},
-		&TestComponent3{ID: 5},
-		&TestComponent3{ID: 6},
-	}
-	tc := TestComponent1{}
-	itc := IComponent(&tc)
-	t1 := reflect.TypeOf(tc)
-	t2 := reflect.TypeOf(&tc)
-	t3 := reflect.TypeOf(itc)
+	c1 := TestComponent1{ID: 1}
+	c2 := TestComponent1{ID: 2}
+	c3 := TestComponent2{ID: 3}
+	c4 := TestComponent2{ID: 4}
+	c5 := TestComponent3{ID: 5}
+	c6 := TestComponent3{ID: 6}
 
-	_ = t1
-	_ = t2
-	_ = t3
+	c1.SetType(reflect.TypeOf(c1))
+	c2.SetType(reflect.TypeOf(c2))
+	c3.SetType(reflect.TypeOf(c3))
+	c4.SetType(reflect.TypeOf(c4))
+	c5.SetType(reflect.TypeOf(c5))
+	c6.SetType(reflect.TypeOf(c6))
 
-	println("src ptr:", &tc)
-	uptr := unsafe.Pointer(&tc)
-	println(uptr)
-	println(*(*int)(unsafe.Pointer(&tc)))
+	_ = c1
+	_ = c2
+	_ = c3
+	_ = c4
+	_ = c5
+	_ = c6
 
-	sitc := unsafe.Sizeof(itc)
-	println(sitc)
-
-	println(t1.Bits())
-	println(t3.Bits())
-
-	ifs := (*iface)(unsafe.Pointer(&itc))
-
-	_ = ifs
+	inter(&c1)
 
 	cc := NewComponentCollection(16 * 4)
 
-	for index, value := range tests {
-		cc.Push(value, uint64(index))
-	}
+	cc.Push(&c1, 1)
+	cc.Push(&c2, 2)
+	cc.Push(&c3, 3)
+	cc.Push(&c4, 4)
+	cc.Push(&c5, 5)
+	cc.Push(&c6, 6)
+
 	//test GetComponents
-	com1 := cc.GetComponents(&TestComponent1{})
-	for com := com1.Next(); com != com1.End(); com = com1.Next() {
+	iter0 := cc.GetComponents(TestComponent1{})
+	for com := iter0.Next(); com != iter0.End(); com = iter0.Next() {
 		println(((*TestComponent1)(com)).ID)
 	}
 
 	//test GetComponent
-	com2 := cc.GetComponent(&TestComponent3{}, 4)
+	com2 := cc.GetComponent(TestComponent2{}, 4)
 	if com2 != nil {
-		println(reflect.TypeOf(com2).String())
+		println(((*TestComponent2)(com2)).ID)
 	}
 	//test iterator
-	iter := cc.GetIterator()
-	for com := iter.Next(); com != iter.End(); iter.Next() {
-		println((*com).(*TestComponent1).ID)
+	iter1 := cc.GetIterator()
+	for com := iter1.Next(); com != iter1.End(); com = iter1.Next() {
+		println(com.GetBase())
 	}
 }
