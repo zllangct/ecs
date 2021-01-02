@@ -27,7 +27,7 @@ func NewEntity(runtime *Runtime) *Entity {
 
 func (p *Entity) Destroy() {
 	for _, c := range p.components {
-		p.runtime.ComponentRemove(c)
+		p.runtime.ComponentRemove(c.GetOwner(), c)
 	}
 	p.runtime.DeleteEntity(p)
 }
@@ -39,6 +39,11 @@ func (p *Entity) ID() uint64 {
 func (p *Entity) Has(types ...reflect.Type) bool {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
+
+	return p.has(types...)
+}
+
+func (p *Entity) has(types ...reflect.Type) bool {
 	for _, typ := range types {
 		_, ok := p.components[typ]
 		if !ok {
@@ -50,25 +55,35 @@ func (p *Entity) Has(types ...reflect.Type) bool {
 
 func (p *Entity) AddComponent(com ...IComponent) {
 	for _, c := range com {
-		if c.GetOwner() != nil {
-			continue
-		}
-		typ := reflect.TypeOf(c)
-		if p.Has(typ) {
-			p.runtime.Error(errors.New("repeat component:" + typ.Name()))
-			continue
-		}
 		p.lock.Lock()
-		p.components[typ] = c
-		c.setOwner(p)
-		p.runtime.ComponentAttach(c)
+		p.addComponent(c)
 		p.lock.Unlock()
 	}
+}
+
+func (p *Entity) addComponent(com IComponent) {
+	if com.GetOwner() != nil {
+		return
+	}
+	typ := com.GetRealType()
+	if p.has(typ) {
+		p.runtime.Error("repeat component:", typ.Name())
+		return
+	}
+	p.runtime.ComponentAttach(p, com)
+}
+
+func (p *Entity) componentAdded(typ reflect.Type, com IComponent) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	p.components[typ] = com
 }
 
 func (p *Entity) RemoveComponent(com ...IComponent) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
+
 	for _, c := range com {
 		typ := reflect.TypeOf(c)
 		if !p.Has(typ) {
@@ -76,12 +91,13 @@ func (p *Entity) RemoveComponent(com ...IComponent) {
 			continue
 		}
 		delete(p.components, typ)
-		p.runtime.ComponentRemove(c)
+		p.runtime.ComponentRemove(c.GetOwner(), c)
 	}
 }
 
-func (p *Entity) GetComponent(com IComponent) IComponent {
+func (p *Entity) GetComponent(com IComponentType) IComponent {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
+
 	return p.components[reflect.TypeOf(com)]
 }

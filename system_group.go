@@ -14,8 +14,8 @@ type Node struct {
 }
 
 func (p *Node) isFriend(node *Node) bool {
-	for _, com := range p.val.GetRequirements() {
-		for _, comTarget := range node.val.GetRequirements() {
+	for com, _ := range p.val.GetRequirements() {
+		for comTarget, _ := range node.val.GetRequirements() {
 			if comTarget.String() == com.String() {
 				return true
 			}
@@ -58,9 +58,9 @@ func NewSystemGroup() *SystemGroup {
 	}
 }
 
-func (p *SystemGroup) refCount(rqs []reflect.Type) int {
+func (p *SystemGroup) refCount(rqs map[reflect.Type]struct{}) int {
 	ref := 0
-	for _, com := range rqs {
+	for com, _ := range rqs {
 		ref += p.ref[com.String()] - 1
 	}
 	return ref
@@ -126,7 +126,7 @@ func (p *SystemGroup) insert(sys ISystem) {
 		panic("invalid system")
 	}
 	//reference count
-	for _, com := range rqs {
+	for com, _ := range rqs {
 		if _, ok := p.ref[com.String()]; ok {
 			p.ref[com.String()] += 1
 		} else {

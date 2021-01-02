@@ -31,17 +31,20 @@ func NewEntityCollection(k int) *EntityCollection {
 
 func (p *EntityCollection) get(id uint64) *Entity {
 	hash := id & p.base
+
 	p.locks[hash].RLock()
 	defer p.locks[hash].RUnlock()
+
 	return p.collection[hash][id]
 }
 
 func (p *EntityCollection) add(entity *Entity) {
 	hash := entity.id & p.base
-	println(entity.id, entity.id%(p.base+1), entity.id&p.base)
+
 	p.locks[hash].Lock()
+	defer p.locks[hash].Unlock()
+
 	p.collection[hash][entity.id] = entity
-	p.locks[hash].Unlock()
 }
 
 func (p *EntityCollection) delete(entity *Entity) {
@@ -50,7 +53,9 @@ func (p *EntityCollection) delete(entity *Entity) {
 
 func (p *EntityCollection) deleteByID(id uint64) {
 	hash := id & p.base
+
 	p.locks[hash].Lock()
+	defer p.locks[hash].Unlock()
+
 	delete(p.collection[hash], id)
-	p.locks[hash].Unlock()
 }

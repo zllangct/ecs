@@ -29,7 +29,7 @@ func (p *Container) Add(pointer unsafe.Pointer) (int, unsafe.Pointer) {
 	p.buf = append(p.buf, *(*[]byte)(unsafe.Pointer(&data))...)
 	p.head = (*reflect.SliceHeader)(unsafe.Pointer(&p.buf)).Data
 	p.len += 1
-	return p.len - 1, unsafe.Pointer(p.head + uintptr(p.len)*p.unit)
+	return p.len - 1, unsafe.Pointer(p.head + uintptr(p.len-1)*p.unit)
 }
 
 func (p *Container) Remove(idx int) {

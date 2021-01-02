@@ -91,21 +91,21 @@ func (p *Runtime) DeleteEntityByID(id uint64) {
 	p.entities.deleteByID(id)
 }
 
-func (p *Runtime) ComponentAttach(com IComponent) {
-	p.components.TempComponentOperate(com, COLLECTION_OPERATE_ADD)
+func (p *Runtime) ComponentAttach(target *Entity, com IComponent) {
+	p.components.TempComponentOperate(target, com, COLLECTION_OPERATE_ADD)
 }
 
-func (p *Runtime) ComponentRemove(com IComponent) {
-	p.components.TempComponentOperate(com, COLLECTION_OPERATE_DELETE)
+func (p *Runtime) ComponentRemove(target *Entity, com IComponent) {
+	p.components.TempComponentOperate(target, com, COLLECTION_OPERATE_DELETE)
 }
 
 func (p *Runtime) GetAllComponents() ComponentCollectionIter {
 	return p.components.GetAllComponents()
 }
 
-func (p *Runtime) Error(err error) {
+func (p *Runtime) Error(v ...interface{}) {
 	if p.logger != nil {
-		p.logger.Error(err)
+		p.logger.Error(v...)
 	}
 }
 

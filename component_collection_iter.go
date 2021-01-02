@@ -8,6 +8,7 @@ type componentCollectionIter struct {
 	ls         []*ContainerWithId
 	index      int
 	indexInner int
+	len        int
 	temp       IComponent
 }
 
@@ -16,6 +17,7 @@ func NewComponentCollectionIter(ls []*ContainerWithId) ComponentCollectionIter {
 		ls:         ls,
 		index:      0,
 		indexInner: -1,
+		len:        len(ls),
 		temp:       &ComponentBase{},
 	}
 }
@@ -25,13 +27,16 @@ func (p *componentCollectionIter) End() IComponent {
 }
 
 func (p *componentCollectionIter) Next() IComponent {
+	if p.len == 0 {
+		return nil
+	}
 	if p.indexInner == p.ls[p.index].Len()-1 {
 		p.index += 1
 		p.indexInner = 0
 	} else {
 		p.indexInner += 1
 	}
-	if p.index == len(p.ls) {
+	if p.index == p.len {
 		p.temp = nil
 		return nil
 	}

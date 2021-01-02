@@ -39,10 +39,6 @@ func (t TestStruct) Test() {
 func (t TestStruct) Test2() {
 	println("test2")
 }
-func inter(in IComponent) {
-	ifaceStruct := (*iface)(unsafe.Pointer(&in))
-	_ = ifaceStruct
-}
 
 func TestComponentCollection(t *testing.T) {
 	c1 := TestComponent1{ID: 1}
@@ -52,12 +48,12 @@ func TestComponentCollection(t *testing.T) {
 	c5 := TestComponent3{ID: 5}
 	c6 := TestComponent3{ID: 6}
 
-	c1.SetType(reflect.TypeOf(c1))
-	c2.SetType(reflect.TypeOf(c2))
-	c3.SetType(reflect.TypeOf(c3))
-	c4.SetType(reflect.TypeOf(c4))
-	c5.SetType(reflect.TypeOf(c5))
-	c6.SetType(reflect.TypeOf(c6))
+	c1.SetRealType(reflect.TypeOf(c1))
+	c2.SetRealType(reflect.TypeOf(c2))
+	c3.SetRealType(reflect.TypeOf(c3))
+	c4.SetRealType(reflect.TypeOf(c4))
+	c5.SetRealType(reflect.TypeOf(c5))
+	c6.SetRealType(reflect.TypeOf(c6))
 
 	_ = c1
 	_ = c2
@@ -66,11 +62,13 @@ func TestComponentCollection(t *testing.T) {
 	_ = c5
 	_ = c6
 
-	inter(&c1)
-
 	cc := NewComponentCollection(16 * 4)
 
-	cc.Push(&c1, 1)
+	ptrc1 := &c1
+	println("c1 old ptr:", uintptr(unsafe.Pointer(ptrc1)))
+	ret := cc.Push(ptrc1, 1)
+	println("c1 new ptr:", uintptr(unsafe.Pointer(ptrc1)), uintptr(unsafe.Pointer(&ret)))
+
 	cc.Push(&c2, 2)
 	cc.Push(&c3, 3)
 	cc.Push(&c4, 4)

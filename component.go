@@ -9,7 +9,7 @@ type IComponent interface {
 	setOwner(*Entity)
 	GetOwner() *Entity
 	GetBase() *ComponentBase
-	GetType() reflect.Type
+	GetRealType() reflect.Type
 }
 
 type IComponentType interface {
@@ -17,9 +17,9 @@ type IComponentType interface {
 }
 
 type ComponentBase struct {
-	lock  sync.Mutex
-	owner *Entity
-	typ   reflect.Type
+	lock     sync.Mutex
+	owner    *Entity
+	realType reflect.Type
 }
 
 func (p *ComponentBase) setOwner(entity *Entity) {
@@ -34,12 +34,12 @@ func (p *ComponentBase) GetBase() *ComponentBase {
 	return p
 }
 
-func (p *ComponentBase) SetType(t reflect.Type) {
-	p.typ = t
+func (p *ComponentBase) SetRealType(t reflect.Type) {
+	p.realType = t
 }
 
-func (p *ComponentBase) GetType() reflect.Type {
-	return p.typ
+func (p *ComponentBase) GetRealType() reflect.Type {
+	return p.realType
 }
 
 func (p ComponentBase) typeFlag() {

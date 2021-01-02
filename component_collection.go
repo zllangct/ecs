@@ -22,12 +22,13 @@ const (
 )
 
 type CollectionOperateInfo struct {
-	com IComponent
-	op  CollectionOperate
+	target *Entity
+	com    IComponent
+	op     CollectionOperate
 }
 
-func NewCollectionOperateInfo(com IComponent, op CollectionOperate) CollectionOperateInfo {
-	return CollectionOperateInfo{com: com, op: op}
+func NewCollectionOperateInfo(entity *Entity, com IComponent, op CollectionOperate) CollectionOperateInfo {
+	return CollectionOperateInfo{target: entity, com: com, op: op}
 }
 
 type ComponentCollection struct {
@@ -62,10 +63,10 @@ func NewComponentCollection(k int) *ComponentCollection {
 }
 
 //new component temp
-func (p *ComponentCollection) TempComponentOperate(com IComponent, op CollectionOperate) {
-	hash := com.GetOwner().ID() & p.base
+func (p *ComponentCollection) TempComponentOperate(entity *Entity, com IComponent, op CollectionOperate) {
+	hash := entity.ID() & p.base
 	p.locks[hash].Lock()
-	p.componentsTemp[hash] = append(p.componentsTemp[hash], NewCollectionOperateInfo(com, op))
+	p.componentsTemp[hash] = append(p.componentsTemp[hash], NewCollectionOperateInfo(entity, com, op))
 	p.locks[hash].Unlock()
 }
 
@@ -83,9 +84,14 @@ func (p *ComponentCollection) TempFlush() {
 		COLLECTION_OPERATE_DELETE: make(map[reflect.Type][]CollectionOperateInfo),
 	}
 	for _, operate := range temp {
-		typ := reflect.TypeOf(operate.com)
+		typ := operate.com.GetRealType()
+		//set component owner
+		operate.com.setOwner(operate.target)
 		//add to component container
-		p.push(typ, operate.com, operate.com.GetOwner().ID())
+		ret := p.push(typ, operate.com, operate.target.ID())
+		//add to entity
+		operate.target.componentAdded(typ, ret)
+
 		//add to new component list
 		if _, ok := tempNew[operate.op][typ]; !ok {
 			tempNew[operate.op][typ] = make([]CollectionOperateInfo, 0)
@@ -96,11 +102,11 @@ func (p *ComponentCollection) TempFlush() {
 
 }
 
-func (p *ComponentCollection) Push(com IComponent, id uint64) unsafe.Pointer {
-	return p.push(com.GetType(), com, id)
+func (p *ComponentCollection) Push(com IComponent, id uint64) IComponent {
+	return p.push(com.GetRealType(), com, id)
 }
 
-func (p *ComponentCollection) push(typ reflect.Type, com IComponent, id uint64) unsafe.Pointer {
+func (p *ComponentCollection) push(typ reflect.Type, com IComponent, id uint64) IComponent {
 	ifaceStruct := (*iface)(unsafe.Pointer(&com))
 	var v *ContainerWithId
 	var ok bool
@@ -109,13 +115,13 @@ func (p *ComponentCollection) push(typ reflect.Type, com IComponent, id uint64) 
 		v = NewContainerWithId(typ.Size())
 		p.collection[typ] = v
 	}
+	//_, pointer := v.Add(unsafe.Pointer(*(**byte)(ifaceStruct.data)), id)
 	_, pointer := v.Add(ifaceStruct.data, id)
-	//TODO 检查正确性
-	*(**[]byte)(ifaceStruct.data) = (*[]byte)(pointer)
-	return pointer
+	ifaceStruct.data = pointer
+	return com
 }
 
-func (p *ComponentCollection) Pop(com IComponent, id uint64) {
+func (p *ComponentCollection) Pop(com IComponentType, id uint64) {
 	typ := reflect.TypeOf(com)
 	if v, ok := p.collection[typ]; ok {
 		v.RemoveById(id)

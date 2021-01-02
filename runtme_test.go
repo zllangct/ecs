@@ -17,11 +17,23 @@ type Position struct {
 	Z int
 }
 
+func NewPosition() *Position {
+	c := Position{}
+	c.SetRealType(reflect.TypeOf(c))
+	return &c
+}
+
 //movement component
 type Movement struct {
 	ComponentBase
 	v   int
 	dir []int
+}
+
+func NewMovement() *Movement {
+	c := Movement{}
+	c.SetRealType(reflect.TypeOf(c))
+	return &c
 }
 
 //move system
@@ -33,12 +45,14 @@ type MoveSystemData struct {
 type MoveSystem struct {
 	SystemBase
 	components map[uint64]MoveSystemData
+	logger     IInternalLogger
 }
 
 func (p *MoveSystem) Init(runtime *Runtime) {
 	p.SystemBase.Init(runtime)
+	p.logger = runtime.logger
 	p.SetType(reflect.TypeOf(p))
-	p.SetRequirements(&Position{}, &Movement{})
+	p.SetRequirements(Position{}, Movement{})
 	p.components = map[uint64]MoveSystemData{}
 }
 
@@ -48,8 +62,8 @@ func (p *MoveSystem) Filter(com IComponent, op ComponentOperate) {
 		switch op {
 		case COMPONENT_OPERATE_ADD:
 			p.components[owner.ID()] = MoveSystemData{
-				movement: owner.GetComponent(&Movement{}).(*Movement),
-				position: owner.GetComponent(&Position{}).(*Position),
+				movement: owner.GetComponent(Movement{}).(*Movement),
+				position: owner.GetComponent(Position{}).(*Position),
 			}
 		case COMPONENT_OPERATE_DELETE:
 			delete(p.components, owner.ID())
@@ -66,7 +80,7 @@ func (p *MoveSystem) Update(event Event) {
 		position.Y = position.Y + int(float64(move.dir[1]*move.v)*delta.Seconds())
 		position.Z = position.Z + int(float64(move.dir[2]*move.v)*delta.Seconds())
 
-		//println("current position:", position.X, position.Y, position.Z)
+		p.logger.Info("target id:", position.GetOwner().ID(), " current position:", position.X, position.Y, position.Z)
 	}
 }
 
@@ -90,7 +104,7 @@ type DamageSystem struct {
 func (p *DamageSystem) Init(runtime *Runtime) {
 	p.SystemBase.Init(runtime)
 	p.SetType(reflect.TypeOf(p))
-	p.SetRequirements(&Position{}, &HealthPoint{})
+	p.SetRequirements(Position{}, HealthPoint{})
 	p.components = map[uint64]DamageSystemData{}
 }
 
@@ -123,29 +137,29 @@ func TestRuntime0(t *testing.T) {
 	go rt.Run()
 
 	rt.Register(&MoveSystem{})
-	rt.Register(&DamageSystem{})
+	//rt.Register(&DamageSystem{})
 
 	NewEntity(rt)
 	NewEntity(rt)
 	NewEntity(rt)
 
-	entity1 := NewEntity(rt)
-	entity1.AddComponent(
-		&Position{X: 100, Y: 100, Z: 100},
-		&Movement{
-			v:   1000,
-			dir: []int{1, 0, 0},
-		},
-	)
-	entity2 := NewEntity(rt)
-	entity2.AddComponent(
-		&Position{X: 100, Y: 100, Z: 100},
-		&Movement{
-			v:   2000,
-			dir: []int{0, 1, 0},
-		},
-	)
-	time.Sleep(time.Second * 10)
+	p1 := NewPosition()
+	p1.X = 100
+	p1.Y = 100
+	p1.Z = 100
+	m1 := NewMovement()
+	m1.v = 1000
+	m1.dir = []int{1, 0, 0}
+	NewEntity(rt).AddComponent(p1, m1)
+	p2 := NewPosition()
+	p2.X = 100
+	p2.Y = 100
+	p2.Z = 100
+	m2 := NewMovement()
+	m2.v = 2000
+	m2.dir = []int{0, 1, 0}
+	NewEntity(rt).AddComponent(p2, m2)
+	time.Sleep(time.Second * 3)
 	//<-make(chan struct{})
 }
 
@@ -162,21 +176,23 @@ func TestRuntime1(t *testing.T) {
 
 	//初始化实体
 	for i := 0; i < 100000; i++ {
-		NewEntity(rt).AddComponent(
-			&Position{X: 100, Y: 100, Z: 100},
-			&Movement{
-				v:   1000,
-				dir: []int{1, 0, 0},
-			},
-		)
-		NewEntity(rt).AddComponent(
-			&Position{X: 100, Y: 100, Z: 100},
-			&Movement{
-				v:   2000,
-				dir: []int{0, 1, 0},
-			},
-		)
+		p1 := NewPosition()
+		p1.X = 100
+		p1.Y = 100
+		p1.Z = 100
+		m1 := NewMovement()
+		m1.v = 1000
+		m1.dir = []int{1, 0, 0}
+		NewEntity(rt).AddComponent(p1, m1)
+		p2 := NewPosition()
+		p2.X = 100
+		p2.Y = 100
+		p2.Z = 100
+		m2 := NewMovement()
+		m2.v = 2000
+		m2.dir = []int{0, 1, 0}
+		NewEntity(rt).AddComponent(p2, m2)
 	}
-	//time.Sleep(time.Second * 30)
-	<-make(chan struct{})
+	time.Sleep(time.Second * 3)
+	//<-make(chan struct{})
 }

@@ -24,13 +24,13 @@ type ISystem interface {
 	GetBase() *SystemBase  //get system base data
 	GetType() reflect.Type
 	GetOrder() Order
-	GetRequirements() []reflect.Type
+	GetRequirements() map[reflect.Type]struct{}
 	Call(label int) interface{}
 }
 
 type SystemBase struct {
 	sync.Mutex
-	requirements []reflect.Type
+	requirements map[reflect.Type]struct{}
 	order        Order
 	runtime      *Runtime
 	typ          reflect.Type
@@ -45,18 +45,21 @@ func (p *SystemBase) GetBase() *SystemBase {
 	return p
 }
 
-func (p *SystemBase) SetRequirements(rqs ...IComponent) {
+func (p *SystemBase) SetRequirements(rqs ...IComponentType) {
+	if p.requirements == nil {
+		p.requirements = map[reflect.Type]struct{}{}
+	}
 	for _, value := range rqs {
-		p.requirements = append(p.requirements, reflect.TypeOf(value))
+		p.requirements[reflect.TypeOf(value)] = struct{}{}
 	}
 }
 
-func (p *SystemBase) GetRequirements() []reflect.Type {
+func (p *SystemBase) GetRequirements() map[reflect.Type]struct{} {
 	return p.requirements
 }
 
 func (p *SystemBase) Init(runtime *Runtime) {
-	p.requirements = []reflect.Type{}
+	p.requirements = map[reflect.Type]struct{}{}
 	p.SetOrder(ORDER_DEFAULT)
 	p.runtime = runtime
 }
@@ -77,26 +80,32 @@ func (p *SystemBase) GetType() reflect.Type {
 
 func (p *SystemBase) SetOrder(order Order) {
 	p.Lock()
+	defer p.Unlock()
+
 	p.order = order
-	p.Unlock()
 }
 
 func (p *SystemBase) GetOrder() Order {
 	p.Lock()
 	defer p.Unlock()
+
 	return p.order
 }
 
 func (p *SystemBase) IsConcerned(com IComponent) bool {
-	concerned := true
-	cType := reflect.TypeOf(com)
-	for _, typ := range p.requirements {
-		if typ != cType && !com.GetOwner().Has(typ) {
-			concerned = false
-			break
+	cType := com.GetRealType()
+	if _, concerned := p.requirements[cType]; concerned {
+		for r, _ := range p.requirements {
+			if r != cType {
+				if !com.GetOwner().Has(r) {
+					concerned = false
+					break
+				}
+			}
 		}
+		return concerned
 	}
-	return concerned
+	return false
 }
 
 func (p *SystemBase) GetRuntime() *Runtime {
@@ -105,7 +114,7 @@ func (p *SystemBase) GetRuntime() *Runtime {
 
 func (p *SystemBase) GetNewComponent(op CollectionOperate) map[reflect.Type][]CollectionOperateInfo {
 	temp := map[reflect.Type][]CollectionOperateInfo{}
-	for _, typ := range p.requirements {
+	for typ, _ := range p.requirements {
 		temp[typ] = p.runtime.getNewComponents(op, typ)
 	}
 	return temp

@@ -161,9 +161,10 @@ func (p *systemFlow) filterExecute() {
 								filter.Filter(com, COLLECTION_OPERATE_ADD)
 							}
 							sys.GetBase().isPreFilter = true
-						}
-						for _, comInfo := range comInfos {
-							filter.Filter(comInfo.com, comInfo.op)
+						} else {
+							for _, comInfo := range comInfos {
+								filter.Filter(comInfo.com, comInfo.op)
+							}
 						}
 						wg.Done()
 					}, ss[i], filter, p.wg)
