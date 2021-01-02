@@ -1,19 +1,17 @@
 package ecs
 
-import "errors"
-
 func Try(task func()) (err error) {
-	defer func() {
-		r := recover()
-		switch typ := r.(type) {
-		case error:
-			err = r.(error)
-		case string:
-			err = errors.New(r.(string))
-		default:
-			_ = typ
-		}
-	}()
+	//defer func() {
+	//	r := recover()
+	//	switch typ := r.(type) {
+	//	case error:
+	//		err = r.(error)
+	//	case string:
+	//		err = errors.New(r.(string))
+	//	default:
+	//		_ = typ
+	//	}
+	//}()
 	task()
 	return nil
 }

@@ -19,7 +19,7 @@ type Runtime struct {
 	//runtime worker pool
 	workPool *Pool
 	//logger
-	logger ILogger
+	logger IInternalLogger
 }
 
 func NewRuntime() *Runtime {
@@ -30,6 +30,7 @@ func NewRuntime() *Runtime {
 		systemFlow: nil,
 		components: NewComponentCollection(config.HashCount),
 		entities:   NewEntityCollection(config.HashCount),
+		logger:     NewStdLogger(),
 	}
 	rt.workPool = NewPool(rt, config.MaxPoolThread, config.MaxPoolJobQueue)
 	//initialise system flow
@@ -45,13 +46,13 @@ func (p *Runtime) SetConfig(config *RuntimeConfig) {
 }
 
 //set logger
-func (p *Runtime) SetLogger(logger ILogger) {
+func (p *Runtime) SetLogger(logger IInternalLogger) {
 	p.logger = logger
 }
 
 //start ecs world
 func (p *Runtime) Run() {
-	println("runtime running")
+	p.logger.Info("start runtime success")
 	//start the work pool
 	p.workPool.Start()
 

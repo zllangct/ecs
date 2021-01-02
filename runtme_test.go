@@ -125,6 +125,10 @@ func TestRuntime0(t *testing.T) {
 	rt.Register(&MoveSystem{})
 	rt.Register(&DamageSystem{})
 
+	NewEntity(rt)
+	NewEntity(rt)
+	NewEntity(rt)
+
 	entity1 := NewEntity(rt)
 	entity1.AddComponent(
 		&Position{X: 100, Y: 100, Z: 100},

@@ -37,7 +37,9 @@ func (p *EntityCollection) get(id uint64) *Entity {
 }
 
 func (p *EntityCollection) add(entity *Entity) {
+	//TODO some thing wrong
 	hash := entity.id & p.base
+	println(entity.id, 66%(p.base+1), 66&p.base)
 	p.locks[hash].Lock()
 	p.collection[hash][entity.id] = entity
 	p.locks[hash].Unlock()
