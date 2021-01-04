@@ -16,10 +16,6 @@ func init() {
 }
 
 func UniqueID() EntityID {
-	t1 := time.Now().Unix()
-	_ = t1
-	t2 := time.Now().UnixNano()
-	_ = t2
 	tNow := uint64(time.Now().UnixNano()) << 32
 	tTemp := atomic.LoadUint64(&timestamp)
 	if tTemp != tNow {
