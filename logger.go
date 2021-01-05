@@ -8,8 +8,9 @@ import (
 )
 
 type IInternalLogger interface {
-	Error(v ...interface{})
 	Info(v ...interface{})
+	Error(v ...interface{})
+	Fatal(v ...interface{})
 }
 
 type StdLogger struct {
@@ -20,6 +21,10 @@ func NewStdLogger() *StdLogger {
 	return &StdLogger{
 		logger: log.New(os.Stdout, "", log.Lshortfile),
 	}
+}
+
+func (p StdLogger) Info(v ...interface{}) {
+	p.logger.Output(2, fmt.Sprint(v...))
 }
 
 func (p StdLogger) Error(v ...interface{}) {
@@ -34,10 +39,10 @@ func (p StdLogger) Error(v ...interface{}) {
 	}
 	s := fmt.Sprint(append(v, "\n", string(buf))...)
 	p.logger.Output(2, s)
-	panic(s)
-	//os.Exit(1)
 }
 
-func (p StdLogger) Info(v ...interface{}) {
-	p.logger.Output(2, fmt.Sprint(v...))
+func (p StdLogger) Fatal(v ...interface{})  {
+	p.Error(v...)
+	os.Exit(1)
 }
+
