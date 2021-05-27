@@ -11,7 +11,7 @@ type iterator struct {
 	head       uintptr
 }
 
-func NewIterator(container *Container) Iterator {
+func NewIterator(container *UnorderedContainer) Iterator {
 	return &iterator{
 		memberSize: container.unit,
 		size:       container.len,
@@ -37,12 +37,4 @@ func (p *iterator) Next() unsafe.Pointer {
 	}
 	p.index++
 	return unsafe.Pointer(p.head + uintptr(p.index)*p.memberSize)
-}
-
-func (p *iterator) NextIV() (int, unsafe.Pointer) {
-	if p.index >= p.size || p.size == 0 {
-		return -1, nil
-	}
-	p.index++
-	return p.index, unsafe.Pointer(p.head + uintptr(p.index)*p.memberSize)
 }

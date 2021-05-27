@@ -3,14 +3,14 @@ package ecs
 import "unsafe"
 
 type ContainerWithId struct {
-	Container
+	UnorderedContainer
 	id2idx map[uint64]int
 	idx2id map[int]uint64
 }
 
 func NewContainerWithId(size uintptr) *ContainerWithId {
 	return &ContainerWithId{
-		Container: Container{
+		UnorderedContainer: UnorderedContainer{
 			buf:  make([]byte, 0, size),
 			len:  0,
 			unit: size,
@@ -27,7 +27,7 @@ func (p *ContainerWithId) Add(pointer unsafe.Pointer, id ...uint64) (int, unsafe
 			return 0, nil
 		}
 	}
-	idx, ptr := p.Container.Add(pointer)
+	idx, ptr := p.UnorderedContainer.Add(pointer)
 	if len(id) > 0 {
 		p.id2idx[id[0]] = idx
 		p.idx2id[idx] = id[0]
@@ -44,7 +44,7 @@ func (p *ContainerWithId) Remove(idx int) {
 	p.idx2id[idx] = p.idx2id[p.len]
 	delete(p.idx2id, p.len)
 
-	p.Container.Remove(idx)
+	p.UnorderedContainer.Remove(idx)
 }
 
 func (p *ContainerWithId) RemoveById(id uint64) {
@@ -56,7 +56,7 @@ func (p *ContainerWithId) RemoveById(id uint64) {
 }
 
 func (p *ContainerWithId) Get(idx int) unsafe.Pointer {
-	return p.Container.Get(idx)
+	return p.UnorderedContainer.Get(idx)
 }
 
 func (p *ContainerWithId) GetById(id uint64) unsafe.Pointer {
@@ -64,7 +64,7 @@ func (p *ContainerWithId) GetById(id uint64) unsafe.Pointer {
 	if !ok {
 		return nil
 	}
-	return p.Container.Get(idx)
+	return p.UnorderedContainer.Get(idx)
 }
 
 func (p *ContainerWithId) GetId(idx int) uint64 {

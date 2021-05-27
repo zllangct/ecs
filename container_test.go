@@ -40,3 +40,67 @@ func TestNewContainer(t *testing.T) {
 		}
 	})
 }
+
+func BenchmarkContainerNormalWrite(b *testing.B) {
+	type Item struct {
+		Count int
+		Name  string
+	}
+
+	typ := reflect.TypeOf(Item{})
+	c := NewContainer(typ.Size())
+
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		item := &Item{
+			Count: n,
+			Name:  "foo" + strconv.Itoa(n),
+		}
+
+		c.Add(unsafe.Pointer(item))
+	}
+}
+
+func BenchmarkContainerNormalRead(b *testing.B) {
+	type Item struct {
+		Count int
+		Name  string
+	}
+
+	typ := reflect.TypeOf(Item{})
+	c := NewContainer(typ.Size())
+
+	for n := 0; n < b.N; n++ {
+		item := &Item{
+			Count: n,
+			Name:  "foo" + strconv.Itoa(n),
+		}
+
+		c.Add(unsafe.Pointer(item))
+	}
+
+	b.ResetTimer()
+
+	for n := 0; n < b.N; n++ {
+		p := c.Get(n)
+		item := *((*Item)(p))
+		_ = item
+	}
+}
+
+// func BenchmarkContainerGenericWrite(b *testing.B) {
+// 	type Item struct {
+// 		Count int
+// 		Name  string
+// 	}
+// 	c := NewTContainer[Item]()
+// 	b.ResetTimer()
+// 	for n := 0; n < b.N; n++ {
+// 		item := Item{
+// 			Count: n,
+// 			Name:  "foo" + strconv.Itoa(n),
+// 		}
+
+// 		c.Add(item)
+// 	}
+// }
