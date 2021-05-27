@@ -13,7 +13,8 @@ type UnorderedContainerByte[T any] struct {
 }
 
 func NewUnorderedContainerByte[T any]() *UnorderedContainerByte[T] {
-	size := reflect.Sizeof(T)
+	var ins T
+	size := reflect.TypeOf(ins).Size()
 	c := &UnorderedContainerByte{
 		buf:  make([]byte, 0, size),
 		len:  0,
@@ -22,7 +23,8 @@ func NewUnorderedContainerByte[T any]() *UnorderedContainerByte[T] {
 	return c
 }
 
-func (p *UnorderedContainerByte) Add(pointer unsafe.Pointer) (int, unsafe.Pointer) {
+func (p *UnorderedContainerByte[T]) Add(item *T) (int, *T) {
+	pointer	:= unsafe.Pointer(item)
 	data := reflect.SliceHeader{
 		Data: uintptr(pointer),
 		Len:  int(p.unit),
@@ -31,10 +33,10 @@ func (p *UnorderedContainerByte) Add(pointer unsafe.Pointer) (int, unsafe.Pointe
 	p.buf = append(p.buf, *(*[]byte)(unsafe.Pointer(&data))...)
 	p.head = (*reflect.SliceHeader)(unsafe.Pointer(&p.buf)).Data
 	p.len += 1
-	return p.len - 1, unsafe.Pointer(p.head + uintptr(p.len-1)*p.unit)
+	return p.len - 1, (*T)(unsafe.Pointer(p.head + uintptr(p.len-1)*p.unit))
 }
 
-func (p *UnorderedContainerByte) Remove(idx int) {
+func (p *UnorderedContainerByte[T]) Remove(idx int) {
 	if idx < 0 || idx >= p.len {
 		return
 	}
@@ -45,9 +47,9 @@ func (p *UnorderedContainerByte) Remove(idx int) {
 	p.len -= 1
 }
 
-func (p *UnorderedContainerByte) Get(idx int) unsafe.Pointer {
+func (p *UnorderedContainerByte[T]) Get(idx int) *T {
 	if idx < 0 || idx >= p.len {
 		return nil
 	}
-	return unsafe.Pointer(p.head + uintptr(idx)*p.unit)
+	return (*T)(unsafe.Pointer(p.head + uintptr(idx)*p.unit))
 }

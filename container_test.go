@@ -88,19 +88,19 @@ func BenchmarkContainerNormalRead(b *testing.B) {
 	}
 }
 
-// func BenchmarkContainerGenericWrite(b *testing.B) {
-// 	type Item struct {
-// 		Count int
-// 		Name  string
-// 	}
-// 	c := NewTContainer[Item]()
-// 	b.ResetTimer()
-// 	for n := 0; n < b.N; n++ {
-// 		item := Item{
-// 			Count: n,
-// 			Name:  "foo" + strconv.Itoa(n),
-// 		}
+func BenchmarkContainerGenericWrite(b *testing.B) {
+	type Item struct {
+		Count int
+		Name  string
+	}
+	c := NewTUnorderedContainer[Item]()
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		item := Item{
+			Count: n,
+			Name:  "foo" + strconv.Itoa(n),
+		}
 
-// 		c.Add(item)
-// 	}
-// }
+		c.Add(item)
+	}
+}

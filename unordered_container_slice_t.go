@@ -6,7 +6,7 @@ type TUnorderedContainer[T any] struct {
 }
 
 func NewTUnorderedContainer[T any]() *TUnorderedContainer[T] {
-	return &TContainer[T]{
+	return &TUnorderedContainer[T]{
 		data:  make([]T, 0),
 		len:  0,
 	}
