@@ -1,9 +1,6 @@
 package ecs
 
-type TUnorderedContainer[T any] struct {
-	data  []T
-	len  int
-}
+type TUnorderedContainer[T any] []T
 
 func NewTUnorderedContainer[T any]() *TUnorderedContainer[T] {
 	return &TUnorderedContainer[T]{
@@ -36,4 +33,8 @@ func (p *TUnorderedContainer[T]) Get(idx int) *T {
 
 func (p *TUnorderedContainer[T]) Len() int {
 	return p.len
+}
+
+func (p *TUnorderedContainer[T]) Iterator() IIterator[T] {
+	return NewIterator[T](p)
 }

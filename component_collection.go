@@ -32,7 +32,7 @@ func NewCollectionOperateInfo(entity *Entity, com IComponent, op CollectionOpera
 }
 
 type ComponentCollection struct {
-	collection map[reflect.Type]*ContainerWithId
+	collection map[reflect.Type]interface{}
 	//new component cache
 	base           uint64
 	locks          []sync.Mutex
@@ -42,7 +42,7 @@ type ComponentCollection struct {
 
 func NewComponentCollection(k int) *ComponentCollection {
 	cc := &ComponentCollection{
-		collection:    map[reflect.Type]*ContainerWithId{},
+		collection:    map[reflect.Type]interface{}{},
 		componentsNew: make(map[CollectionOperate]map[reflect.Type][]CollectionOperateInfo),
 	}
 
@@ -102,29 +102,30 @@ func (p *ComponentCollection) TempFlush() {
 
 }
 
-func (p *ComponentCollection) Push(com IComponent, id uint64) IComponent {
-	return p.push(com.GetRealType(), com, id)
+func (p *ComponentCollection) Push[T IComponent](com T, id int64) IComponent {
+	return p.push[T](com, id)
 }
 
-func (p *ComponentCollection) push(typ reflect.Type, com IComponent, id uint64) IComponent {
-	ifaceStruct := (*iface)(unsafe.Pointer(&com))
+func (p *ComponentCollection) push[T IComponent](com *T, id int64) *T {
+	typ := reflect.TypeOf(*ins)
+	ifaceStruct := (*iface)(unsafe.Pointer(com))
 	var v *ContainerWithId
 	var ok bool
 	v, ok = p.collection[typ]
 	if !ok {
-		v = NewContainerWithId(typ.Size())
+		v = NewContainerWithIdByte[T]()
 		p.collection[typ] = v
 	}
-	//_, pointer := v.Add(unsafe.Pointer(*(**byte)(ifaceStruct.data)), id)
-	_, pointer := v.Add(ifaceStruct.data, id)
-	ifaceStruct.data = pointer
+	_, ptr := v.Add(ifaceStruct.data, id)
+	ifaceStruct.data = unsafe.Pointer(ptr)
 	return com
 }
 
-func (p *ComponentCollection) Pop(com IComponentType, id uint64) {
-	typ := reflect.TypeOf(com)
+func (p *ComponentCollection) Pop[T IComponent](id int64) {
+	var ins T
+	typ := reflect.TypeOf(ins)
 	if v, ok := p.collection[typ]; ok {
-		v.RemoveById(id)
+		v.(ContainerWithId[T]).RemoveById(id)
 	}
 }
 
@@ -144,18 +145,22 @@ func (p *ComponentCollection) GetNewComponentsAll() []CollectionOperateInfo {
 	return temp
 }
 
-func (p *ComponentCollection) GetNewComponents(op CollectionOperate, typ reflect.Type) []CollectionOperateInfo {
+func (p *ComponentCollection) GetNewComponents[T IComponent](op CollectionOperate) []CollectionOperateInfo {
+	var ins T
+	typ := reflect.TypeOf(ins)
 	return p.componentsNew[op][typ]
 }
 
-func (p *ComponentCollection) GetComponents(com IComponentType) *iterator {
-	v, ok := p.collection[reflect.TypeOf(com)]
+func (p *ComponentCollection) GetComponents[T IComponent]() *iterator {
+	var ins T
+	v, ok := p.collection[reflect.TypeOf(ins)]
 	if ok {
-		return v.GetIterator()
+		return v.(ContainerWithId[T]).GetIterator()
 	}
 	return EmptyIterator()
 }
 
+//TODO need to refactor
 func (p *ComponentCollection) GetAllComponents() ComponentCollectionIter {
 	length := 0
 	for _, value := range p.collection {
@@ -171,10 +176,11 @@ func (p *ComponentCollection) GetAllComponents() ComponentCollectionIter {
 	return NewComponentCollectionIter(components)
 }
 
-func (p *ComponentCollection) GetComponent(com IComponentType, id uint64) unsafe.Pointer {
-	v, ok := p.collection[reflect.TypeOf(com)]
+func (p *ComponentCollection) GetComponent[T IComponent](id int64) unsafe.Pointer {
+	var ins T
+	v, ok := p.collection[reflect.TypeOf(ins)]
 	if ok {
-		if c := v.GetById(id); c != nil {
+		if c := v.(ContainerWithId[T]).GetById(id); c != nil {
 			return c
 		}
 		return nil
@@ -182,6 +188,7 @@ func (p *ComponentCollection) GetComponent(com IComponentType, id uint64) unsafe
 	return nil
 }
 
+//TODO need to refactor
 func (p *ComponentCollection) GetIterator() *componentCollectionIter {
 	ls := make([]*ContainerWithId, len(p.collection))
 	i := 0

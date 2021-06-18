@@ -23,8 +23,8 @@ func NewUnorderedContainerByte[T any]() *UnorderedContainerByte[T] {
 	return c
 }
 
-func (p *UnorderedContainerByte[T]) Add(item *T) (int, *T) {
-	pointer	:= unsafe.Pointer(item)
+func (p *UnorderedContainerByte[T]) Add(item T) (int, *T) {
+	pointer	:= unsafe.Pointer(&item)
 	data := reflect.SliceHeader{
 		Data: uintptr(pointer),
 		Len:  int(p.unit),
@@ -52,4 +52,12 @@ func (p *UnorderedContainerByte[T]) Get(idx int) *T {
 		return nil
 	}
 	return (*T)(unsafe.Pointer(p.head + uintptr(idx)*p.unit))
+}
+
+func (p *UnorderedContainerByte[T]) Len() int {
+	return p.len
+}
+
+func (p *UnorderedContainerByte[T]) Iterator() IIterator[T] {
+	return NewIterator[T](p)
 }

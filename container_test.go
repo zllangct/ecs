@@ -23,7 +23,7 @@ func TestNewContainer(t *testing.T) {
 
 	t.Run("test1", func(t *testing.T) {
 		typ := reflect.TypeOf(Item{})
-		c := NewContainer(typ.Size())
+		c := NewUnorderedContainer(typ.Size())
 
 		cmp := map[int]int{}
 		for i := 0; i < caseCount; i++ {
@@ -48,7 +48,7 @@ func BenchmarkContainerNormalWrite(b *testing.B) {
 	}
 
 	typ := reflect.TypeOf(Item{})
-	c := NewContainer(typ.Size())
+	c := NewUnorderedContainer(typ.Size())
 
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
@@ -68,7 +68,7 @@ func BenchmarkContainerNormalRead(b *testing.B) {
 	}
 
 	typ := reflect.TypeOf(Item{})
-	c := NewContainer(typ.Size())
+	c := NewUnorderedContainer(typ.Size())
 
 	for n := 0; n < b.N; n++ {
 		item := &Item{
@@ -93,7 +93,7 @@ func BenchmarkContainerGenericWrite(b *testing.B) {
 		Count int
 		Name  string
 	}
-	c := NewTUnorderedContainer[Item]()
+	c := NewUnorderedContainerByte[Item]()
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		item := Item{

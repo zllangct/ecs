@@ -2,78 +2,83 @@ package ecs
 
 import "unsafe"
 
-type ContainerWithId struct {
-	UnorderedContainer
-	id2idx map[uint64]int
-	idx2id map[int]uint64
+type IComponentContainer interface {
+	
 }
 
-func NewContainerWithId(size uintptr) *ContainerWithId {
+type ContainerWithId[T any] struct {
+	c	IContainer[T]
+	ids	map[int64]int
+}
+
+func NewContainerWithIdByte[T any]() *ContainerWithId {
 	return &ContainerWithId{
-		UnorderedContainer: UnorderedContainer{
-			buf:  make([]byte, 0, size),
-			len:  0,
-			unit: size,
-		},
-		idx2id: map[int]uint64{},
-		id2idx: map[uint64]int{},
+		c : NewUnorderedContainerByte[T](),
+		ids: map[int64]int{},
 	}
 }
 
-func (p *ContainerWithId) Add(pointer unsafe.Pointer, id ...uint64) (int, unsafe.Pointer) {
+func NewContainerWithId[T any]() *ContainerWithId {
+	return &ContainerWithId{
+		c : NewUnorderedContainer[T](),
+		ids: map[int64]int{},
+	}
+}
+
+func (p *ContainerWithId[T]) Add(item T, id ...uint64) (int, *T) {
 	if len(id) > 0 {
-		_, ok := p.id2idx[id[0]]
+		_, ok := p.ids[id[0]]
 		if ok {
-			return 0, nil
+			return -1, nil
 		}
 	}
-	idx, ptr := p.UnorderedContainer.Add(pointer)
+	idx, ptr := p.c.Add(item)
 	if len(id) > 0 {
-		p.id2idx[id[0]] = idx
-		p.idx2id[idx] = id[0]
+		p.ids[id[0]] = idx	
+		p.ids[-idx] = id[0]
 	}
 	return idx, ptr
 }
 
-func (p *ContainerWithId) Remove(idx int) {
+func (p *ContainerWithId[T]) Remove(idx int) {
 	if idx < 0 || idx >= p.len {
 		return
 	}
-	p.id2idx[p.idx2id[p.len]] = idx
-	delete(p.id2idx, p.idx2id[idx])
-	p.idx2id[idx] = p.idx2id[p.len]
-	delete(p.idx2id, p.len)
+	p.ids[p.ids[p.Len()]] = idx
+	delete(p.ids, p.ids[-idx])
+	p.ids[-idx] = p.ids[p.Len()]
+	delete(p.ids, p.Len())
 
-	p.UnorderedContainer.Remove(idx)
+	p.c.Remove(idx)
 }
 
-func (p *ContainerWithId) RemoveById(id uint64) {
-	idx, ok := p.id2idx[id]
+func (p *ContainerWithId[T]) RemoveById(id uint64) {
+	idx, ok := p.ids[id]
 	if !ok {
 		return
 	}
 	p.Remove(idx)
 }
 
-func (p *ContainerWithId) Get(idx int) unsafe.Pointer {
-	return p.UnorderedContainer.Get(idx)
+func (p *ContainerWithId[T]) Get(idx int) *T {
+	return p.c.Get(idx)
 }
 
-func (p *ContainerWithId) GetById(id uint64) unsafe.Pointer {
-	idx, ok := p.id2idx[id]
+func (p *ContainerWithId[T]) GetById(id uint64) *T {
+	idx, ok := p.ids[id]
 	if !ok {
 		return nil
 	}
-	return p.UnorderedContainer.Get(idx)
+	return p.c.Get(idx)
 }
 
-func (p *ContainerWithId) GetId(idx int) uint64 {
-	if id, ok := p.idx2id[idx]; ok {
+func (p *ContainerWithId[T]) GetId(idx int) uint64 {
+	if id, ok := p.ids[-idx]; ok {
 		return id
 	}
 	return 0
 }
 
-func (p *ContainerWithId) Len() int {
-	return p.len
+func (p *ContainerWithId[T]) Len() int {
+	return p.c.Len()
 }
