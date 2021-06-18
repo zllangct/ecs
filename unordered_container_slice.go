@@ -3,36 +3,35 @@ package ecs
 type TUnorderedContainer[T any] []T
 
 func NewTUnorderedContainer[T any]() *TUnorderedContainer[T] {
-	return &TUnorderedContainer[T]{
-		data:  make([]T, 0),
-		len:  0,
-	}
+	return &TUnorderedContainer[T]{}
+
 }
 
 func (p *TUnorderedContainer[T]) Add(item T) (int, *T) {
-	p.data = append(p.data, item)
-	p.len++
-	return p.len - 1, &(p.data[p.len - 1])
+	*p = append(*p, item)
+	length := p.Len()
+	return length, &(*p)[length-1]
 }
 
 func (p *TUnorderedContainer[T]) Remove(idx int) {
-	if idx < 0 || idx >= p.len {
+	length := p.Len()
+	if idx < 0 || idx >= length {
 		return
 	}
-	p.data[idx] = p.data[p.len - 1]
-	p.len -= 1
-	p.data = p.data[:p.len - 1]
+	(*p)[idx] = (*p)[length-1]
+	*p = (*p)[:length-1]
 }
 
 func (p *TUnorderedContainer[T]) Get(idx int) *T {
-	if idx < 0 || idx >= p.len {
+	length := p.Len()
+	if idx < 0 || idx >= length {
 		return nil
 	}
-	return &(p.data[idx])
+	return &((*p)[idx])
 }
 
 func (p *TUnorderedContainer[T]) Len() int {
-	return p.len
+	return len(*p)
 }
 
 func (p *TUnorderedContainer[T]) Iterator() IIterator[T] {
