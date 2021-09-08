@@ -88,7 +88,7 @@ func (p *ComponentCollection) TempFlush() {
 		//set component owner
 		operate.com.setOwner(operate.target)
 		//add to component container
-		ret := p.push(typ, operate.com, operate.target.ID())
+		ret := Push(p, typ, operate.com, operate.target.ID())
 		//add to entity
 		operate.target.componentAdded(typ, ret)
 
@@ -102,42 +102,38 @@ func (p *ComponentCollection) TempFlush() {
 
 }
 
-func (p *ComponentCollection) Push[T IComponent](com T, id int64) IComponent {
-	return p.push[T](com, id)
-}
-
-func (p *ComponentCollection) push[T IComponent](com *T, id int64) *T {
-	typ := reflect.TypeOf(*ins)
+func Push[T IComponent](c *ComponentCollection, com *T, id int64) IComponent {
+	typ := reflect.TypeOf(*com)
 	ifaceStruct := (*iface)(unsafe.Pointer(com))
 	var v *ContainerWithId
 	var ok bool
-	v, ok = p.collection[typ]
+	v, ok = c.collection[typ]
 	if !ok {
 		v = NewContainerWithIdByte[T]()
-		p.collection[typ] = v
+		c.collection[typ] = v
 	}
-	_, ptr := v.Add(ifaceStruct.data, id)
+	_, ptr := v.Add(com, id)
 	ifaceStruct.data = unsafe.Pointer(ptr)
 	return com
 }
 
-func (p *ComponentCollection) Pop[T IComponent](id int64) {
+func Pop[T IComponent](c *ComponentCollection, id int64) {
 	var ins T
 	typ := reflect.TypeOf(ins)
-	if v, ok := p.collection[typ]; ok {
+	if v, ok := c.collection[typ]; ok {
 		v.(ContainerWithId[T]).RemoveById(id)
 	}
 }
 
-func (p *ComponentCollection) GetNewComponentsAll() []CollectionOperateInfo {
+func GetNewComponentsAll(c *ComponentCollection) []CollectionOperateInfo {
 	size := 0
-	for _, m := range p.componentsNew {
+	for _, m := range c.componentsNew {
 		for _, mm := range m {
 			size += len(mm)
 		}
 	}
 	temp := make([]CollectionOperateInfo, 0, size)
-	for _, m := range p.componentsNew {
+	for _, m := range c.componentsNew {
 		for _, mm := range m {
 			temp = append(temp, mm...)
 		}
@@ -145,10 +141,10 @@ func (p *ComponentCollection) GetNewComponentsAll() []CollectionOperateInfo {
 	return temp
 }
 
-func (p *ComponentCollection) GetNewComponents[T IComponent](op CollectionOperate) []CollectionOperateInfo {
+func GetNewComponents[T IComponent](c *ComponentCollection, op CollectionOperate) []CollectionOperateInfo {
 	var ins T
 	typ := reflect.TypeOf(ins)
-	return p.componentsNew[op][typ]
+	return c.componentsNew[op][typ]
 }
 
 func (p *ComponentCollection) GetComponents[T IComponent]() *iterator {

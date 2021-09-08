@@ -22,8 +22,7 @@ func TestNewContainer(t *testing.T) {
 	}
 
 	t.Run("test1", func(t *testing.T) {
-		typ := reflect.TypeOf(Item{})
-		c := NewUnorderedContainer(typ.Size())
+		c := NewUnorderedContainer[Item]()
 
 		cmp := map[int]int{}
 		for i := 0; i < caseCount; i++ {

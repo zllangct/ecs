@@ -3,24 +3,23 @@ package ecs
 import "unsafe"
 
 type IComponentContainer interface {
-	
 }
 
 type ContainerWithId[T any] struct {
-	c	IContainer[T]
-	ids	map[int64]int
+	c   IContainer[T]
+	ids map[int64]int
 }
 
 func NewContainerWithIdByte[T any]() *ContainerWithId {
 	return &ContainerWithId{
-		c : NewUnorderedContainerByte[T](),
+		c:   NewUnorderedContainer[T](),
 		ids: map[int64]int{},
 	}
 }
 
 func NewContainerWithId[T any]() *ContainerWithId {
 	return &ContainerWithId{
-		c : NewUnorderedContainer[T](),
+		c:   NewUnorderedContainer[T](),
 		ids: map[int64]int{},
 	}
 }
@@ -34,7 +33,7 @@ func (p *ContainerWithId[T]) Add(item T, id ...uint64) (int, *T) {
 	}
 	idx, ptr := p.c.Add(item)
 	if len(id) > 0 {
-		p.ids[id[0]] = idx	
+		p.ids[id[0]] = idx
 		p.ids[-idx] = id[0]
 	}
 	return idx, ptr

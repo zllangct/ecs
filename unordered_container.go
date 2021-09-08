@@ -5,17 +5,17 @@ import (
 	"unsafe"
 )
 
-type UnorderedContainerByte[T any] struct {
+type UnorderedContainer[T any] struct {
 	buf  []byte
 	len  int
 	unit uintptr
 	head uintptr
 }
 
-func NewUnorderedContainerByte[T any]() *UnorderedContainerByte[T] {
+func NewUnorderedContainer[T any]() *UnorderedContainer[T] {
 	var ins T
 	size := reflect.TypeOf(ins).Size()
-	c := &UnorderedContainerByte{
+	c := &UnorderedContainer{
 		buf:  make([]byte, 0, size),
 		len:  0,
 		unit: size,
@@ -23,8 +23,13 @@ func NewUnorderedContainerByte[T any]() *UnorderedContainerByte[T] {
 	return c
 }
 
-func (p *UnorderedContainerByte[T]) Add(item T) (int, *T) {
-	pointer	:= unsafe.Pointer(&item)
+func (p *UnorderedContainer[T]) Add(item T) (int, *T) {
+	pointer := unsafe.Pointer(&item)
+	idx, newPointer := p.AddOriginal(pointer)
+	return idx, (*T)(newPointer)
+}
+
+func (p *UnorderedContainer[T]) AddOriginal(pointer unsafe.Pointer) (int, unsafe.Pointer) {
 	data := reflect.SliceHeader{
 		Data: uintptr(pointer),
 		Len:  int(p.unit),
@@ -33,10 +38,10 @@ func (p *UnorderedContainerByte[T]) Add(item T) (int, *T) {
 	p.buf = append(p.buf, *(*[]byte)(unsafe.Pointer(&data))...)
 	p.head = (*reflect.SliceHeader)(unsafe.Pointer(&p.buf)).Data
 	p.len += 1
-	return p.len - 1, (*T)(unsafe.Pointer(p.head + uintptr(p.len-1)*p.unit))
+	return p.len - 1, unsafe.Pointer(p.head + uintptr(p.len-1)*p.unit)
 }
 
-func (p *UnorderedContainerByte[T]) Remove(idx int) {
+func (p *UnorderedContainer[T]) Remove(idx int) {
 	if idx < 0 || idx >= p.len {
 		return
 	}
@@ -47,17 +52,17 @@ func (p *UnorderedContainerByte[T]) Remove(idx int) {
 	p.len -= 1
 }
 
-func (p *UnorderedContainerByte[T]) Get(idx int) *T {
+func (p *UnorderedContainer[T]) Get(idx int) *T {
 	if idx < 0 || idx >= p.len {
 		return nil
 	}
 	return (*T)(unsafe.Pointer(p.head + uintptr(idx)*p.unit))
 }
 
-func (p *UnorderedContainerByte[T]) Len() int {
+func (p *UnorderedContainer[T]) Len() int {
 	return p.len
 }
 
-func (p *UnorderedContainerByte[T]) Iterator() IIterator[T] {
+func (p *UnorderedContainer[T]) Iterator() IIterator[T] {
 	return NewIterator[T](p)
 }
