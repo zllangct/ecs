@@ -109,7 +109,7 @@ func Push[T IComponent](c *ComponentCollection, com *T, id int64) IComponent {
 	var ok bool
 	v, ok = c.collection[typ]
 	if !ok {
-		v = NewContainerWithIdByte[T]()
+		v = NewContainerWithId[T]()
 		c.collection[typ] = v
 	}
 	_, ptr := v.Add(com, id)
@@ -147,9 +147,9 @@ func GetNewComponents[T IComponent](c *ComponentCollection, op CollectionOperate
 	return c.componentsNew[op][typ]
 }
 
-func (p *ComponentCollection) GetComponents[T IComponent]() *iterator {
+func GetComponents[T IComponent](cc *ComponentCollection) *iterator {
 	var ins T
-	v, ok := p.collection[reflect.TypeOf(ins)]
+	v, ok := cc.collection[reflect.TypeOf(ins)]
 	if ok {
 		return v.(ContainerWithId[T]).GetIterator()
 	}

@@ -4,15 +4,15 @@ import "unsafe"
 
 type ComponentCollectionIter = *componentCollectionIter
 
-type componentCollectionIter struct {
-	ls         []*ContainerWithId
+type componentCollectionIter[T any] struct {
+	ls         []*ContainerWithId[T]
 	index      int
 	indexInner int
 	len        int
 	temp       IComponent
 }
 
-func NewComponentCollectionIter(ls []*ContainerWithId) ComponentCollectionIter {
+func NewComponentCollectionIter[T any](ls []*ContainerWithId[T]) ComponentCollectionIter {
 	return &componentCollectionIter{
 		ls:         ls,
 		index:      0,

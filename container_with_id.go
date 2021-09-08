@@ -10,15 +10,8 @@ type ContainerWithId[T any] struct {
 	ids map[int64]int
 }
 
-func NewContainerWithIdByte[T any]() *ContainerWithId {
-	return &ContainerWithId{
-		c:   NewUnorderedContainer[T](),
-		ids: map[int64]int{},
-	}
-}
-
-func NewContainerWithId[T any]() *ContainerWithId {
-	return &ContainerWithId{
+func NewContainerWithId[T any]() *ContainerWithId[T] {
+	return &ContainerWithId[T]{
 		c:   NewUnorderedContainer[T](),
 		ids: map[int64]int{},
 	}
