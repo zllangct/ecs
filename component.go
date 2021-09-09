@@ -9,11 +9,7 @@ type IComponent interface {
 	setOwner(*Entity)
 	GetOwner() *Entity
 	GetBase() *ComponentBase
-	GetRealType() reflect.Type
-}
-
-type IComponentType interface {
-	typeFlag()
+	GetType() reflect.Type
 }
 
 type ComponentBase struct {
@@ -38,9 +34,6 @@ func (p *ComponentBase) SetRealType(t reflect.Type) {
 	p.realType = t
 }
 
-func (p *ComponentBase) GetRealType() reflect.Type {
+func (p *ComponentBase) GetType() reflect.Type {
 	return p.realType
-}
-
-func (p ComponentBase) typeFlag() {
 }

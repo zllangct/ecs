@@ -14,10 +14,6 @@ func NewIterator[T any](container IContainer[T]) IIterator[T] {
 	}
 }
 
-func (p *Iterator[T]) End() *T {
-	return nil
-}
-
 func (p *Iterator[T]) Next() *T {
 	if p.index >= p.size-1 || p.size == 0 {
 		return nil

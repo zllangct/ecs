@@ -1,13 +1,11 @@
 package ecs
 
 import (
-	"reflect"
 	"strconv"
 	"testing"
-	"unsafe"
 )
 
-func TestNewContainer(t *testing.T) {
+func TestNewCollection(t *testing.T) {
 	type Item struct {
 		Count int
 		Name  string
@@ -22,17 +20,17 @@ func TestNewContainer(t *testing.T) {
 	}
 
 	t.Run("test1", func(t *testing.T) {
-		c := NewUnorderedContainer[Item]()
+		c := NewCollection[Item]()
 
 		cmp := map[int]int{}
 		for i := 0; i < caseCount; i++ {
-			idx, _ := c.Add(unsafe.Pointer(&srcList[i]))
+			idx, _ := c.Add(srcList[i])
 			cmp[idx] = i
 		}
 
 		for idx, isrc := range cmp {
 			p := c.Get(idx)
-			item := *((*Item)(p))
+			item := *p
 			if item != srcList[isrc] {
 				t.Errorf("src item %v != container item %v", srcList[isrc], item)
 			}
@@ -40,59 +38,40 @@ func TestNewContainer(t *testing.T) {
 	})
 }
 
-func BenchmarkContainerNormalWrite(b *testing.B) {
+func TestCollectionIterator(t *testing.T){
 	type Item struct {
 		Count int
 		Name  string
 	}
+	caseCount := 100
+	var srcList []Item
+	for i := 0; i < caseCount; i++ {
+		srcList = append(srcList, Item{
+			Count: i,
+			Name:  "foo" + strconv.Itoa(i),
+		})
+	}
 
-	typ := reflect.TypeOf(Item{})
-	c := NewUnorderedContainer(typ.Size())
+	c := NewCollection[Item]()
 
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
-		item := &Item{
-			Count: n,
-			Name:  "foo" + strconv.Itoa(n),
-		}
+	cmp := map[int]int{}
+	for i := 0; i < caseCount; i++ {
+		idx, _ := c.Add(srcList[i])
+		cmp[idx] = i
+	}
 
-		c.Add(unsafe.Pointer(item))
+	iter := NewIterator(c)
+	for v := iter.Next(); v != nil; v = iter.Next(){
+		_ = v
 	}
 }
 
-func BenchmarkContainerNormalRead(b *testing.B) {
+func BenchmarkCollectionWrite(b *testing.B) {
 	type Item struct {
 		Count int
 		Name  string
 	}
-
-	typ := reflect.TypeOf(Item{})
-	c := NewUnorderedContainer(typ.Size())
-
-	for n := 0; n < b.N; n++ {
-		item := &Item{
-			Count: n,
-			Name:  "foo" + strconv.Itoa(n),
-		}
-
-		c.Add(unsafe.Pointer(item))
-	}
-
-	b.ResetTimer()
-
-	for n := 0; n < b.N; n++ {
-		p := c.Get(n)
-		item := *((*Item)(p))
-		_ = item
-	}
-}
-
-func BenchmarkContainerGenericWrite(b *testing.B) {
-	type Item struct {
-		Count int
-		Name  string
-	}
-	c := NewUnorderedContainerByte[Item]()
+	c := NewCollection[Item]()
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		item := Item{
@@ -101,5 +80,24 @@ func BenchmarkContainerGenericWrite(b *testing.B) {
 		}
 
 		c.Add(item)
+	}
+}
+
+func BenchmarkCollectionRead(b *testing.B) {
+	type Item struct {
+		Count int
+		Name  string
+	}
+	c := NewCollection[Item]()
+	for n := 0; n < b.N; n++ {
+		item := Item{
+			Count: n,
+			Name:  "foo" + strconv.Itoa(n),
+		}
+		c.Add(item)
+	}
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		_ = c.Get(n)
 	}
 }

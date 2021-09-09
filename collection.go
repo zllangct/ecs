@@ -5,17 +5,17 @@ import (
 	"unsafe"
 )
 
-type UnorderedContainer[T any] struct {
+type Collection[T any] struct {
 	buf  []byte
 	len  int
 	unit uintptr
 	head uintptr
 }
 
-func NewUnorderedContainer[T any]() *UnorderedContainer[T] {
+func NewCollection[T any]() *Collection[T] {
 	var ins T
 	size := reflect.TypeOf(ins).Size()
-	c := &UnorderedContainer{
+	c := &Collection[T]{
 		buf:  make([]byte, 0, size),
 		len:  0,
 		unit: size,
@@ -23,13 +23,13 @@ func NewUnorderedContainer[T any]() *UnorderedContainer[T] {
 	return c
 }
 
-func (p *UnorderedContainer[T]) Add(item T) (int, *T) {
+func (p *Collection[T]) Add(item T) (int, *T) {
 	pointer := unsafe.Pointer(&item)
 	idx, newPointer := p.AddOriginal(pointer)
 	return idx, (*T)(newPointer)
 }
 
-func (p *UnorderedContainer[T]) AddOriginal(pointer unsafe.Pointer) (int, unsafe.Pointer) {
+func (p *Collection[T]) AddOriginal(pointer unsafe.Pointer) (int, unsafe.Pointer) {
 	data := reflect.SliceHeader{
 		Data: uintptr(pointer),
 		Len:  int(p.unit),
@@ -41,9 +41,9 @@ func (p *UnorderedContainer[T]) AddOriginal(pointer unsafe.Pointer) (int, unsafe
 	return p.len - 1, unsafe.Pointer(p.head + uintptr(p.len-1)*p.unit)
 }
 
-func (p *UnorderedContainer[T]) Remove(idx int) {
+func (p *Collection[T]) Remove(idx int) {
 	if idx < 0 || idx >= p.len {
-		return
+		return nil
 	}
 	offsetDelete := p.head + uintptr(idx)*p.unit
 	offsetEnd := p.head + uintptr(p.len)*p.unit
@@ -52,17 +52,21 @@ func (p *UnorderedContainer[T]) Remove(idx int) {
 	p.len -= 1
 }
 
-func (p *UnorderedContainer[T]) Get(idx int) *T {
+func (p *Collection[T]) Get(idx int) *T {
+	return (*T)(p.GetOriginal(idx))
+}
+
+func (p *Collection[T]) GetOriginal(idx int) unsafe.Pointer {
 	if idx < 0 || idx >= p.len {
 		return nil
 	}
-	return (*T)(unsafe.Pointer(p.head + uintptr(idx)*p.unit))
+	return unsafe.Pointer(p.head + uintptr(idx)*p.unit)
 }
 
-func (p *UnorderedContainer[T]) Len() int {
+func (p *Collection[T]) Len() int {
 	return p.len
 }
 
-func (p *UnorderedContainer[T]) Iterator() IIterator[T] {
-	return NewIterator[T](p)
-}
+//func (p *Collection[T]) Iterator() IIterator[T] {
+//	return NewIterator[T](p)
+//}

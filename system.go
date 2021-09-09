@@ -93,7 +93,7 @@ func (p *SystemBase) GetOrder() Order {
 }
 
 func (p *SystemBase) IsConcerned(com IComponent) bool {
-	cType := com.GetRealType()
+	cType := com.GetType()
 	if _, concerned := p.requirements[cType]; concerned {
 		for r, _ := range p.requirements {
 			if r != cType {

@@ -2,6 +2,7 @@ package ecs
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"sync"
 )
@@ -25,27 +26,27 @@ func NewEntity(runtime *Runtime) *Entity {
 	return entity
 }
 
-func (p *Entity) Destroy() {
-	for _, c := range p.components {
-		p.runtime.ComponentRemove(c.GetOwner(), c)
+func (e *Entity) Destroy() {
+	for _, c := range e.components {
+		e.runtime.ComponentRemove(c.GetOwner(), c)
 	}
-	p.runtime.DeleteEntity(p)
+	e.runtime.DeleteEntity(e)
 }
 
-func (p *Entity) ID() uint64 {
-	return p.id
+func (e *Entity) ID() uint64 {
+	return e.id
 }
 
-func (p *Entity) Has(types ...reflect.Type) bool {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
+func (e *Entity) Has(types ...reflect.Type) bool {
+	e.lock.RLock()
+	defer e.lock.RUnlock()
 
-	return p.has(types...)
+	return e.has(types...)
 }
 
-func (p *Entity) has(types ...reflect.Type) bool {
+func (e *Entity) has(types ...reflect.Type) bool {
 	for _, typ := range types {
-		_, ok := p.components[typ]
+		_, ok := e.components[typ]
 		if !ok {
 			return false
 		}
@@ -53,51 +54,60 @@ func (p *Entity) has(types ...reflect.Type) bool {
 	return true
 }
 
-func (p *Entity) AddComponent(com ...IComponent) {
-	for _, c := range com {
-		p.lock.Lock()
-		p.addComponent(c)
-		p.lock.Unlock()
+func (e *Entity) AddComponent(components ...IComponent) {
+	for _, c := range components {
+		if err := e.addComponent(c); err != nil{
+			e.runtime.Error("repeat component:", err)
+		}
 	}
 }
 
-func (p *Entity) addComponent(com IComponent) {
+func (e *Entity) addComponent(com IComponent) error {
 	if com.GetOwner() != nil {
-		return
+		return errors.New("the owner of component is nil")
 	}
-	typ := com.GetRealType()
-	if p.has(typ) {
-		p.runtime.Error("repeat component:", typ.Name())
-		return
+	typ := com.GetType()
+	if e.has(typ) {
+		return fmt.Errorf("repeated component: %s", typ.Name())
 	}
-	p.runtime.ComponentAttach(p, com)
+	e.runtime.ComponentAttach(e, com)
+	return nil
 }
 
-func (p *Entity) componentAdded(typ reflect.Type, com IComponent) {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-
-	p.components[typ] = com
+func (e *Entity) addComponentNoLock(typ reflect.Type, com IComponent){
+	e.components[typ] = com
 }
 
-func (p *Entity) RemoveComponent(com ...IComponent) {
-	p.lock.Lock()
-	defer p.lock.Unlock()
+func (e *Entity) componentAdded(typ reflect.Type, com IComponent) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	e.addComponentNoLock(typ, com)
+}
+
+func (e *Entity) RemoveComponent(com ...IComponent) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
 
 	for _, c := range com {
 		typ := reflect.TypeOf(c)
-		if !p.Has(typ) {
-			p.runtime.Error(errors.New("repeat component:" + typ.Name()))
+		if !e.Has(typ) {
+			e.runtime.Error(errors.New("repeat component:" + typ.Name()))
 			continue
 		}
-		delete(p.components, typ)
-		p.runtime.ComponentRemove(c.GetOwner(), c)
+		delete(e.components, typ)
+		e.runtime.ComponentRemove(c.GetOwner(), c)
 	}
 }
 
-func (p *Entity) GetComponent(com IComponentType) IComponent {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
+func (e *Entity) GetComponent(com IComponentType) IComponent {
+	e.lock.RLock()
+	defer e.lock.RUnlock()
 
-	return p.components[reflect.TypeOf(com)]
+	return e.components[reflect.TypeOf(com)]
+}
+
+func AddComponent[T IComponent](e *Entity) {
+	var ins T
+	e.a
 }

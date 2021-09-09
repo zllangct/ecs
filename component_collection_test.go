@@ -87,8 +87,8 @@ func TestComponentCollection(t *testing.T) {
 		println(((*TestComponent2)(com2)).ID)
 	}
 	//test iterator
-	iter1 := cc.GetIterator()
-	for com := iter1.Next(); com != iter1.End(); com = iter1.Next() {
-		println(com.GetBase())
-	}
+	//iter1 := cc.GetIterator()
+	//for com := iter1.Next(); com != iter1.End(); com = iter1.Next() {
+	//	println(com.GetBase())
+	//}
 }
