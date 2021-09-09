@@ -20,8 +20,8 @@ var (
 )
 
 type ISystem interface {
-	Init(runtime *Runtime) //init
-	GetBase() *SystemBase  //get system base data
+	Init()  //init
+	GetBase() *SystemBase //get system base data
 	GetType() reflect.Type
 	GetOrder() Order
 	GetRequirements() map[reflect.Type]struct{}
@@ -31,9 +31,9 @@ type ISystem interface {
 type SystemBase struct {
 	sync.Mutex
 	requirements map[reflect.Type]struct{}
-	order        Order
-	runtime      *Runtime
-	typ          reflect.Type
+	order Order
+	world *World
+	typ   reflect.Type
 	isPreFilter  bool
 }
 
@@ -45,7 +45,7 @@ func (p *SystemBase) GetBase() *SystemBase {
 	return p
 }
 
-func (p *SystemBase) SetRequirements(rqs ...IComponentType) {
+func (p *SystemBase) SetRequirements(rqs ...IComponent) {
 	if p.requirements == nil {
 		p.requirements = map[reflect.Type]struct{}{}
 	}
@@ -58,10 +58,11 @@ func (p *SystemBase) GetRequirements() map[reflect.Type]struct{} {
 	return p.requirements
 }
 
-func (p *SystemBase) Init(runtime *Runtime) {
+func (p *SystemBase) baseInit(world *World, typ reflect.Type) {
 	p.requirements = map[reflect.Type]struct{}{}
 	p.SetOrder(ORDER_DEFAULT)
-	p.runtime = runtime
+	p.SetType(typ)
+	p.world = world
 }
 
 func (p *SystemBase) SetType(typ reflect.Type) {
@@ -108,14 +109,14 @@ func (p *SystemBase) IsConcerned(com IComponent) bool {
 	return false
 }
 
-func (p *SystemBase) GetRuntime() *Runtime {
-	return p.runtime
+func (p *SystemBase) GetWorld() *World {
+	return p.world
 }
 
 func (p *SystemBase) GetNewComponent(op CollectionOperate) map[reflect.Type][]CollectionOperateInfo {
 	temp := map[reflect.Type][]CollectionOperateInfo{}
 	for typ, _ := range p.requirements {
-		temp[typ] = p.runtime.getNewComponents(op, typ)
+		temp[typ] = p.world.getNewComponents(op, typ)
 	}
 	return temp
 }

@@ -4,7 +4,7 @@ const WORKER_ID_RANDOM int32 = -1
 
 //Worker goroutine struct.
 type Worker struct {
-	runtime  *Runtime
+	runtime  *ecsRuntime
 	id       int32
 	p        *Pool
 	jobQueue chan *Job
@@ -31,7 +31,7 @@ func (w *Worker) Start() {
 			}
 			ctx := JobContext{
 				WorkerID: job.WorkerID,
-				Runtime:  w.runtime,
+				Runtime:    w.runtime,
 			}
 			err := Try(func() {
 				job.Job(ctx, job.Args...)

@@ -10,19 +10,19 @@ import (
 type Entity struct {
 	lock sync.RWMutex
 	//private
-	runtime    *Runtime
+	runtime    *World
 	components map[reflect.Type]IComponent
 	//public
 	id uint64
 }
 
-func NewEntity(runtime *Runtime) *Entity {
+func NewEntity(world *World) *Entity {
 	entity := &Entity{
-		runtime:    runtime,
+		runtime:    world,
 		components: make(map[reflect.Type]IComponent),
 		id:         UniqueID(),
 	}
-	runtime.AddEntity(entity)
+	world.AddEntity(entity)
 	return entity
 }
 
@@ -100,14 +100,29 @@ func (e *Entity) RemoveComponent(com ...IComponent) {
 	}
 }
 
-func (e *Entity) GetComponent(com IComponentType) IComponent {
+func (e *Entity) GetComponent(com IComponent) IComponent {
+	return e.getComponent(reflect.TypeOf(com).Elem())
+}
+
+func (e *Entity) getComponent(typ reflect.Type) IComponent {
 	e.lock.RLock()
 	defer e.lock.RUnlock()
 
-	return e.components[reflect.TypeOf(com)]
+	return e.components[typ]
 }
 
-func AddComponent[T IComponent](e *Entity) {
+func AttachTo[T IComponent](e *Entity, com ... *T) {
 	var ins T
-	e.a
+	if len(com) == 0 {
+		ins = *new(T)
+		e.AddComponent(ins)
+	} else {
+		e.AddComponent(com...)
+	}
 }
+
+func GetComponentFrom[T IComponent](e *Entity) IComponent{
+	return e.GetComponent(reflect.TypeOf(*new(T)))
+}
+
+

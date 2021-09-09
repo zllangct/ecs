@@ -18,22 +18,22 @@ type ComponentBase struct {
 	realType reflect.Type
 }
 
-func (p *ComponentBase) setOwner(entity *Entity) {
-	p.owner = entity
+func (c *ComponentBase) setOwner(entity *Entity) {
+	c.owner = entity
 }
 
-func (p *ComponentBase) GetOwner() *Entity {
-	return p.owner
+func (c *ComponentBase) GetOwner() *Entity {
+	return c.owner
 }
 
-func (p *ComponentBase) GetBase() *ComponentBase {
-	return p
+func (c *ComponentBase) GetBase() *ComponentBase {
+	return c
 }
 
-func (p *ComponentBase) SetRealType(t reflect.Type) {
-	p.realType = t
+func (c *ComponentBase) SetRealType(t reflect.Type) {
+	c.realType = t
 }
 
-func (p *ComponentBase) GetType() reflect.Type {
-	return p.realType
+func (c *ComponentBase) GetType() reflect.Type {
+	return c.realType
 }

@@ -15,11 +15,11 @@ type Pool struct {
 	jobPool     sync.Pool
 	jobQueue    chan *Job
 	workerQueue []*Worker
-	runtime     *Runtime
+	runtime     *ecsRuntime
 }
 
 //get the singleton pool
-func GetGlobalPool(runtime *Runtime, numWorkers int, jobQueueLen int) *Pool {
+func GetGlobalPool(runtime *ecsRuntime, numWorkers int, jobQueueLen int) *Pool {
 	if globalPool == nil {
 		globalPool = NewPool(runtime, numWorkers, jobQueueLen)
 	}
@@ -27,7 +27,7 @@ func GetGlobalPool(runtime *Runtime, numWorkers int, jobQueueLen int) *Pool {
 }
 
 //NewPool news goroutine pool
-func NewPool(runtime *Runtime, numWorkers int, jobQueueLen int) *Pool {
+func NewPool(runtime *ecsRuntime, numWorkers int, jobQueueLen int) *Pool {
 	if numWorkers == 0 {
 		numWorkers = 2 * runtime2.NumCPU()
 	}

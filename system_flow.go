@@ -1,6 +1,7 @@
 package ecs
 
 import (
+	"reflect"
 	"sync"
 	"time"
 )
@@ -38,16 +39,16 @@ type OrderSequence []*SystemGroup
 //system execute flow
 type systemFlow struct {
 	sync.Mutex
-	runtime      *Runtime
+	world        *World
 	systemPeriod map[SystemPeriod]OrderSequence
 	periodList   []SystemPeriod
 	wg           *sync.WaitGroup
 }
 
-func newSystemFlow(runtime *Runtime) *systemFlow {
+func newSystemFlow(runtime *World) *systemFlow {
 	sf := &systemFlow{
-		runtime: runtime,
-		wg:      &sync.WaitGroup{},
+		world: runtime,
+		wg:    &sync.WaitGroup{},
 	}
 	sf.init()
 	return sf
@@ -117,7 +118,7 @@ func (p *systemFlow) run(delta time.Duration) {
 						}
 
 						p.wg.Add(1)
-						p.runtime.workPool.AddJob(func(ctx JobContext, args ...interface{}) {
+						p.world.AddJob(func(ctx JobContext, args ...interface{}) {
 							fn := args[0].(func(event Event))
 							delta := args[1].(time.Duration)
 							wg := args[2].(*sync.WaitGroup)
@@ -133,13 +134,13 @@ func (p *systemFlow) run(delta time.Duration) {
 
 	}
 	//do filter
-	p.runtime.components.TempFlush()
+	p.world.components.TempFlush()
 	p.filterExecute()
 }
 
 func (p *systemFlow) filterExecute() {
 	var sq OrderSequence
-	comInfos := p.runtime.components.GetNewComponentsAll()
+	comInfos := p.world.components.GetNewComponentsAll()
 	for _, period := range p.periodList {
 		sq = p.systemPeriod[period]
 		for _, sl := range sq {
@@ -151,12 +152,12 @@ func (p *systemFlow) filterExecute() {
 					if !ok {
 						continue
 					}
-					p.runtime.workPool.AddJob(func(ctx JobContext, args ...interface{}) {
+					p.world.AddJob(func(ctx JobContext, args ...interface{}) {
 						sys := args[0].(ISystem)
 						filter := args[1].(IEventFilter)
 						wg := args[2].(*sync.WaitGroup)
 						if !sys.GetBase().isPreFilter {
-							components := ctx.Runtime.GetAllComponents()
+							components := ctx.World.GetAllComponents()
 							for com := components.Next(); com != components.End(); com = components.Next() {
 								filter.Filter(com, COLLECTION_OPERATE_ADD)
 							}
@@ -176,9 +177,10 @@ func (p *systemFlow) filterExecute() {
 	}
 }
 
-//register method only in runtime init or func init(){}
+//register method only in world init or func init(){}
 func (p *systemFlow) register(system ISystem) {
-	system.Init(p.runtime)
+	system.GetBase().baseInit(p.world, reflect.TypeOf(system))
+	system.Init()
 	order := system.GetOrder()
 
 	for _, period := range p.periodList {
@@ -226,8 +228,8 @@ func (p *systemFlow) register(system ISystem) {
 			err := Try(func() {
 				sys.Initialize()
 			})
-			if err != nil && p.runtime.logger != nil {
-				p.runtime.logger.Error(err)
+			if err != nil && p.world.logger != nil {
+				p.world.logger.Error(err)
 			}
 		}
 	}

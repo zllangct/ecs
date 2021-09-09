@@ -43,7 +43,7 @@ func (p *Collection[T]) AddOriginal(pointer unsafe.Pointer) (int, unsafe.Pointer
 
 func (p *Collection[T]) Remove(idx int) {
 	if idx < 0 || idx >= p.len {
-		return nil
+		return
 	}
 	offsetDelete := p.head + uintptr(idx)*p.unit
 	offsetEnd := p.head + uintptr(p.len)*p.unit
@@ -66,7 +66,3 @@ func (p *Collection[T]) GetOriginal(idx int) unsafe.Pointer {
 func (p *Collection[T]) Len() int {
 	return p.len
 }
-
-//func (p *Collection[T]) Iterator() IIterator[T] {
-//	return NewIterator[T](p)
-//}

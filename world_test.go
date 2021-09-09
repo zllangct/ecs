@@ -48,11 +48,9 @@ type MoveSystem struct {
 	logger     IInternalLogger
 }
 
-func (p *MoveSystem) Init(runtime *Runtime) {
-	p.SystemBase.Init(runtime)
-	p.logger = runtime.logger
-	p.SetType(reflect.TypeOf(p))
-	p.SetRequirements(Position{}, Movement{})
+func (p *MoveSystem) Init() {
+	p.logger = p.GetWorld().logger
+	p.SetRequirements(&Position{}, &Movement{})
 	p.components = map[uint64]MoveSystemData{}
 }
 
@@ -62,8 +60,8 @@ func (p *MoveSystem) Filter(com IComponent, op ComponentOperate) {
 		switch op {
 		case COMPONENT_OPERATE_ADD:
 			p.components[owner.ID()] = MoveSystemData{
-				movement: owner.GetComponent(Movement{}).(*Movement),
-				position: owner.GetComponent(Position{}).(*Position),
+				movement: owner.GetComponent(&Movement{}).(*Movement),
+				position: owner.GetComponent(&Position{}).(*Position),
 			}
 		case COMPONENT_OPERATE_DELETE:
 			delete(p.components, owner.ID())
@@ -101,13 +99,12 @@ type DamageSystem struct {
 	components map[uint64]DamageSystemData
 }
 
-func (p *DamageSystem) Init(runtime *Runtime) {
-	p.SystemBase.Init(runtime)
-	p.SetType(reflect.TypeOf(p))
-	p.SetRequirements(Position{}, HealthPoint{})
+func (p *DamageSystem) Init() {
+	p.SetRequirements(&Position{}, &HealthPoint{})
 	p.components = map[uint64]DamageSystemData{}
 }
 
+//Filter example for filter: cache sth by filter, filter will be called only on component be added or deleted
 func (p *DamageSystem) Filter(com IComponent, op ComponentOperate) {
 	if p.IsConcerned(com) {
 		owner := com.GetOwner()
@@ -123,6 +120,7 @@ func (p *DamageSystem) Filter(com IComponent, op ComponentOperate) {
 	}
 }
 
+// Update will be called every frame
 func (p *DamageSystem) Update(event Event) {
 
 }
@@ -133,15 +131,18 @@ func TestRuntime0(t *testing.T) {
 		log.Println(http.ListenAndServe("localhost:8888", nil))
 	}()
 
-	rt := NewRuntime()
+	rt := Runtime
+	world := rt.NewWorld()
+
 	go rt.Run()
 
-	rt.Register(&MoveSystem{})
+	world.Register(&MoveSystem{})
 	//rt.Register(&DamageSystem{})
 
-	NewEntity(rt)
-	NewEntity(rt)
-	NewEntity(rt)
+
+	world.NewEntity()
+	world.NewEntity()
+	world.NewEntity()
 
 	p1 := NewPosition()
 	p1.X = 100
@@ -150,7 +151,7 @@ func TestRuntime0(t *testing.T) {
 	m1 := NewMovement()
 	m1.v = 1000
 	m1.dir = []int{1, 0, 0}
-	NewEntity(rt).AddComponent(p1, m1)
+	world.NewEntity().AddComponent(p1, m1)
 	p2 := NewPosition()
 	p2.X = 100
 	p2.Y = 100
@@ -158,7 +159,7 @@ func TestRuntime0(t *testing.T) {
 	m2 := NewMovement()
 	m2.v = 2000
 	m2.dir = []int{0, 1, 0}
-	NewEntity(rt).AddComponent(p2, m2)
+	world.NewEntity().AddComponent(p2, m2)
 	time.Sleep(time.Second * 3)
 	//<-make(chan struct{})
 }
@@ -168,11 +169,12 @@ func TestRuntime1(t *testing.T) {
 		log.Println(http.ListenAndServe("localhost:8888", nil))
 	}()
 
-	rt := NewRuntime()
+	rt := Runtime
+	world := rt.NewWorld()
 	go rt.Run()
 
-	rt.Register(&MoveSystem{})
-	rt.Register(&DamageSystem{})
+	world.Register(&MoveSystem{})
+	world.Register(&DamageSystem{})
 
 	//初始化实体
 	for i := 0; i < 100000; i++ {
@@ -183,7 +185,7 @@ func TestRuntime1(t *testing.T) {
 		m1 := NewMovement()
 		m1.v = 1000
 		m1.dir = []int{1, 0, 0}
-		NewEntity(rt).AddComponent(p1, m1)
+		world.NewEntity().AddComponent(p1, m1)
 		p2 := NewPosition()
 		p2.X = 100
 		p2.Y = 100
@@ -191,7 +193,7 @@ func TestRuntime1(t *testing.T) {
 		m2 := NewMovement()
 		m2.v = 2000
 		m2.dir = []int{0, 1, 0}
-		NewEntity(rt).AddComponent(p2, m2)
+		world.NewEntity().AddComponent(p2, m2)
 	}
 	time.Sleep(time.Second * 3)
 	//<-make(chan struct{})
