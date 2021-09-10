@@ -24,7 +24,7 @@ func TestNewCollection(t *testing.T) {
 
 		cmp := map[int]int{}
 		for i := 0; i < caseCount; i++ {
-			idx, _ := c.Add(srcList[i])
+			idx, _ := c.Add(&srcList[i])
 			cmp[idx] = i
 		}
 
@@ -56,7 +56,7 @@ func TestCollectionIterator(t *testing.T){
 
 	cmp := map[int]int{}
 	for i := 0; i < caseCount; i++ {
-		idx, _ := c.Add(srcList[i])
+		idx, _ := c.Add(&srcList[i])
 		cmp[idx] = i
 	}
 
@@ -79,7 +79,7 @@ func BenchmarkCollectionWrite(b *testing.B) {
 			Name:  "foo" + strconv.Itoa(n),
 		}
 
-		c.Add(item)
+		c.Add(&item)
 	}
 }
 
@@ -94,7 +94,7 @@ func BenchmarkCollectionRead(b *testing.B) {
 			Count: n,
 			Name:  "foo" + strconv.Itoa(n),
 		}
-		c.Add(item)
+		c.Add(&item)
 	}
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {

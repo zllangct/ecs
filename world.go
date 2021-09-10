@@ -8,7 +8,7 @@ import (
 
 type World struct {
 	//mutex
-	sync.Mutex
+	mutex sync.Mutex
 	//frame interval
 	frameInterval time.Duration
 	//runtime

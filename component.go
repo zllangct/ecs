@@ -12,7 +12,11 @@ type IComponent interface {
 	GetType() reflect.Type
 }
 
-type ComponentBase struct {
+type TComponent[T IComponent] interface {
+	GetComponent() *T
+}
+
+type ComponentBase[T any] struct {
 	lock     sync.Mutex
 	owner    *Entity
 	realType reflect.Type
@@ -36,4 +40,8 @@ func (c *ComponentBase) SetRealType(t reflect.Type) {
 
 func (c *ComponentBase) GetType() reflect.Type {
 	return c.realType
+}
+
+func NewTContainer[T IComponent](){
+
 }

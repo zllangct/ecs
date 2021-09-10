@@ -1,13 +1,16 @@
 package ecs
 
+import "unsafe"
+
 type IndexedCollection[T any] struct {
 	c   IContainer[T]
 	ids map[int64]int64
 }
 
 func NewContainerWithId[T any]() *IndexedCollection[T] {
+	size := unsafe.Sizeof(*new(T))
 	return &IndexedCollection[T]{
-		c:   NewCollection[T](),
+		c:   NewCollection(size),
 		ids: map[int64]int64{},
 	}
 }

@@ -13,7 +13,7 @@ type Entity struct {
 	runtime    *World
 	components map[reflect.Type]IComponent
 	//public
-	id uint64
+	id int64
 }
 
 func NewEntity(world *World) *Entity {
@@ -33,7 +33,7 @@ func (e *Entity) Destroy() {
 	e.runtime.DeleteEntity(e)
 }
 
-func (e *Entity) ID() uint64 {
+func (e *Entity) ID() int64 {
 	return e.id
 }
 

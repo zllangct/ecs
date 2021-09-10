@@ -14,7 +14,7 @@ type ecsRuntime struct {
 	//logger
 	logger IInternalLogger
 	//world collection
-	world []World
+	world []*World
 }
 
 //TODO runtime global event system
@@ -28,7 +28,7 @@ func (r *ecsRuntime) NewWorld() *World{
 	defer r.mutex.Unlock()
 
 	world := NewWorld(r)
-	r.world = append(r.world, *world)
+	r.world = append(r.world, world)
 
 	return world
 }
