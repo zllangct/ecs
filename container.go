@@ -8,7 +8,7 @@ type IContainer[T any] interface {
 }
 
 type IIterator[T any] interface {
-	Value() *T
+	Val() *T
 	Next()
 	End() bool
 }

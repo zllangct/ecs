@@ -5,8 +5,8 @@ import (
 )
 
 type EntityCollection struct {
-	collection []map[uint64]*Entity
-	base       uint64
+	collection []map[int64]*Entity
+	base       int64
 	locks      []sync.RWMutex
 }
 
@@ -14,22 +14,22 @@ func NewEntityCollection(k int) *EntityCollection {
 	ec := &EntityCollection{}
 
 	for i := 1; ; i++ {
-		if c := uint64(1 << i); uint64(k) < c {
+		if c := int64(1 << i); int64(k) < c {
 			ec.base = c - 1
 			break
 		}
 	}
 
-	ec.collection = make([]map[uint64]*Entity, ec.base+1)
+	ec.collection = make([]map[int64]*Entity, ec.base+1)
 	ec.locks = make([]sync.RWMutex, ec.base+1)
 	for index := range ec.collection {
-		ec.collection[index] = map[uint64]*Entity{}
+		ec.collection[index] = map[int64]*Entity{}
 		ec.locks[index] = sync.RWMutex{}
 	}
 	return ec
 }
 
-func (p *EntityCollection) get(id uint64) *Entity {
+func (p *EntityCollection) get(id int64) *Entity {
 	hash := id & p.base
 
 	p.locks[hash].RLock()
@@ -51,7 +51,7 @@ func (p *EntityCollection) delete(entity *Entity) {
 	p.deleteByID(entity.id)
 }
 
-func (p *EntityCollection) deleteByID(id uint64) {
+func (p *EntityCollection) deleteByID(id int64) {
 	hash := id & p.base
 
 	p.locks[hash].Lock()

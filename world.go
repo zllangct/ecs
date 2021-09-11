@@ -6,9 +6,13 @@ import (
 	"time"
 )
 
+type WorldStatus int
+
 type World struct {
 	//mutex
 	mutex sync.Mutex
+	//world status
+	status WorldStatus
 	//frame interval
 	frameInterval time.Duration
 	//runtime
@@ -21,6 +25,10 @@ type World struct {
 	entities *EntityCollection
 	//logger
 	logger IInternalLogger
+
+	stop chan struct{}
+	//do some work for world cleaning
+	stopHandler func()
 }
 
 func NewWorld(runtime *ecsRuntime) *World {
@@ -31,6 +39,7 @@ func NewWorld(runtime *ecsRuntime) *World {
 		components: NewComponentCollection(config.HashCount),
 		entities:   NewEntityCollection(config.HashCount),
 		logger:     runtime.logger,
+		status: STATUS_INIT,
 	}
 	//initialise system flow
 	sf := newSystemFlow(world)
@@ -39,13 +48,34 @@ func NewWorld(runtime *ecsRuntime) *World {
 	return world
 }
 
-//start ecs world
+// Run start ecs world
 func (w *World) Run() {
-	//main loop
+	w.mutex.Lock()
 	frameInterval := w.frameInterval
+	w.status = STATUS_RUNNING
+	w.mutex.Unlock()
+
+	defer func() {
+		w.mutex.Lock()
+		w.status = STATUS_STOP
+		w.mutex.Unlock()
+	}()
+
 	var ts time.Time
 	var delta time.Duration
+	//main loop
 	for {
+		select {
+		case <-w.stop:
+			w.mutex.Lock()
+			if w.stopHandler != nil {
+				w.stopHandler()
+			}
+			w.mutex.Unlock()
+			return
+		default:
+		}
+
 		ts = time.Now()
 		w.systemFlow.run(delta)
 		delta = time.Since(ts)
@@ -56,27 +86,45 @@ func (w *World) Run() {
 	}
 }
 
+func (w *World) Stop()  {
+	w.stop<- struct{}{}
+}
+
+func (w *World) SetStopHandler(handler func()){
+	w.mutex.Lock()
+	defer w.mutex.Unlock()
+
+	w.stopHandler = handler
+}
+
+func (w *World) GetStatus() WorldStatus {
+	w.mutex.Lock()
+	defer w.mutex.Unlock()
+
+	return w.status
+}
+
 func (w *World) AddJob(handler func(JobContext, ...interface{}), args ...interface{}) {
 	w.runtime.AddJob(handler, args...)
 }
 
-//register system
+// Register register system
 func (w *World) Register(system ISystem) {
 	w.systemFlow.register(system)
 }
 
-//entity operate : add
+// AddEntity entity operate : add
 func (w *World) AddEntity(entity *Entity) {
 	w.entities.add(entity)
 }
 
-//entity operate : delete
+// DeleteEntity entity operate : delete
 func (w *World) DeleteEntity(entity *Entity) {
 	w.entities.delete(entity)
 }
 
-//entity operate : delete
-func (w *World) DeleteEntityByID(id uint64) {
+// DeleteEntityByID entity operate : delete
+func (w *World) DeleteEntityByID(id int64) {
 	w.entities.deleteByID(id)
 }
 

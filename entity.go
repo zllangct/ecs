@@ -28,7 +28,7 @@ func NewEntity(world *World) *Entity {
 
 func (e *Entity) Destroy() {
 	for _, c := range e.components {
-		e.runtime.ComponentRemove(c.GetOwner(), c)
+		e.runtime.ComponentRemove(c.Owner(), c)
 	}
 	e.runtime.DeleteEntity(e)
 }
@@ -63,10 +63,10 @@ func (e *Entity) AddComponent(components ...IComponent) {
 }
 
 func (e *Entity) addComponent(com IComponent) error {
-	if com.GetOwner() != nil {
+	if com.Owner() != nil {
 		return errors.New("the owner of component is nil")
 	}
-	typ := com.GetType()
+	typ := com.Type()
 	if e.has(typ) {
 		return fmt.Errorf("repeated component: %s", typ.Name())
 	}
@@ -96,7 +96,7 @@ func (e *Entity) RemoveComponent(com ...IComponent) {
 			continue
 		}
 		delete(e.components, typ)
-		e.runtime.ComponentRemove(c.GetOwner(), c)
+		e.runtime.ComponentRemove(c.Owner(), c)
 	}
 }
 
@@ -109,20 +109,6 @@ func (e *Entity) getComponent(typ reflect.Type) IComponent {
 	defer e.lock.RUnlock()
 
 	return e.components[typ]
-}
-
-func AttachTo[T IComponent](e *Entity, com ... *T) {
-	var ins T
-	if len(com) == 0 {
-		ins = *new(T)
-		e.AddComponent(ins)
-	} else {
-		e.AddComponent(com...)
-	}
-}
-
-func GetComponentFrom[T IComponent](e *Entity) IComponent{
-	return e.GetComponent(reflect.TypeOf(*new(T)))
 }
 
 

@@ -1,9 +1,9 @@
 package ecs
 
 import (
-	"errors"
 	"reflect"
 	"sync"
+	"unsafe"
 )
 
 type SystemLifeCircleType int
@@ -15,90 +15,88 @@ const (
 	SYSTEM_LIFE_CIRCLE_TYPE_REPEAT
 )
 
-var (
-	ErrSystemNotInit = errors.New("system not init")
-)
-
 type ISystem interface {
-	Init()  //init
-	GetBase() *SystemBase //get system base data
-	GetType() reflect.Type
-	GetOrder() Order
-	GetRequirements() map[reflect.Type]struct{}
+	Type() reflect.Type
+	Order() Order
+	Requirements() map[reflect.Type]struct{}
 	Call(label int) interface{}
 }
 
-type SystemBase struct {
+type ISystemInit interface {
+	Init()
+}
+
+type ISystemBaseInit interface{
+	BaseInit(world *World)
+}
+
+type System[T any] struct {
 	sync.Mutex
 	requirements map[reflect.Type]struct{}
 	order Order
 	world *World
-	typ   reflect.Type
+	realType reflect.Type
 	isPreFilter  bool
 }
 
-func (p *SystemBase) Call(label int) interface{} {
+func (s *System[T]) Ins() *T {
+	return (*T)(unsafe.Pointer(s))
+}
+
+func (s *System[T]) Call(label int) interface{} {
 	return nil
 }
 
-func (p *SystemBase) GetBase() *SystemBase {
-	return p
-}
-
-func (p *SystemBase) SetRequirements(rqs ...IComponent) {
-	if p.requirements == nil {
-		p.requirements = map[reflect.Type]struct{}{}
+func (s *System[T]) SetRequirements(rqs ...IComponent) {
+	if s.requirements == nil {
+		s.requirements = map[reflect.Type]struct{}{}
 	}
 	for _, value := range rqs {
-		p.requirements[reflect.TypeOf(value)] = struct{}{}
+		s.requirements[reflect.TypeOf(value)] = struct{}{}
 	}
 }
 
-func (p *SystemBase) GetRequirements() map[reflect.Type]struct{} {
-	return p.requirements
+func (s *System[T]) Requirements() map[reflect.Type]struct{} {
+	return s.requirements
 }
 
-func (p *SystemBase) baseInit(world *World, typ reflect.Type) {
-	p.requirements = map[reflect.Type]struct{}{}
-	p.SetOrder(ORDER_DEFAULT)
-	p.SetType(typ)
-	p.world = world
+func (s *System[T]) BaseInit(world *World) {
+
+	s.requirements = map[reflect.Type]struct{}{}
+	s.SetOrder(ORDER_DEFAULT)
+	s.world = world
 }
 
-func (p *SystemBase) SetType(typ reflect.Type) {
-	p.Lock()
-	defer p.Unlock()
+func (s *System[T]) Type() reflect.Type {
+	s.Lock()
+	defer s.Unlock()
 
-	p.typ = typ
+	if s.realType == nil {
+		s.realType = reflect.TypeOf(*new(T))
+	}
+	return s.realType
 }
 
-func (p *SystemBase) GetType() reflect.Type {
-	p.Lock()
-	defer p.Unlock()
+func (s *System[T]) SetOrder(order Order) {
+	s.Lock()
+	defer s.Unlock()
 
-	return reflect.TypeOf(p)
+	s.order = order
 }
 
-func (p *SystemBase) SetOrder(order Order) {
-	p.Lock()
-	defer p.Unlock()
+func (s *System[T]) Order() Order {
+	s.Lock()
+	defer s.Unlock()
 
-	p.order = order
+	return s.order
 }
 
-func (p *SystemBase) GetOrder() Order {
-	p.Lock()
-	defer p.Unlock()
-
-	return p.order
-}
-
-func (p *SystemBase) IsConcerned(com IComponent) bool {
-	cType := com.GetType()
-	if _, concerned := p.requirements[cType]; concerned {
-		for r, _ := range p.requirements {
+func (s *System[T]) IsConcerned(com IComponent) bool {
+	cType := com.Type()
+	if _, concerned := s.requirements[cType]; concerned {
+		for r := range s.requirements {
 			if r != cType {
-				if !com.GetOwner().Has(r) {
+				if !com.Owner().Has(r) {
 					concerned = false
 					break
 				}
@@ -109,14 +107,14 @@ func (p *SystemBase) IsConcerned(com IComponent) bool {
 	return false
 }
 
-func (p *SystemBase) GetWorld() *World {
-	return p.world
+func (s *System[T]) GetWorld() *World {
+	return s.world
 }
 
-func (p *SystemBase) GetNewComponent(op CollectionOperate) map[reflect.Type][]CollectionOperateInfo {
+func (s *System[T]) GetNewComponent(op CollectionOperate) map[reflect.Type][]CollectionOperateInfo {
 	temp := map[reflect.Type][]CollectionOperateInfo{}
-	for typ, _ := range p.requirements {
-		temp[typ] = p.world.getNewComponents(op, typ)
+	for typ := range s.requirements {
+		temp[typ] = s.world.getNewComponents(op, typ)
 	}
 	return temp
 }

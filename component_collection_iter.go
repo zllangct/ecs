@@ -2,31 +2,31 @@ package ecs
 
 import "unsafe"
 
-type ComponentCollectionIter[T any]  *componentCollectionIter[T]
+type ComponentCollectionIter  *componentCollectionIter
 
-type componentCollectionIter[T any] struct {
-	ls         []*IndexedCollection[T]
+type componentCollectionIter struct {
+	ls         []*Collection
 	index      int
 	indexInner int
 	len        int
 	temp       IComponent
 }
 
-func NewComponentCollectionIter[T any](ls []*IndexedCollection[T]) ComponentCollectionIter[T] {
-	return &componentCollectionIter[T]{
+func NewComponentCollectionIter(ls []*Collection) ComponentCollectionIter {
+	return &componentCollectionIter{
 		ls:         ls,
 		index:      0,
 		indexInner: -1,
 		len:        len(ls),
-		temp:       &ComponentBase{},
+		temp:       &Component[int]{},
 	}
 }
 
-func (p *componentCollectionIter[T]) End() IComponent {
+func (p *componentCollectionIter) End() IComponent {
 	return nil
 }
 
-func (p *componentCollectionIter[T]) Next() IComponent {
+func (p *componentCollectionIter) Next() IComponent {
 	if p.len == 0 {
 		return nil
 	}

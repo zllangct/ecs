@@ -5,7 +5,7 @@ import (
 )
 
 func TestUniqueID(t *testing.T) {
-	m := make(map[uint64]struct{})
+	m := make(map[int64]struct{})
 	count := 0
 	for i := 0; i < 5000000; i++ {
 		id := UniqueID()

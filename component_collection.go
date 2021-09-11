@@ -32,16 +32,17 @@ func NewCollectionOperateInfo(entity *Entity, com IComponent, op CollectionOpera
 }
 
 type ComponentCollection struct {
-	collection map[reflect.Type]interface{}
+	collections map[reflect.Type]*Collection
 	//new component cache
 	base  int64
 	locks []sync.Mutex
-	cTemp []map[reflect.Type][]func()
+	cTemp []map[reflect.Type][]CollectionOperateInfo
+	cNew map[CollectionOperate]map[reflect.Type][]CollectionOperateInfo
 }
 
 func NewComponentCollection(k int) *ComponentCollection {
 	cc := &ComponentCollection{
-		collection: map[reflect.Type]interface{}{},
+		collections: map[reflect.Type]*Collection{},
 	}
 
 	for i := 1; ; i++ {
@@ -60,14 +61,14 @@ func NewComponentCollection(k int) *ComponentCollection {
 	return cc
 }
 
-func TempComponentOperate[T IComponent](c *ComponentCollection, entity *Entity, com *T, op CollectionOperate) {
+func (c *ComponentCollection) TempComponentOperate(entity *Entity, com IComponent, op CollectionOperate) {
 	hash := entity.ID() & c.base
 
 	c.locks[hash].Lock()
 	defer c.locks[hash].Unlock()
 
 	newOpt := NewCollectionOperateInfo(entity, com, op)
-	typ := com.GetType()
+	typ := com.Type()
 	b := c.cTemp[hash]
 	if _, ok := b[typ]; ok {
 		b[typ] = append(b[typ], newOpt)
@@ -77,7 +78,6 @@ func TempComponentOperate[T IComponent](c *ComponentCollection, entity *Entity, 
 }
 
 func (c *ComponentCollection) GetTempFlushTasks() []func() {
-
 	combination := make(map[reflect.Type][]CollectionOperateInfo)
 
 	for i:=0; i < len(c.cTemp); i++ {
@@ -92,23 +92,17 @@ func (c *ComponentCollection) GetTempFlushTasks() []func() {
 
 	var tasks []func()
 	for typ, opList := range combination {
-		ttyp := typ
+		typTemp := typ
 		oopList := opList
 		fn := func(){
 			for _, operate := range oopList {
-				//set component owner
+				typTemp = operate.com.Type()
+				//set owner
 				operate.com.setOwner(operate.target)
 				//add to component container
-				ret := Add(c, operate.com, operate.target.ID())
+				_, ret := c.add(operate.com)
 				//add to entity
-				operate.target.componentAdded(typ, ret)
-
-				//add to new component list
-				if _, ok := tempNew[operate.op][typ]; !ok {
-					tempNew[operate.op][typ] = make([]CollectionOperateInfo, 0)
-				}
-				tempNew[operate.op][typ] = append(tempNew[operate.op][typ], operate)
-
+				operate.target.componentAdded(typTemp, ret)
 			}
 		}
 		tasks = append(tasks, fn)
@@ -116,99 +110,90 @@ func (c *ComponentCollection) GetTempFlushTasks() []func() {
 	return tasks
 }
 
-//handle and flush new components,should be called before destroy period
+// TempFlush handle and flush new components,should be called before destroy period
 func (c *ComponentCollection) TempFlush() {
-	var temp []CollectionOperateInfo
-	for index, item := range c.cTemp {
-		c.locks[index].Lock()
-		temp = append(temp, item...)
-		c.cTemp[index] = c.cTemp[index][0:0]
-		c.locks[index].Unlock()
-	}
-	tempNew := map[CollectionOperate]map[reflect.Type][]CollectionOperateInfo{
-		COLLECTION_OPERATE_ADD:    make(map[reflect.Type][]CollectionOperateInfo),
-		COLLECTION_OPERATE_DELETE: make(map[reflect.Type][]CollectionOperateInfo),
-	}
-	for _, operate := range temp {
-		typ := operate.com.GetType()
-		//set component owner
-		operate.com.setOwner(operate.target)
-		//add to component container
-		ret := (c, operate.com, operate.target.ID())
-		//add to entity
-		operate.target.componentAdded(typ, ret)
-
-		//add to new component list
-		if _, ok := tempNew[operate.op][typ]; !ok {
-			tempNew[operate.op][typ] = make([]CollectionOperateInfo, 0)
-		}
-		tempNew[operate.op][typ] = append(tempNew[operate.op][typ], operate)
-	}
+	//var temp []CollectionOperateInfo
+	//for index, item := range c.cTemp {
+	//	c.locks[index].Lock()
+	//	temp = append(temp, item...)
+	//	c.cTemp[index] = c.cTemp[index][0:0]
+	//	c.locks[index].Unlock()
+	//}
+	//tempNew := map[CollectionOperate]map[reflect.Type][]CollectionOperateInfo{
+	//	COLLECTION_OPERATE_ADD:    make(map[reflect.Type][]CollectionOperateInfo),
+	//	COLLECTION_OPERATE_DELETE: make(map[reflect.Type][]CollectionOperateInfo),
+	//}
+	//for _, operate := range temp {
+	//	typ := operate.com.Type()
+	//	//set owner
+	//	operate.com.setOwner(operate.target)
+	//	//add to component container
+	//	_, ret := c.add(operate.com)
+	//	//add to entity
+	//	operate.target.componentAdded(typ, ret)
+	//	//add to new component list
+	//	if _, ok := tempNew[operate.op][typ]; !ok {
+	//		tempNew[operate.op][typ] = make([]CollectionOperateInfo, 0)
+	//	}
+	//	tempNew[operate.op][typ] = append(tempNew[operate.op][typ], operate)
+	//}
 }
 
-func Add[T IComponent](cc *ComponentCollection, com *T, id int64) *T {
-	var c *IndexedCollection[T]
-	var ins T
-	typ := reflect.TypeOf(ins)
-	if v, ok := cc.collection[typ]; ok {
-		v = NewContainerWithId[T]()
-		cc.collection[typ] = v
+func (c *ComponentCollection) add(com IComponent) (int64, IComponent) {
+	typ := com.Type()
+	var collection *Collection
+	if v, ok := c.collections[typ]; ok {
+		nc := NewCollection(int(typ.Size()))
+		c.collections[typ] = nc
 	} else {
-		c = v.(*IndexedCollection[T])
+		collection = v
 	}
-	_, ptr := c.Add(com, id)
-	return ptr
+	i := (*iface)(unsafe.Pointer(&com))
+	id, ptr := collection.Add(i.data)
+	i.data = ptr
+	com.setID(id)
+	return id, com
 }
 
-func Remove[T IComponent](c *ComponentCollection, id int64) {
-	var ins T
-	typ := reflect.TypeOf(ins)
-	if v, ok := c.collection[typ]; ok {
-		v.(*IndexedCollection[T]).Remove(id)
+func (p *ComponentCollection) GetNewComponentsAll() []CollectionOperateInfo {
+	size := 0
+	for _, m := range p.cNew {
+		for _, mm := range m {
+			size += len(mm)
+		}
 	}
+	temp := make([]CollectionOperateInfo, 0, size)
+	for _, m := range p.cNew {
+		for _, mm := range m {
+			temp = append(temp, mm...)
+		}
+	}
+	return temp
 }
 
-func GetNewComponentsAll(c *ComponentCollection) []CollectionOperateInfo {
-	return nil
+func (p *ComponentCollection) GetNewComponents(op CollectionOperate, typ reflect.Type) []CollectionOperateInfo {
+	return p.cNew[op][typ]
 }
 
-func GetNewComponents[T IComponent](c *ComponentCollection, op CollectionOperate) []CollectionOperateInfo {
-	var ins T
-	typ := reflect.TypeOf(ins)
-	_=typ
-	return nil
-}
-
-//func GetComponents[T IComponent](cc *ComponentCollection) *iterator {
-//	//var ins T
-//	//v, ok := cc.collection[reflect.TypeOf(ins)]
-//	//if ok {
-//	//	return v.(IndexedCollection[T]).GetIterator()
-//	//}
-//	//return EmptyIterator()
-//	return nil
-//}
-
-//TODO need to refactor
+// GetAllComponents TODO need to refactor
 func (c *ComponentCollection) GetAllComponents() ComponentCollectionIter {
-	//length := 0
-	//for _, value := range c.collection {
-	//	length += value.Len()
-	//}
-	//components := make([]*IndexedCollection, 0, length)
-	//index := 0
-	//for _, value := range c.collection {
-	//	l := value.Len()
-	//	components = append(components, value)
-	//	index += l
-	//}
-	//return NewComponentCollectionIter(components)
-	return nil
+	length := 0
+	for _, value := range c.collections {
+		length += value.Len()
+	}
+	components := make([]*Collection, 0, length)
+	index := 0
+	for _, value := range c.collections {
+		l := value.Len()
+		components = append(components, value)
+		index += l
+	}
+	return NewComponentCollectionIter(components)
 }
 
 func (c *ComponentCollection) GetComponent(id int64) unsafe.Pointer {
 	//var ins T
-	//v, ok := c.collection[reflect.TypeOf(ins)]
+	//v, ok := c.collections[reflect.TypeOf(ins)]
 	//if ok {
 	//	if c := v.(IndexedCollection[T]).Get(id); c != nil {
 	//		return c
@@ -218,14 +203,3 @@ func (c *ComponentCollection) GetComponent(id int64) unsafe.Pointer {
 	return nil
 }
 
-//TODO need to refactor
-//func (p *ComponentCollection) GetIterator() *componentCollectionIter {
-//	//ls := make([]*IndexedCollection, len(p.collection))
-//	//i := 0
-//	//for _, value := range p.collection {
-//	//	ls[i] = value
-//	//	i += 1
-//	//}
-//	//return NewComponentCollectionIter(ls)
-//	return nil
-//}

@@ -3,45 +3,56 @@ package ecs
 import (
 	"reflect"
 	"sync"
+	"unsafe"
 )
 
 type IComponent interface {
-	setOwner(*Entity)
-	GetOwner() *Entity
-	GetBase() *ComponentBase
-	GetType() reflect.Type
+	Owner() *Entity
+	Type() reflect.Type
+	setID(id int64)
+	setOwner(entity *Entity)
 }
 
-type TComponent[T IComponent] interface {
-	GetComponent() *T
+type ITComponent[T any] interface {
+	IComponent
+	NewContainer() *Collection
+	ToIComponent() IComponent
 }
 
-type ComponentBase[T any] struct {
+type Component[T any] struct {
 	lock     sync.Mutex
 	owner    *Entity
+	id 		 int64
 	realType reflect.Type
 }
 
-func (c *ComponentBase) setOwner(entity *Entity) {
+func (c *Component[T]) setOwner(entity *Entity) {
 	c.owner = entity
 }
 
-func (c *ComponentBase) GetOwner() *Entity {
+func (c *Component[T]) setID(id int64){
+	c.id = id
+}
+
+func (c *Component[T]) Ins() *T {
+	return (*T)(unsafe.Pointer(c))
+}
+
+func (c *Component[T]) Owner() *Entity {
 	return c.owner
 }
 
-func (c *ComponentBase) GetBase() *ComponentBase {
-	return c
-}
-
-func (c *ComponentBase) SetRealType(t reflect.Type) {
-	c.realType = t
-}
-
-func (c *ComponentBase) GetType() reflect.Type {
+func (c *Component[T]) Type() reflect.Type {
+	if c.realType == nil {
+		c.realType = reflect.TypeOf(*(new(T)))
+	}
 	return c.realType
 }
 
-func NewTContainer[T IComponent](){
+func (c *Component[T]) ToIComponent() IComponent {
+	return IComponent(c)
+}
 
+func (c *Component[T]) NewContainer() *Collection {
+	return NewCollection(int(reflect.TypeOf(*new(T)).Size()))
 }

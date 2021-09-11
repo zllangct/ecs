@@ -1,8 +1,10 @@
 package ecs
 
 import (
+	"reflect"
 	"strconv"
 	"testing"
+	"unsafe"
 )
 
 func TestNewCollection(t *testing.T) {
@@ -19,23 +21,21 @@ func TestNewCollection(t *testing.T) {
 		})
 	}
 
-	t.Run("test1", func(t *testing.T) {
-		c := NewCollection[Item]()
+	c := NewCollection(int(reflect.TypeOf(Item{}).Size()))
 
-		cmp := map[int]int{}
-		for i := 0; i < caseCount; i++ {
-			idx, _ := c.Add(&srcList[i])
-			cmp[idx] = i
-		}
+	cmp := map[int64]int{}
+	for i := 0; i < caseCount; i++ {
+		id, _ := c.Add(unsafe.Pointer(&srcList[i]))
+		cmp[id] = i
+	}
 
-		for idx, isrc := range cmp {
-			p := c.Get(idx)
-			item := *p
-			if item != srcList[isrc] {
-				t.Errorf("src item %v != container item %v", srcList[isrc], item)
-			}
+	for id, idx := range cmp {
+		p := c.Get(id)
+		item := *(*Item)(p)
+		if item != srcList[idx] {
+			t.Errorf("src item %v != container item %v", srcList[idx], item)
 		}
-	})
+	}
 }
 
 func TestCollectionIterator(t *testing.T){
@@ -52,17 +52,16 @@ func TestCollectionIterator(t *testing.T){
 		})
 	}
 
-	c := NewCollection[Item]()
+	c := NewCollection(int(reflect.TypeOf(Item{}).Size()))
 
-	cmp := map[int]int{}
+	cmp := map[int64]int{}
 	for i := 0; i < caseCount; i++ {
-		idx, _ := c.Add(&srcList[i])
-		cmp[idx] = i
+		id, _ := c.Add(unsafe.Pointer(&srcList[i]))
+		cmp[id] = i
 	}
 
-	iter := NewIterator(c)
-	for v := iter.Next(); v != nil; v = iter.Next(){
-		_ = v
+	for iter := NewIterator[Item](c) ; !iter.End(); iter.Next(){
+		_ = iter.Val
 	}
 }
 
@@ -71,7 +70,7 @@ func BenchmarkCollectionWrite(b *testing.B) {
 		Count int
 		Name  string
 	}
-	c := NewCollection[Item]()
+	c := NewCollection(int(reflect.TypeOf(Item{}).Size()))
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		item := Item{
@@ -79,7 +78,7 @@ func BenchmarkCollectionWrite(b *testing.B) {
 			Name:  "foo" + strconv.Itoa(n),
 		}
 
-		c.Add(&item)
+		c.Add(unsafe.Pointer(&item))
 	}
 }
 
@@ -88,16 +87,16 @@ func BenchmarkCollectionRead(b *testing.B) {
 		Count int
 		Name  string
 	}
-	c := NewCollection[Item]()
+	c := NewCollection(int(reflect.TypeOf(Item{}).Size()))
 	for n := 0; n < b.N; n++ {
 		item := Item{
 			Count: n,
 			Name:  "foo" + strconv.Itoa(n),
 		}
-		c.Add(&item)
+		c.Add(unsafe.Pointer(&item))
 	}
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		_ = c.Get(n)
+		_ = c.get(n)
 	}
 }

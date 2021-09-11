@@ -4,14 +4,13 @@ import (
 	"log"
 	"net/http"
 	_ "net/http/pprof"
-	"reflect"
 	"testing"
 	"time"
 )
 
 //position component
 type Position struct {
-	ComponentBase
+	Component[Position]
 	X int
 	Y int
 	Z int
@@ -19,20 +18,18 @@ type Position struct {
 
 func NewPosition() *Position {
 	c := Position{}
-	c.SetRealType(reflect.TypeOf(c))
 	return &c
 }
 
 //movement component
 type Movement struct {
-	ComponentBase
+	Component[Movement]
 	v   int
 	dir []int
 }
 
 func NewMovement() *Movement {
 	c := Movement{}
-	c.SetRealType(reflect.TypeOf(c))
 	return &c
 }
 
@@ -43,20 +40,20 @@ type MoveSystemData struct {
 }
 
 type MoveSystem struct {
-	SystemBase
-	components map[uint64]MoveSystemData
+	System[MoveSystem]
+	components map[int64]MoveSystemData
 	logger     IInternalLogger
 }
 
 func (p *MoveSystem) Init() {
 	p.logger = p.GetWorld().logger
 	p.SetRequirements(&Position{}, &Movement{})
-	p.components = map[uint64]MoveSystemData{}
+	p.components = map[int64]MoveSystemData{}
 }
 
 func (p *MoveSystem) Filter(com IComponent, op ComponentOperate) {
 	if p.IsConcerned(com) {
-		owner := com.GetOwner()
+		owner := com.Owner()
 		switch op {
 		case COMPONENT_OPERATE_ADD:
 			p.components[owner.ID()] = MoveSystemData{
@@ -78,13 +75,13 @@ func (p *MoveSystem) Update(event Event) {
 		position.Y = position.Y + int(float64(move.dir[1]*move.v)*delta.Seconds())
 		position.Z = position.Z + int(float64(move.dir[2]*move.v)*delta.Seconds())
 
-		p.logger.Info("target id:", position.GetOwner().ID(), " current position:", position.X, position.Y, position.Z)
+		p.logger.Info("target id:", position.Owner().ID(), " current position:", position.X, position.Y, position.Z)
 	}
 }
 
 //hp component
 type HealthPoint struct {
-	ComponentBase
+	Component[HealthPoint]
 	HP int
 }
 
@@ -95,19 +92,19 @@ type DamageSystemData struct {
 }
 
 type DamageSystem struct {
-	SystemBase
-	components map[uint64]DamageSystemData
+	System[DamageSystem]
+	components map[int64]DamageSystemData
 }
 
 func (p *DamageSystem) Init() {
 	p.SetRequirements(&Position{}, &HealthPoint{})
-	p.components = map[uint64]DamageSystemData{}
+	p.components = map[int64]DamageSystemData{}
 }
 
 //Filter example for filter: cache sth by filter, filter will be called only on component be added or deleted
 func (p *DamageSystem) Filter(com IComponent, op ComponentOperate) {
 	if p.IsConcerned(com) {
-		owner := com.GetOwner()
+		owner := com.Owner()
 		switch op {
 		case COMPONENT_OPERATE_ADD:
 			p.components[owner.ID()] = DamageSystemData{
@@ -137,8 +134,6 @@ func TestRuntime0(t *testing.T) {
 	go rt.Run()
 
 	world.Register(&MoveSystem{})
-	//rt.Register(&DamageSystem{})
-
 
 	world.NewEntity()
 	world.NewEntity()
@@ -159,7 +154,10 @@ func TestRuntime0(t *testing.T) {
 	m2 := NewMovement()
 	m2.v = 2000
 	m2.dir = []int{0, 1, 0}
-	world.NewEntity().AddComponent(p2, m2)
+	//e2 := world.NewEntity()
+	//AttachTo(e2, p2)
+	//AttachTo(e2, m2)
+
 	time.Sleep(time.Second * 3)
 	//<-make(chan struct{})
 }

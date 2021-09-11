@@ -1,7 +1,6 @@
 package ecs
 
 import (
-	"reflect"
 	"sync"
 	"time"
 )
@@ -24,7 +23,7 @@ const (
 	PERIOD_POST_DESTROY
 )
 
-// default suborder of system
+// Order default suborder of system
 type Order int32
 
 const (
@@ -33,7 +32,7 @@ const (
 	ORDER_DEFAULT Order = ORDER_APPEND
 )
 
-//extension of system group slice
+// OrderSequence extension of system group slice
 type OrderSequence []*SystemGroup
 
 //system execute flow
@@ -133,8 +132,20 @@ func (p *systemFlow) run(delta time.Duration) {
 		}
 
 	}
+	//p.world.components.TempFlush()
+	tasks := p.world.components.GetTempFlushTasks()
+	p.wg.Add(len(tasks))
+	for _, task := range tasks{
+		Runtime.AddJob(func(context JobContext, args ...interface{}) {
+			fn := args[0].(func())
+			wg := args[1].(*sync.WaitGroup)
+			fn()
+			wg.Done()
+
+		}, task)
+	}
+	p.wg.Wait()
 	//do filter
-	p.world.components.TempFlush()
 	p.filterExecute()
 }
 
@@ -153,22 +164,15 @@ func (p *systemFlow) filterExecute() {
 						continue
 					}
 					p.world.AddJob(func(ctx JobContext, args ...interface{}) {
-						sys := args[0].(ISystem)
-						filter := args[1].(IEventFilter)
-						wg := args[2].(*sync.WaitGroup)
-						if !sys.GetBase().isPreFilter {
-							components := ctx.World.GetAllComponents()
-							for com := components.Next(); com != components.End(); com = components.Next() {
-								filter.Filter(com, COLLECTION_OPERATE_ADD)
-							}
-							sys.GetBase().isPreFilter = true
-						} else {
-							for _, comInfo := range comInfos {
-								filter.Filter(comInfo.com, comInfo.op)
-							}
+						filter := args[0].(IEventFilter)
+						wg := args[1].(*sync.WaitGroup)
+
+						for _, comInfo := range comInfos {
+							filter.Filter(comInfo.com, comInfo.op)
 						}
+
 						wg.Done()
-					}, ss[i], filter, p.wg)
+					}, filter, p.wg)
 				}
 			}
 			//waiting for all complete
@@ -179,9 +183,13 @@ func (p *systemFlow) filterExecute() {
 
 //register method only in world init or func init(){}
 func (p *systemFlow) register(system ISystem) {
-	system.GetBase().baseInit(p.world, reflect.TypeOf(system))
-	system.Init()
-	order := system.GetOrder()
+	if baseInit, ok := system.(ISystemBaseInit);ok {
+		baseInit.BaseInit(p.world)
+	}
+	if init, ok := system.(ISystemInit);ok {
+		init.Init()
+	}
+	order := system.Order()
 
 	for _, period := range p.periodList {
 		imp := false

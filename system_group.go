@@ -14,8 +14,8 @@ type Node struct {
 }
 
 func (p *Node) isFriend(node *Node) bool {
-	for com, _ := range p.val.GetRequirements() {
-		for comTarget, _ := range node.val.GetRequirements() {
+	for com, _ := range p.val.Requirements() {
+		for comTarget, _ := range node.val.Requirements() {
 			if comTarget.String() == com.String() {
 				return true
 			}
@@ -71,8 +71,8 @@ func (p *SystemGroup) reset() {
 	//need resort
 	if !p.ordered {
 		sort.Slice(p.systems, func(i, j int) bool {
-			return p.refCount(p.systems[i].val.GetRequirements()) >
-				p.refCount(p.systems[j].val.GetRequirements())
+			return p.refCount(p.systems[i].val.Requirements()) >
+				p.refCount(p.systems[j].val.Requirements())
 		})
 		if p.root == nil {
 			p.root = &Node{
@@ -121,7 +121,7 @@ func (p *SystemGroup) insert(sys ISystem) {
 	//set cluster no ordered
 	p.ordered = false
 	//get system's required components
-	rqs := sys.GetRequirements()
+	rqs := sys.Requirements()
 	if len(rqs) == 0 {
 		panic("invalid system")
 	}
