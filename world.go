@@ -92,6 +92,7 @@ func (w *World) run() {
 		}
 
 		ts = time.Now()
+		w.Info("frame:", delta)
 		w.systemFlow.run(delta)
 		delta = time.Since(ts)
 		if frameInterval-delta > 0 {
@@ -120,7 +121,7 @@ func (w *World) GetStatus() WorldStatus {
 }
 
 func (w *World) AddJob(handler func(JobContext, ...interface{}), args ...interface{}) {
-	w.runtime.AddJob(handler, args...)
+	Runtime.AddJob(handler, args...)
 }
 
 // Register register system

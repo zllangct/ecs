@@ -77,7 +77,7 @@ func (r *ecsRuntime) Status() RuntimeStatus {
 }
 
 func (r *ecsRuntime) Run() {
-	go r.Run()
+	 r.run()
 }
 
 func (r *ecsRuntime) run() {

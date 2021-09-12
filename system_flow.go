@@ -125,7 +125,7 @@ func (p *systemFlow) run(delta time.Duration) {
 						}
 
 						p.wg.Add(1)
-						p.world.AddJob(func(ctx JobContext, args ...interface{}) {
+						Runtime.AddJob(func(ctx JobContext, args ...interface{}) {
 							fn := args[0].(func(event Event))
 							delta := args[1].(time.Duration)
 							wg := args[2].(*sync.WaitGroup)
@@ -138,8 +138,9 @@ func (p *systemFlow) run(delta time.Duration) {
 			//waiting for all complete
 			p.wg.Wait()
 		}
-
 	}
+
+	p.wg.Wait()
 
 	tasks := p.world.components.GetTempTasks()
 	newList := map[reflect.Type][]ComponentOptResult{}
@@ -147,10 +148,14 @@ func (p *systemFlow) run(delta time.Duration) {
 	p.wg.Add(len(tasks))
 	for _, task := range tasks{
 		Runtime.AddJob(func(context JobContext, args ...interface{}) {
+			Runtime.logger.Info("temp task execute")
 			t := args[0].(TempTask)
 			typ, rn := t.fn()
+
 			t.lock.Lock()
 			t.m[typ] = rn
+			t.lock.Unlock()
+
 			t.wg.Done()
 		}, TempTask{
 			fn: task,
@@ -159,7 +164,9 @@ func (p *systemFlow) run(delta time.Duration) {
 			lock: &l,
 		})
 	}
+	p.world.Info("temp tasks added")
 	p.wg.Wait()
+	p.world.Info("temp tasks added 2")
 
 	p.world.components.TempTasksDone(newList)
 }
