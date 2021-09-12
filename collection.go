@@ -1,29 +1,19 @@
 package ecs
 
-import (
-	"reflect"
-	"unsafe"
-)
-
-type Collection struct {
-	buf  []byte
-	len  int
-	unit int
+type Collection[T any] struct {
+	data  []T
 	ids map[int64]int64
 	seq int64
 }
 
-func NewCollection(elementSize int) *Collection {
-	c := &Collection{
-		buf:  make([]byte, 0, elementSize),
-		len:  0,
-		unit: elementSize,
+func NewCollection[T any]() *Collection[T] {
+	c := &Collection[T]{
 		ids: map[int64]int64{},
 	}
 	return c
 }
 
-func (c *Collection) getID() int64 {
+func (c *Collection[T]) getID() int64 {
 	ok := false
 	for !ok {
 		c.seq++
@@ -34,37 +24,19 @@ func (c *Collection) getID() int64 {
 	return c.seq
 }
 
-func (c *Collection) add(element unsafe.Pointer) (int, unsafe.Pointer) {
-	data := reflect.SliceHeader{
-		Data: uintptr(element),
-		Len:  c.unit,
-		Cap:  c.unit,
-	}
-	c.buf = append(c.buf, *(*[]byte)(unsafe.Pointer(&data))...)
-	c.len += 1
-	return c.len - 1, unsafe.Pointer(&c.buf)
-}
-
-func (c *Collection) Add(element unsafe.Pointer) (int64, unsafe.Pointer)  {
-	idx, ptr := c.add(element)
+func (c *Collection[T]) Add(element *T) (int64, *T)  {
+	idx := len(c.data)
+	c.data = append(c.data, *element)
 	id := c.getID()
 	c.ids[id] = int64(idx)
 	c.ids[int64(-idx)] = -id
-	return id, ptr
+	ret := &(c.data[idx])
+	//ss := (*T)(unsafe.Pointer(ret))
+	//c.data[idx].setID(id)
+	return id, ret
 }
 
-func (c *Collection) remove(idx int) {
-	if idx < 0 || idx >= c.len {
-		return
-	}
-	offsetDelete := idx * c.unit
-	offsetEnd := c.len * c.unit
-	copy(c.buf[offsetDelete:offsetDelete + c.unit], c.buf[offsetEnd:])
-	c.buf = c.buf[:offsetEnd]
-	c.len -= 1
-}
-
-func (c *Collection) Remove(id int64) {
+func (c *Collection[T]) Remove(id int64) {
 	if id < 0 {
 		return
 	}
@@ -72,22 +44,17 @@ func (c *Collection) Remove(id int64) {
 	if !ok {
 		return
 	}
-	c.ids[c.ids[int64(c.len)]] = idx
+	l:=len(c.data)
+	c.ids[c.ids[int64(l)]] = idx
 	delete(c.ids, c.ids[-idx])
-	c.ids[-idx] = c.ids[int64(c.len)]
-	delete(c.ids, int64(c.len))
+	c.ids[-idx] = c.ids[int64(l)]
+	delete(c.ids, int64(l))
 
-	c.remove(int(idx))
+	c.data[idx], c.data[l-1] = c.data[l - 1], c.data[idx]
+	c.data = c.data[:l - 1]
 }
 
-func (c *Collection) get(idx int) unsafe.Pointer {
-	if idx < 0 || idx >= c.len {
-		return nil
-	}
-	return unsafe.Add(unsafe.Pointer(&c.buf), idx * c.unit)
-}
-
-func (c *Collection) Get(id int64) unsafe.Pointer {
+func (c *Collection[T]) Get(id int64) *T {
 	if id < 0 {
 		return nil
 	}
@@ -95,9 +62,9 @@ func (c *Collection) Get(id int64) unsafe.Pointer {
 	if !ok {
 		return nil
 	}
-	return c.get(int(idx))
+	return &(c.data[idx])
 }
 
-func (c *Collection) Len() int {
-	return c.len
+func (c *Collection[T]) Len() int {
+	return len(c.data)
 }

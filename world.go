@@ -128,16 +128,16 @@ func (w *World) DeleteEntityByID(id int64) {
 	w.entities.deleteByID(id)
 }
 
+func (w *World) ComponentTemplateAttach(target *Entity, com IComponentTemplate) {
+	w.components.TempTemplateOperate(target, com, COLLECTION_OPERATE_ADD)
+}
+
 func (w *World) ComponentAttach(target *Entity, com IComponent) {
-	w.components.TempComponentOperate(target, com, COLLECTION_OPERATE_ADD)
+	w.components.TempTemplateOperate(target, com.Template(), COLLECTION_OPERATE_ADD)
 }
 
 func (w *World) ComponentRemove(target *Entity, com IComponent) {
-	w.components.TempComponentOperate(target, com, COLLECTION_OPERATE_DELETE)
-}
-
-func (w *World) GetAllComponents() ComponentCollectionIter {
-	return w.components.GetAllComponents()
+	w.components.TempTemplateOperate(target, com.Template(), COLLECTION_OPERATE_DELETE)
 }
 
 func (w *World) Error(v ...interface{}) {
@@ -146,12 +146,12 @@ func (w *World) Error(v ...interface{}) {
 	}
 }
 
-func (w *World) getNewComponentsAll() []CollectionOperateInfo {
+func (w *World) getNewComponentsAll() map[reflect.Type][]ComponentOptResult {
 	return w.components.GetNewComponentsAll()
 }
 
-func (w *World) getNewComponents(op CollectionOperate, typ reflect.Type) []CollectionOperateInfo {
-	return w.components.GetNewComponents(op, typ)
+func (w *World) getNewComponents(typ reflect.Type) []ComponentOptResult {
+	return w.components.GetNewComponents(typ)
 }
 
 func (w *World) NewEntity() *Entity{

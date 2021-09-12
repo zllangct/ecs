@@ -16,7 +16,7 @@ type RuntimeStatus int
 type ecsRuntime struct {
 	//mutex
 	mutex sync.Mutex
-	//runtime status
+	//world status
 	status RuntimeStatus
 	//world config
 	config *RuntimeConfig
@@ -31,7 +31,7 @@ type ecsRuntime struct {
 }
 
 
-//TODO runtime global event system
+//TODO world global event system
 
 func NewRuntime() *ecsRuntime {
 	return &ecsRuntime{}

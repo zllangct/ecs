@@ -10,7 +10,7 @@ import (
 type Entity struct {
 	lock sync.RWMutex
 	//private
-	runtime    *World
+	world      *World
 	components map[reflect.Type]IComponent
 	//public
 	id int64
@@ -18,7 +18,7 @@ type Entity struct {
 
 func NewEntity(world *World) *Entity {
 	entity := &Entity{
-		runtime:    world,
+		world:      world,
 		components: make(map[reflect.Type]IComponent),
 		id:         UniqueID(),
 	}
@@ -28,9 +28,9 @@ func NewEntity(world *World) *Entity {
 
 func (e *Entity) Destroy() {
 	for _, c := range e.components {
-		e.runtime.ComponentRemove(c.Owner(), c)
+		e.world.ComponentRemove(c.Owner(), c)
 	}
-	e.runtime.DeleteEntity(e)
+	e.world.DeleteEntity(e)
 }
 
 func (e *Entity) ID() int64 {
@@ -54,10 +54,28 @@ func (e *Entity) has(types ...reflect.Type) bool {
 	return true
 }
 
+func (e *Entity) AddByTemplate(templates ...IComponentTemplate) {
+	for _, c := range templates {
+		if err := e.addByTemplate(c); err != nil{
+			e.world.Error("repeat component:", err)
+		}
+	}
+}
+
+func (e *Entity) addByTemplate(com IComponentTemplate) error {
+	com = com.SetOwner(e)
+	typ := com.ComponentType()
+	if e.has(typ) {
+		return fmt.Errorf("repeated component: %s", typ.Name())
+	}
+	e.world.ComponentTemplateAttach(e, com)
+	return nil
+}
+
 func (e *Entity) AddComponent(components ...IComponent) {
 	for _, c := range components {
 		if err := e.addComponent(c); err != nil{
-			e.runtime.Error("repeat component:", err)
+			e.world.Error("repeat component:", err)
 		}
 	}
 }
@@ -70,7 +88,7 @@ func (e *Entity) addComponent(com IComponent) error {
 	if e.has(typ) {
 		return fmt.Errorf("repeated component: %s", typ.Name())
 	}
-	e.runtime.ComponentAttach(e, com)
+	e.world.ComponentAttach(e, com)
 	return nil
 }
 
@@ -92,11 +110,11 @@ func (e *Entity) RemoveComponent(com ...IComponent) {
 	for _, c := range com {
 		typ := reflect.TypeOf(c)
 		if !e.Has(typ) {
-			e.runtime.Error(errors.New("repeat component:" + typ.Name()))
+			e.world.Error(errors.New("repeat component:" + typ.Name()))
 			continue
 		}
 		delete(e.components, typ)
-		e.runtime.ComponentRemove(c.Owner(), c)
+		e.world.ComponentRemove(c.Owner(), c)
 	}
 }
 

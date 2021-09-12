@@ -7,7 +7,7 @@ type Event struct {
 }
 
 type IEventInit interface {
-	Initialize()
+	Init()
 }
 
 type IEventStart interface {
@@ -34,6 +34,3 @@ type IEventPostDestroy interface {
 	PostDestroy(event Event)
 }
 
-type IEventFilter interface {
-	Filter(component IComponent, op CollectionOperate)
-}

@@ -1,16 +1,16 @@
 package ecs
 
 import (
-	"reflect"
+	"fmt"
 	"strconv"
 	"testing"
-	"unsafe"
 )
 
 func TestNewCollection(t *testing.T) {
 	type Item struct {
 		Count int
 		Name  string
+		o1 int
 	}
 	caseCount := 10
 	var srcList []Item
@@ -20,19 +20,17 @@ func TestNewCollection(t *testing.T) {
 			Name:  "foo" + strconv.Itoa(i),
 		})
 	}
-
-	c := NewCollection(int(reflect.TypeOf(Item{}).Size()))
+	c := NewCollection[Item]()
 
 	cmp := map[int64]int{}
 	for i := 0; i < caseCount; i++ {
-		id, _ := c.Add(unsafe.Pointer(&srcList[i]))
+		id, _ := c.Add(&srcList[i])
 		cmp[id] = i
 	}
 
 	for id, idx := range cmp {
-		p := c.Get(id)
-		item := *(*Item)(p)
-		if item != srcList[idx] {
+		item := c.Get(id)
+		if *item != srcList[idx] {
 			t.Errorf("src item %v != container item %v", srcList[idx], item)
 		}
 	}
@@ -52,16 +50,17 @@ func TestCollectionIterator(t *testing.T){
 		})
 	}
 
-	c := NewCollection(int(reflect.TypeOf(Item{}).Size()))
+	c := NewCollection[Item]()
 
 	cmp := map[int64]int{}
 	for i := 0; i < caseCount; i++ {
-		id, _ := c.Add(unsafe.Pointer(&srcList[i]))
+		id, _ := c.Add(&srcList[i])
 		cmp[id] = i
 	}
 
-	for iter := NewIterator[Item](c) ; !iter.End(); iter.Next(){
-		_ = iter.Val
+	for iter := NewIterator(c) ; !iter.End(); iter.Next(){
+		v := iter.Val()
+		fmt.Printf("%+v", v)
 	}
 }
 
@@ -70,15 +69,15 @@ func BenchmarkCollectionWrite(b *testing.B) {
 		Count int
 		Name  string
 	}
-	c := NewCollection(int(reflect.TypeOf(Item{}).Size()))
+	c := NewCollection[Item]()
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		item := Item{
+		item := &Item{
 			Count: n,
 			Name:  "foo" + strconv.Itoa(n),
 		}
 
-		c.Add(unsafe.Pointer(&item))
+		c.Add(item)
 	}
 }
 
@@ -87,16 +86,18 @@ func BenchmarkCollectionRead(b *testing.B) {
 		Count int
 		Name  string
 	}
-	c := NewCollection(int(reflect.TypeOf(Item{}).Size()))
+	c := NewCollection[Item]()
+	var ids []int64
 	for n := 0; n < b.N; n++ {
-		item := Item{
+		item := &Item{
 			Count: n,
 			Name:  "foo" + strconv.Itoa(n),
 		}
-		c.Add(unsafe.Pointer(&item))
+		id, _ := c.Add(item)
+		ids = append(ids, id)
 	}
 	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
-		_ = c.get(n)
+	for n := 0; n < len(ids); n++ {
+		_ = c.Get(ids[n])
 	}
 }

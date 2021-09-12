@@ -22,10 +22,6 @@ type ISystem interface {
 	Call(label int) interface{}
 }
 
-type ISystemInit interface {
-	Init()
-}
-
 type ISystemBaseInit interface{
 	BaseInit(world *World)
 }
@@ -61,7 +57,6 @@ func (s *System[T]) Requirements() map[reflect.Type]struct{} {
 }
 
 func (s *System[T]) BaseInit(world *World) {
-
 	s.requirements = map[reflect.Type]struct{}{}
 	s.SetOrder(ORDER_DEFAULT)
 	s.world = world
@@ -111,10 +106,3 @@ func (s *System[T]) GetWorld() *World {
 	return s.world
 }
 
-func (s *System[T]) GetNewComponent(op CollectionOperate) map[reflect.Type][]CollectionOperateInfo {
-	temp := map[reflect.Type][]CollectionOperateInfo{}
-	for typ := range s.requirements {
-		temp[typ] = s.world.getNewComponents(op, typ)
-	}
-	return temp
-}

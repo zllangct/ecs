@@ -1,6 +1,7 @@
 package ecs
 
 import (
+	"reflect"
 	"sync"
 	"time"
 )
@@ -31,6 +32,13 @@ const (
 	ORDER_APPEND  Order = 999999
 	ORDER_DEFAULT Order = ORDER_APPEND
 )
+
+type TempTask struct {
+	lock *sync.Mutex
+	m  map[reflect.Type][]ComponentOptResult
+	wg *sync.WaitGroup
+	fn func()(reflect.Type, []ComponentOptResult)
+}
 
 // OrderSequence extension of system group slice
 type OrderSequence []*SystemGroup
@@ -132,62 +140,49 @@ func (p *systemFlow) run(delta time.Duration) {
 		}
 
 	}
-	//p.world.components.TempFlush()
-	tasks := p.world.components.GetTempFlushTasks()
+
+	tasks := p.world.components.GetTempTasks()
+	newList := map[reflect.Type][]ComponentOptResult{}
+	l := sync.Mutex{}
 	p.wg.Add(len(tasks))
 	for _, task := range tasks{
 		Runtime.AddJob(func(context JobContext, args ...interface{}) {
-			fn := args[0].(func())
-			wg := args[1].(*sync.WaitGroup)
-			fn()
-			wg.Done()
-
-		}, task)
+			t := args[0].(TempTask)
+			typ, rn := t.fn()
+			t.lock.Lock()
+			t.m[typ] = rn
+			t.wg.Done()
+		}, TempTask{
+			fn: task,
+			wg: p.wg,
+			m: newList,
+			lock: &l,
+		})
 	}
 	p.wg.Wait()
-	//do filter
-	p.filterExecute()
-}
 
-func (p *systemFlow) filterExecute() {
-	var sq OrderSequence
-	comInfos := p.world.components.GetNewComponentsAll()
-	for _, period := range p.periodList {
-		sq = p.systemPeriod[period]
-		for _, sl := range sq {
-			ss := sl.all()
-			if systemCount := len(ss); systemCount != 0 {
-				p.wg.Add(systemCount)
-				for i := 0; i < systemCount; i++ {
-					filter, ok := ss[i].(IEventFilter)
-					if !ok {
-						continue
-					}
-					p.world.AddJob(func(ctx JobContext, args ...interface{}) {
-						filter := args[0].(IEventFilter)
-						wg := args[1].(*sync.WaitGroup)
-
-						for _, comInfo := range comInfos {
-							filter.Filter(comInfo.com, comInfo.op)
-						}
-
-						wg.Done()
-					}, filter, p.wg)
-				}
-			}
-			//waiting for all complete
-			p.wg.Wait()
-		}
-	}
+	p.world.components.TempTasksDone(newList)
 }
 
 //register method only in world init or func init(){}
 func (p *systemFlow) register(system ISystem) {
-	if baseInit, ok := system.(ISystemBaseInit);ok {
-		baseInit.BaseInit(p.world)
+	if sys, ok := system.(ISystemBaseInit); ok {
+		err := Try(func() {
+			sys.BaseInit(p.world)
+		})
+		if err != nil && p.world.logger != nil {
+			p.world.logger.Error(err)
+			return
+		}
 	}
-	if init, ok := system.(ISystemInit);ok {
-		init.Init()
+	if sys, ok := system.(IEventInit); ok {
+		err := Try(func() {
+			sys.Init()
+		})
+		if err != nil && p.world.logger != nil {
+			p.world.logger.Error(err)
+			return
+		}
 	}
 	order := system.Order()
 
@@ -230,14 +225,6 @@ func (p *systemFlow) register(system ISystem) {
 					p.systemPeriod[period] = append(append(sl[:i-1], sg), temp...)
 					break
 				}
-			}
-		}
-		if sys, ok := system.(IEventInit); ok {
-			err := Try(func() {
-				sys.Initialize()
-			})
-			if err != nil && p.world.logger != nil {
-				p.world.logger.Error(err)
 			}
 		}
 	}
