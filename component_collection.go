@@ -62,8 +62,9 @@ func NewComponentCollection(k int) *ComponentCollection {
 		cc.locks[i] = sync.Mutex{}
 	}
 	cc.optTemp =  make([]map[reflect.Type][]TemplateOperateInfo, cc.base+1)
-	cc.componentsNew =  make(map[reflect.Type][]ComponentOptResult)
+	cc.resetOptTemp()
 
+	cc.componentsNew =  make(map[reflect.Type][]ComponentOptResult)
 	return cc
 }
 

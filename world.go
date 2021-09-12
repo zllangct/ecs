@@ -50,10 +50,25 @@ func NewWorld(runtime *ecsRuntime) *World {
 
 // Run start ecs world
 func (w *World) Run() {
+	go w.run()
+}
+
+func (w *World) run() {
+	if Runtime.Status() != STATUS_RUNNING {
+		w.logger.Error("runtime is not running")
+		return
+	}
+
 	w.mutex.Lock()
+	if w.status != STATUS_INIT {
+		w.logger.Info("this world is already running.")
+		return
+	}
 	frameInterval := w.frameInterval
 	w.status = STATUS_RUNNING
 	w.mutex.Unlock()
+
+	w.logger.Info("start world success")
 
 	defer func() {
 		w.mutex.Lock()
@@ -143,6 +158,18 @@ func (w *World) ComponentRemove(target *Entity, com IComponent) {
 func (w *World) Error(v ...interface{}) {
 	if w.logger != nil {
 		w.logger.Error(v...)
+	}
+}
+
+func (w *World) Info(v ...interface{}) {
+	if w.logger != nil {
+		w.logger.Info(v...)
+	}
+}
+
+func (w *World) Fatal(v ...interface{}) {
+	if w.logger != nil {
+		w.logger.Fatal(v...)
 	}
 }
 

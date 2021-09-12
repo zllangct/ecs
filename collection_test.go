@@ -1,7 +1,6 @@
 package ecs
 
 import (
-	"fmt"
 	"strconv"
 	"testing"
 )
@@ -58,10 +57,10 @@ func TestCollectionIterator(t *testing.T){
 		cmp[id] = i
 	}
 
-	for iter := NewIterator(c) ; !iter.End(); iter.Next(){
-		v := iter.Val()
-		fmt.Printf("%+v", v)
-	}
+	//for iter := NewIterator(c) ; !iter.End(); iter.Next(){
+	//	v := iter.Val()
+	//	fmt.Printf("%+v", v)
+	//}
 }
 
 func BenchmarkCollectionWrite(b *testing.B) {

@@ -27,7 +27,7 @@ type ISystemBaseInit interface{
 }
 
 type System[T any] struct {
-	sync.Mutex
+	lock sync.Mutex
 	requirements map[reflect.Type]struct{}
 	order Order
 	world *World
@@ -43,12 +43,12 @@ func (s *System[T]) Call(label int) interface{} {
 	return nil
 }
 
-func (s *System[T]) SetRequirements(rqs ...IComponent) {
+func (s *System[T]) SetRequirements(rqs ...IComponentTemplate) {
 	if s.requirements == nil {
 		s.requirements = map[reflect.Type]struct{}{}
 	}
 	for _, value := range rqs {
-		s.requirements[reflect.TypeOf(value)] = struct{}{}
+		s.requirements[value.ComponentType()] = struct{}{}
 	}
 }
 
@@ -63,8 +63,8 @@ func (s *System[T]) BaseInit(world *World) {
 }
 
 func (s *System[T]) Type() reflect.Type {
-	s.Lock()
-	defer s.Unlock()
+	s.lock.Lock()
+	defer s.lock.Unlock()
 
 	if s.realType == nil {
 		s.realType = reflect.TypeOf(*new(T))
@@ -73,15 +73,15 @@ func (s *System[T]) Type() reflect.Type {
 }
 
 func (s *System[T]) SetOrder(order Order) {
-	s.Lock()
-	defer s.Unlock()
+	s.lock.Lock()
+	defer s.lock.Unlock()
 
 	s.order = order
 }
 
 func (s *System[T]) Order() Order {
-	s.Lock()
-	defer s.Unlock()
+	s.lock.Lock()
+	defer s.lock.Unlock()
 
 	return s.order
 }

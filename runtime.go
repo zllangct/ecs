@@ -34,7 +34,13 @@ type ecsRuntime struct {
 //TODO world global event system
 
 func NewRuntime() *ecsRuntime {
-	return &ecsRuntime{}
+	config := NewDefaultRuntimeConfig()
+	rt := &ecsRuntime{
+		config:     config,
+		logger:     NewStdLogger(),
+	}
+	rt.workPool = NewPool(rt, config.MaxPoolThread, config.MaxPoolJobQueue)
+	return rt
 }
 
 func (r *ecsRuntime) NewWorld() *World{
@@ -63,31 +69,26 @@ func (r *ecsRuntime) SetLogger(logger IInternalLogger) {
 	r.logger = logger
 }
 
+func (r *ecsRuntime) Status() RuntimeStatus {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	return r.status
+}
+
 func (r *ecsRuntime) Run() {
+	go r.Run()
+}
+
+func (r *ecsRuntime) run() {
 	//default config
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
 	if r.status == STATUS_INIT {
-		config := NewDefaultRuntimeConfig()
-		rt := &ecsRuntime{
-			config:     config,
-			logger:     NewStdLogger(),
-		}
-		rt.workPool = NewPool(rt, config.MaxPoolThread, config.MaxPoolJobQueue)
-
-		r.logger.Info("start world success")
 		//start the work pool
 		r.workPool.Start()
-
 		r.status = STATUS_RUNNING
-	}
-
-	//run all independent world
-	for _, world := range r.world {
-		if world.GetStatus() == STATUS_INIT {
-			go world.Run()
-		}
 	}
 }
 
@@ -107,4 +108,6 @@ func (r *ecsRuntime) Stop()  {
 func (r *ecsRuntime) AddJob(handler func(JobContext, ...interface{}), args ...interface{}) {
 	r.workPool.AddJob(handler, args...)
 }
+
+
 
