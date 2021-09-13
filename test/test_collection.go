@@ -2,6 +2,7 @@ package main
 
 import (
 	"ecs"
+	"fmt"
 	"strconv"
 )
 
@@ -30,8 +31,8 @@ func main()  {
 	ret := c.Get(5)
 	println(ret.Name)
 
-	//for iter := ecs.NewIterator[Item](c) ; !iter.End(); iter.Next(){
-	//	v := iter.Val()
-	//	fmt.Printf("%+v", v)
-	//}
+	for iter := ecs.NewIterator(c) ; !iter.End(); iter.Next(){
+		v := iter.Val()
+		fmt.Printf("%+v", v)
+	}
 }

@@ -183,6 +183,10 @@ func (w *World) getNewComponents(typ reflect.Type) []ComponentOptResult {
 	return w.components.GetNewComponents(typ)
 }
 
+func (w *World) getComponents(typ reflect.Type) interface{} {
+	return w.components.GetCollection(typ)
+}
+
 func (w *World) NewEntity() *Entity{
 	return NewEntity(w)
 }

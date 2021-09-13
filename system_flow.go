@@ -171,26 +171,16 @@ func (p *systemFlow) run(delta time.Duration) {
 
 //register method only in world init or func init(){}
 func (p *systemFlow) register(system ISystem) {
-	if sys, ok := system.(ISystemBaseInit); ok {
-		err := Try(func() {
-			sys.BaseInit(p.world)
-		})
-		if err != nil && p.world.logger != nil {
-			p.world.logger.Error(err)
-			return
-		}
+	//init function call
+	err := Try(func() {
+		system.baseInit(p.world, system)
+	})
+	if err != nil && p.world.logger != nil {
+		p.world.logger.Error(err)
+		return
 	}
-	if sys, ok := system.(IEventInit); ok {
-		err := Try(func() {
-			sys.Init()
-		})
-		if err != nil && p.world.logger != nil {
-			p.world.logger.Error(err)
-			return
-		}
-	}
-	order := system.Order()
 
+	order := system.Order()
 	for _, period := range p.periodList {
 		imp := false
 		switch period {

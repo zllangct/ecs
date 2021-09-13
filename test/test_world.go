@@ -2,6 +2,7 @@ package main
 
 import (
 	"ecs"
+	"reflect"
 	"time"
 )
 
@@ -11,43 +12,45 @@ type Position struct {
 	X int
 	Y int
 	Z int
-}
-
-//movement component
-type Movement struct {
-	ecs.Component[Movement]
 	v   int
 	dir []int
 }
 
-////move system
-type MoveSystemData struct {
-	movement *Movement
-	position *Position
-}
-
 type MoveSystem struct {
 	ecs.System[MoveSystem]
-	components map[int64]MoveSystemData
 	logger     ecs.IInternalLogger
 }
 
-func (p *MoveSystem) Init() {
-	//p.logger = p.GetWorld().logger
-	p.SetRequirements(&Position{}, &Movement{})
-	p.components = map[int64]MoveSystemData{}
+func (m *MoveSystem) Init() {
+	//m.logger = m.GetWorld().logger
+	m.SetRequirements(&Position{})
 }
 
-func (p *MoveSystem) Update(event ecs.Event) {
-	delta := event.Delta
-	for _, comInfos := range p.components {
-		position := comInfos.position
-		move := comInfos.movement
-		position.X = position.X + int(float64(move.dir[0]*move.v)*delta.Seconds())
-		position.Y = position.Y + int(float64(move.dir[1]*move.v)*delta.Seconds())
-		position.Z = position.Z + int(float64(move.dir[2]*move.v)*delta.Seconds())
+func (m *MoveSystem) Filter(ls map[reflect.Type][]ecs.ComponentOptResult) {
+	if len(ls) > 0 {
+		m.World().Info("new component:", len(ls))
+	}
+}
 
-		p.logger.Info("target id:", position.Owner().ID(), " current position:", position.X, position.Y, position.Z)
+func (m *MoveSystem) Update(event ecs.Event) {
+	delta := event.Delta
+
+	nc := m.GetInterestedNew()
+	m.Filter(nc)
+
+	//way 1:
+	//cs := m.GetInterested(ecs.GetType[Position]()).(*ecs.Collection[Position])
+
+	//way 2:
+	cs := ecs.GetInterestedComponents[Position](m)
+
+	for iter := ecs.NewIterator(cs); !iter.End(); iter.Next(){
+		c := iter.Val()
+		c.X = c.X + int(float64(c.dir[0]*c.v)*delta.Seconds())
+		c.Y = c.Y + int(float64(c.dir[1]*c.v)*delta.Seconds())
+		c.Z = c.Z + int(float64(c.dir[2]*c.v)*delta.Seconds())
+
+		m.logger.Info("target id:", c.Owner().ID(), " current position:", c.X, c.Y, c.Z)
 	}
 }
 
@@ -57,105 +60,100 @@ type HealthPoint struct {
 	HP int
 }
 
-//damage system
-type DamageSystemData struct {
-	movement *Movement
-	position *Position
+type Force struct {
+	ecs.Component[Force]
+	AttackRange int
+	PhysicalBaseAttack int
+	Strength int
+	CriticalChange int
+	CriticalMultiple int
+}
+
+type Action struct {
+	ecs.Component[Action]
+	Type int
 }
 
 type DamageSystem struct {
 	ecs.System[DamageSystem]
-	components map[int64]DamageSystemData
+	actions []ecs.ComponentOptResult
 }
 
-func (p *DamageSystem) Init() {
-	p.SetRequirements(Position{}, HealthPoint{})
-	p.components = map[int64]DamageSystemData{}
+func (d *DamageSystem) Init() {
+	d.SetRequirements(Position{}, HealthPoint{}, Force{}, Action{})
+}
+
+
+func (d *DamageSystem) Filter(ls map[reflect.Type][]ecs.ComponentOptResult) {
+	if len(ls) == 0 {
+		return
+	}
+
+	as, ok := ls[ecs.GetType[Action]()]
+	if !ok {
+		return
+	}
+
+	d.actions = as
 }
 
 // Update will be called every frame
-func (p *DamageSystem) Update(event ecs.Event) {
+func (d *DamageSystem) Update(event ecs.Event) {
+	nc := d.GetInterestedNew()
+	d.Filter(nc)
+
+	//todo logic
 
 }
 
 //main function
 func Runtime0() {
+	// pprof
 	//go func() {
 	//	log.Println(http.ListenAndServe("localhost:8888", nil))
 	//}()
 
+	// 创建运行时
 	rt := ecs.Runtime
 	rt.Run()
 
+	// 创建世界
 	world := rt.NewWorld()
 	world.Run()
 
+	// 注册系统
 	world.Register(&MoveSystem{})
 
+	// 创建实体并添加组件
 	ee1 := world.NewEntity()
 	ee2 := world.NewEntity()
 	ee3 := world.NewEntity()
 
 	println(ee1.ID(), ee2.ID(), ee3.ID())
 
-	p1 := &Position{}
-	p1.X = 100
-	p1.Y = 100
-	p1.Z = 100
-	m1 := &Movement{}
-	m1.v = 1000
-	m1.dir = []int{1, 0, 0}
-	world.NewEntity().AddByTemplate(p1, m1)
-	p2 := &Position{}
-	p2.X = 100
-	p2.Y = 100
-	p2.Z = 100
-	m2 := &Movement{}
-	m2.v = 2000
-	m2.dir = []int{0, 1, 0}
+	p1 := &Position{
+		X: 100,
+		Y: 100,
+		Z: 100,
+		v: 2000,
+		dir: []int{1,0,0},
+	}
+	world.NewEntity().AddByTemplate(p1)
+	p2 := &Position{
+		X: 100,
+		Y: 100,
+		Z: 100,
+		v: 2000,
+		dir: []int{0,1,0},
+	}
 	e2 := world.NewEntity()
-	e2.AddByTemplate(p2, m2)
+	e2.AddByTemplate(p2)
 
 	world.Info("e2:", e2.ID())
 
 	for {
 		time.Sleep(time.Second * 3)
 	}
-}
-
-func Runtime1() {
-	//go func() {
-	//	log.Println(http.ListenAndServe("localhost:8888", nil))
-	//}()
-
-	//rt := Runtime
-	//world := rt.NewWorld()
-	//go rt.Run()
-	//
-	//world.Register(&MoveSystem{})
-	//world.Register(&DamageSystem{})
-	//
-	////初始化实体
-	//for i := 0; i < 100000; i++ {
-	//	p1 := NewPosition()
-	//	p1.X = 100
-	//	p1.Y = 100
-	//	p1.Z = 100
-	//	m1 := NewMovement()
-	//	m1.v = 1000
-	//	m1.dir = []int{1, 0, 0}
-	//	world.NewEntity().AddComponent(p1, m1)
-	//	p2 := NewPosition()
-	//	p2.X = 100
-	//	p2.Y = 100
-	//	p2.Z = 100
-	//	m2 := NewMovement()
-	//	m2.v = 2000
-	//	m2.dir = []int{0, 1, 0}
-	//	world.NewEntity().AddComponent(p2, m2)
-	//}
-	//time.Sleep(time.Second * 3)
-	//<-make(chan struct{})
 }
 
 func main() {

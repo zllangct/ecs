@@ -137,3 +137,10 @@ func (c *ComponentCollection) GetNewComponentsAll() map[reflect.Type][]Component
 func (c *ComponentCollection) GetNewComponents(typ reflect.Type) []ComponentOptResult {
 	return c.componentsNew[typ]
 }
+
+func (c *ComponentCollection) GetCollection(typ reflect.Type) interface{} {
+	if collection, ok := c.collections[typ]; ok {
+		return collection
+	}
+	return c.collections[typ]
+}
