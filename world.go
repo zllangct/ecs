@@ -36,6 +36,7 @@ func NewWorld(runtime *ecsRuntime) *World {
 	config := NewDefaultRuntimeConfig()
 	world := &World{
 		systemFlow: nil,
+		frameInterval: config.FrameInterval,
 		components: NewComponentCollection(config.HashCount),
 		entities:   NewEntityCollection(config.HashCount),
 		logger:     runtime.logger,
@@ -92,9 +93,9 @@ func (w *World) run() {
 		}
 
 		ts = time.Now()
-		w.Info("frame:", delta)
 		w.systemFlow.run(delta)
 		delta = time.Since(ts)
+		//w.Info(delta, frameInterval - delta)
 		if frameInterval-delta > 0 {
 			time.Sleep(frameInterval - delta)
 			delta = frameInterval

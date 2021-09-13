@@ -164,9 +164,7 @@ func (p *systemFlow) run(delta time.Duration) {
 			lock: &l,
 		})
 	}
-	p.world.Info("temp tasks added")
 	p.wg.Wait()
-	p.world.Info("temp tasks added 2")
 
 	p.world.components.TempTasksDone(newList)
 }
