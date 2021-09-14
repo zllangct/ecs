@@ -143,12 +143,12 @@ func (p *systemFlow) run(delta time.Duration) {
 	p.wg.Wait()
 
 	tasks := p.world.components.GetTempTasks()
+	//Log.Info("temp task count:", len(tasks))
 	newList := map[reflect.Type][]ComponentOptResult{}
 	l := sync.Mutex{}
 	p.wg.Add(len(tasks))
 	for _, task := range tasks{
 		Runtime.AddJob(func(context JobContext, args ...interface{}) {
-			Log.Info("temp task execute")
 			t := args[0].(TempTask)
 			typ, rn := t.fn()
 
@@ -166,6 +166,7 @@ func (p *systemFlow) run(delta time.Duration) {
 	}
 	p.wg.Wait()
 
+	//Log.Info("new component this frame:", len(newList))
 	p.world.components.TempTasksDone(newList)
 }
 

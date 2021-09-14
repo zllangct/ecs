@@ -11,6 +11,7 @@ func main()  {
 	type Item struct {
 		Count int
 		Name  string
+		Arr []int
 	}
 
 	//准备数据
@@ -20,6 +21,7 @@ func main()  {
 		srcList = append(srcList, Item{
 			Count: i,
 			Name:  "foo" + strconv.Itoa(i),
+			Arr: []int{1,2,3},
 		})
 	}
 

@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"sync"
 	"unsafe"
+	"fmt"
 )
 
 type IComponent interface {
@@ -19,6 +20,7 @@ type IComponentTemplate interface {
 	SetID(id int64) IComponentTemplate
 	ComponentType() reflect.Type
 	AddToCollection(collection interface{}) IComponent
+	NewCollection() interface{}
 }
 
 type Component[T any] struct {
@@ -40,18 +42,23 @@ func (c Component[T]) SetID(id int64) IComponentTemplate {
 }
 
 func (c Component[T]) ComponentType() reflect.Type {
-	return reflect.TypeOf(c)
+	return reflect.TypeOf(*new(T))
 }
 
 func (c Component[T]) AddToCollection(collection interface{}) IComponent {
 	cc, ok := collection.(*Collection[T])
 	if !ok {
+		Log.Info("add to collection, collecion is nil")
 		return nil
 	}
 	_, ins := cc.Add((&c).Ins())
 	var com IComponent
 	(*iface)(unsafe.Pointer(&com)).data = unsafe.Pointer(ins)
 	return com
+}
+
+func (c Component[T]) NewCollection() interface{} {
+	return NewCollection[T]()
 }
 
 func (c *Component[T]) setOwner(entity *Entity) {
@@ -91,6 +98,9 @@ func (c *Component[T]) Type() reflect.Type {
 	return c.realType
 }
 
+func (c *Component[T]) String() string {
+	return fmt.Sprintf("%+v", c.Ins())
+}
 //func (c *Component[T]) AddToCollection(collection interface{}) IComponent {
 //	cc, ok := collection.(*Collection[T])
 //	if !ok {
@@ -102,6 +112,4 @@ func (c *Component[T]) Type() reflect.Type {
 //	return com
 //}
 
-func (c *Component[T]) NewCollection() interface{} {
-	return NewCollection[T]()
-}
+

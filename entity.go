@@ -74,7 +74,7 @@ func (e *Entity) hasByType(types ...reflect.Type) bool {
 func (e *Entity) AddByTemplate(templates ...IComponentTemplate) {
 	for _, c := range templates {
 		if err := e.addByTemplate(c); err != nil{
-			e.world.Logger().Error("repeat component:", err)
+			Log.Error(err)
 		}
 	}
 }

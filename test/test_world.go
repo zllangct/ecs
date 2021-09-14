@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	"github.com/zllangct/ecs"
 	"reflect"
 	"time"
@@ -45,8 +47,8 @@ type Position struct {
 
 type Movement struct {
 	ecs.Component[Movement]
-	v   int
-	dir []int
+	V   int
+	Dir []int
 }
 
 type MoveSystemData struct {
@@ -66,7 +68,7 @@ func (m *MoveSystem) Init() {
 
 func (m *MoveSystem) Filter(ls map[reflect.Type][]ecs.ComponentOptResult) {
 	if len(ls) > 0 {
-		m.World().Logger().Info("new component:", len(ls))
+		ecs.Log.Info("new component:", len(ls))
 	}
 }
 
@@ -90,49 +92,60 @@ func (m *MoveSystem) Update(event ecs.Event) {
 	*/
 	csPosition := ecs.GetInterestedComponents[Position](m)
 	if csPosition == nil {
-		ecs.Log.Info("position component list is nil")
 		return
 	}
 	csMovement := ecs.GetInterestedComponents[Movement](m)
 	if csMovement == nil {
-		ecs.Log.Info("movement component list is nil")
 		return
 	}
 
-	var d map[*ecs.Entity]MoveSystemData
+
+	d := map[int64]*MoveSystemData{}
 	for iter := ecs.NewIterator(csPosition); !iter.End(); iter.Next() {
 		c := iter.Val()
-		if cd, ok := d[c.Owner()]; ok {
+		cb , _ := json.Marshal(c)
+		ecs.Log.Info("position:", string(cb))
+		if cd, ok := d[c.Owner().ID()]; ok {
 			cd.P = c
 		}else {
-			d[c.Owner()] = MoveSystemData{P: c}
+			d[c.Owner().ID()] = &MoveSystemData{P: c}
 		}
 	}
+	ecs.Log.Info(csMovement.Len())
 	for iter := ecs.NewIterator(csMovement); !iter.End(); iter.Next() {
 		c := iter.Val()
-		if cd, ok := d[c.Owner()]; ok {
+		cb , _ := json.Marshal(c)
+		_=cb
+
+		ecs.Log.Info("movement: id:",c.Owner().ID(), string(cb), "type:", reflect.TypeOf(c))
+
+		fmt.Printf("%+v \n", *c) //TODO 无法正确获取到 Movement
+
+		if cd, ok := d[c.Owner().ID()]; ok {
 			cd.M = c
-		}else {
-			d[c.Owner()] = MoveSystemData{M: c}
+		}else{
+			d[c.Owner().ID()] = &MoveSystemData{M: c}
 		}
 	}
-
+	b,_:= json.Marshal(d)
+	ecs.Log.Info(string(b))
 	/* MoveSystem 主逻辑
 		- 移动计算公式：最终位置 = 当前位置 + 移动速度 * 移动方向
 		- 本系统的移动逻辑非常简单，但可以进一步思考，各个实体的移动是相互独立的，无数据竞争，类似的
 	      情况还有很多，此情况下，或者有意设计成独立逻辑的，且该系统计算量特别大的，导致本帧其他系统
 	      已经执行完成，会全部等待本系统完成的情况下，可进一步将操作放入线程池中并行处理，充分利用计算资源。
 	*/
+	ecs.Log.Info("main logic")
 	for e, data := range d {
 		if data.M == nil || data.P == nil {
 			//聚合数据组件不齐时，跳过处理
 			continue
 		}
-		data.P.X = data.P.X + int(float64(data.M.dir[0]*data.M.v)*delta.Seconds())
-		data.P.Y = data.P.Y + int(float64(data.M.dir[1]*data.M.v)*delta.Seconds())
-		data.P.Z = data.P.Z + int(float64(data.M.dir[2]*data.M.v)*delta.Seconds())
+		data.P.X = data.P.X + int(float64(data.M.Dir[0]*data.M.V)*delta.Seconds())
+		data.P.Y = data.P.Y + int(float64(data.M.Dir[1]*data.M.V)*delta.Seconds())
+		data.P.Z = data.P.Z + int(float64(data.M.Dir[2]*data.M.V)*delta.Seconds())
 
-		ecs.Log.Info("target id:", e.ID(), " current position:", data.P.X, data.P.Y, data.P.Z)
+		ecs.Log.Info("target id:", e, " current position:", data.P.X, data.P.Y, data.P.Z)
 	}
 }
 
@@ -228,7 +241,7 @@ func Runtime0() {
 	ee2 := world.NewEntity()
 	ee3 := world.NewEntity()
 
-	println(ee1.ID(), ee2.ID(), ee3.ID())
+	ecs.Log.Info(ee1.ID(), ee2.ID(), ee3.ID())
 
 	p1 := &Position{
 		X: 100,
@@ -236,27 +249,28 @@ func Runtime0() {
 		Z: 100,
 	}
 	m1 := &Movement{
-		v: 2000,
-		dir: []int{1,0,0},
+		V:   2000,
+		Dir: []int{1,0,0},
 	}
 	world.NewEntity().AddByTemplate(p1, m1)
-	p2 := &Position{
-		X: 100,
-		Y: 100,
-		Z: 100,
-	}
-	m2 := &Movement{
-		v: 2000,
-		dir: []int{0,1,0},
-	}
-	e2 := world.NewEntity()
-	e2.AddByTemplate(p2, m2)
+	//p2 := &Position{
+	//	X: 100,
+	//	Y: 100,
+	//	Z: 100,
+	//}
+	//m2 := &Movement{
+	//	V: 2000,
+	//	Dir: []int{0,1,0},
+	//}
+	//e2 := world.NewEntity()
+	//e2.AddByTemplate(p2, m2)
 
-	ecs.Log.Info("e2:", e2.ID())
+	//ecs.Log.Info("test entity id e2:", e2.ID())
 
-	for {
-		time.Sleep(time.Second * 3)
-	}
+	time.Sleep(time.Second * 1)
+	//for {
+	//	time.Sleep(time.Second * 3)
+	//}
 }
 
 func main() {

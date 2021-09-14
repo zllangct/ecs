@@ -39,8 +39,8 @@ type ComponentOptResult struct {
 type ComponentCollection struct {
 	collections map[reflect.Type]interface{}
 	//new component cache
-	base  int64
 	locks []sync.Mutex
+	base  int64
 	optTemp []map[reflect.Type][]TemplateOperateInfo
 	componentsNew map[reflect.Type][]ComponentOptResult
 }
@@ -95,6 +95,9 @@ func (c *ComponentCollection) GetTempTasks() []func()(reflect.Type, []ComponentO
 
 	for i:=0; i < len(c.optTemp); i++ {
 		for typ, op := range c.optTemp[i] {
+			if len(op) == 0 {
+				continue
+			}
 			if _, ok := combination[typ]; ok {
 				combination[typ] = append(combination[typ], op...)
 			} else {
@@ -107,18 +110,25 @@ func (c *ComponentCollection) GetTempTasks() []func()(reflect.Type, []ComponentO
 	for typ, opList := range combination {
 		typTemp := typ
 		oopList := opList
+		collection, ok := c.collections[typTemp]
+		if !ok {
+			c.collections[typTemp] = oopList[0].template.NewCollection()
+			collection = c.collections[typTemp]
+		}
+
 		fn := func() (reflect.Type, []ComponentOptResult) {
 			n := make([]ComponentOptResult, len(oopList))
+			var t reflect.Type
 			for _, operate := range oopList {
-				typTemp = operate.typ
+				t = operate.typ
 				//add to component container
-				ret := operate.template.AddToCollection(c)
+				ret := operate.template.AddToCollection(collection)
 				//add to entity
-				operate.target.componentAdded(typTemp, ret)
+				operate.target.componentAdded(t, ret)
 
 				n = append(n, ComponentOptResult{com: ret, opInfo: operate})
 			}
-			return typTemp, n
+			return t, n
 		}
 		tasks = append(tasks, fn)
 	}
@@ -139,8 +149,5 @@ func (c *ComponentCollection) GetNewComponents(typ reflect.Type) []ComponentOptR
 }
 
 func (c *ComponentCollection) GetCollection(typ reflect.Type) interface{} {
-	if collection, ok := c.collections[typ]; ok {
-		return collection
-	}
 	return c.collections[typ]
 }

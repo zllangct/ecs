@@ -1,14 +1,18 @@
 package ecs
 
+import "reflect"
+
 type Collection[T any] struct {
 	data  []T
 	ids map[int64]int64
 	seq int64
+	typ reflect.Type
 }
 
 func NewCollection[T any]() *Collection[T] {
 	c := &Collection[T]{
 		ids: map[int64]int64{},
+		typ: reflect.TypeOf(*new(T)),
 	}
 	return c
 }
@@ -67,4 +71,8 @@ func (c *Collection[T]) Get(id int64) *T {
 
 func (c *Collection[T]) Len() int {
 	return len(c.data)
+}
+
+func (c *Collection[T]) EleType() reflect.Type {
+	return c.typ
 }
