@@ -148,7 +148,7 @@ func (p *systemFlow) run(delta time.Duration) {
 	p.wg.Add(len(tasks))
 	for _, task := range tasks{
 		Runtime.AddJob(func(context JobContext, args ...interface{}) {
-			Runtime.logger.Info("temp task execute")
+			Log.Info("temp task execute")
 			t := args[0].(TempTask)
 			typ, rn := t.fn()
 

@@ -69,7 +69,7 @@ func (w *World) run() {
 	w.status = STATUS_RUNNING
 	w.mutex.Unlock()
 
-	w.logger.Info("start world success")
+	Log.Info("start world success")
 
 	defer func() {
 		w.mutex.Lock()
@@ -157,22 +157,8 @@ func (w *World) ComponentRemove(target *Entity, com IComponent) {
 	w.components.TempTemplateOperate(target, com.Template(), COLLECTION_OPERATE_DELETE)
 }
 
-func (w *World) Error(v ...interface{}) {
-	if w.logger != nil {
-		w.logger.Error(v...)
-	}
-}
-
-func (w *World) Info(v ...interface{}) {
-	if w.logger != nil {
-		w.logger.Info(v...)
-	}
-}
-
-func (w *World) Fatal(v ...interface{}) {
-	if w.logger != nil {
-		w.logger.Fatal(v...)
-	}
+func (w *World) Logger() IInternalLogger {
+	return w.logger
 }
 
 func (w *World) getNewComponentsAll() map[reflect.Type][]ComponentOptResult {

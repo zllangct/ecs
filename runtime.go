@@ -4,6 +4,8 @@ import "sync"
 
 var Runtime = NewRuntime()
 
+var Log = Runtime.Logger()
+
 const(
 	STATUS_INIT = iota
 	STATUS_RUNNING
@@ -67,6 +69,10 @@ func (r *ecsRuntime) SetLogger(logger IInternalLogger) {
 	defer r.mutex.Unlock()
 
 	r.logger = logger
+}
+
+func (r *ecsRuntime) Logger() IInternalLogger {
+	return r.logger
 }
 
 func (r *ecsRuntime) Status() RuntimeStatus {

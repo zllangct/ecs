@@ -2,8 +2,8 @@ module test_ecs
 
 go 1.18
 
-replace ecs => ../ecs
+replace github.com/zllangct/ecs => ../ecs
 
 require (
-	ecs v0.0.0
+	github.com/zllangct/ecs v0.0.0
 )

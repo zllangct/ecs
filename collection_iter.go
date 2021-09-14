@@ -34,6 +34,8 @@ func (i *Iterator[T]) Val() *T {
 
 func (i *Iterator[T]) Next() *T {
 	i.index++
-	i.cur = &(i.c.data[i.index])
+	if !i.End() {
+		i.cur = &(i.c.data[i.index])
+	}
 	return i.cur
 }
