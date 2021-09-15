@@ -15,9 +15,11 @@ type IComponent interface {
 	Template() IComponent
 
 	setOwner(owner *Entity)
-	SetID(id int64)
-	ComponentType() reflect.Type
-	AddToCollection(collection interface{}) IComponent
+	setID(id int64)
+
+	addToCollection(collection interface{}) IComponent
+	deleteFromCollection(collection interface{})
+
 	NewCollection() interface{}
 }
 
@@ -29,25 +31,27 @@ type Component[T any] struct {
 	operation map[string]func()[]interface{}
 }
 
-func (c *Component[T]) SetID(id int64)  {
-	c.id = id
-}
-
-func (c *Component[T]) ComponentType() reflect.Type {
-	return reflect.TypeOf(*new(T))
-}
-
-func (c *Component[T]) AddToCollection(collection interface{}) IComponent {
+func (c *Component[T]) addToCollection(collection interface{}) IComponent {
 	cc, ok := collection.(*Collection[T])
 	if !ok {
 		Log.Info("add to collection, collecion is nil")
 		return nil
 	}
-	Log.Info("AddToCollection:", )
-	_, ins := cc.Add(c.Ins())
+	id, ins := cc.Add(c.Ins())
+	c.setID(id)
 	var com IComponent
 	(*iface)(unsafe.Pointer(&com)).data = unsafe.Pointer(ins)
 	return com
+}
+
+func (c *Component[T]) deleteFromCollection(collection interface{}) {
+	cc, ok := collection.(*Collection[T])
+	if !ok {
+		Log.Info("add to collection, collecion is nil")
+		return
+	}
+	cc.Remove(c.ID())
+	return
 }
 
 func (c *Component[T]) NewCollection() interface{} {

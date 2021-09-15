@@ -22,13 +22,13 @@ const (
 
 type TemplateOperateInfo struct {
 	target *Entity
-	template    IComponent
+	com    IComponent
 	op     CollectionOperate
 	typ reflect.Type
 }
 
 func NewTemplateOperateInfo(entity *Entity, template IComponent, typ reflect.Type, op CollectionOperate) TemplateOperateInfo {
-	return TemplateOperateInfo{target: entity, template: template, op: op, typ: typ}
+	return TemplateOperateInfo{target: entity, com: template, op: op, typ: typ}
 }
 
 type ComponentOptResult struct {
@@ -81,7 +81,7 @@ func (c *ComponentCollection) TempTemplateOperate(entity *Entity, template IComp
 	defer c.locks[hash].Unlock()
 
 
-	typ := template.ComponentType()
+	typ := template.Type()
 	newOpt := NewTemplateOperateInfo(entity, template, typ, op)
 	b := c.optTemp[hash]
 	if _, ok := b[typ]; ok {
@@ -113,7 +113,7 @@ func (c *ComponentCollection) GetTempTasks() []func()(reflect.Type, []ComponentO
 		oopList := opList
 		collection, ok := c.collections[typTemp]
 		if !ok {
-			c.collections[typTemp] = oopList[0].template.NewCollection()
+			c.collections[typTemp] = oopList[0].com.NewCollection()
 			collection = c.collections[typTemp]
 		}
 
@@ -122,12 +122,16 @@ func (c *ComponentCollection) GetTempTasks() []func()(reflect.Type, []ComponentO
 			var t reflect.Type
 			for _, operate := range oopList {
 				t = operate.typ
-				//add to component container
-				ret := operate.template.AddToCollection(collection)
-				//add to entity
-				operate.target.componentAdded(t, ret)
-
-				n = append(n, ComponentOptResult{com: ret, opInfo: operate})
+				switch operate.op {
+				case COLLECTION_OPERATE_ADD:
+					ret := operate.com.addToCollection(collection)
+					operate.target.componentAdded(t, ret)
+					n = append(n, ComponentOptResult{com: ret, opInfo: operate})
+				case COLLECTION_OPERATE_DELETE:
+					operate.com.addToCollection(collection)
+					operate.target.componentDeleted(t, operate.com)
+					n = append(n, ComponentOptResult{com: operate.com, opInfo: operate})
+				}
 			}
 			return t, n
 		}

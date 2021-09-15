@@ -16,7 +16,6 @@ const (
 )
 
 type ISystem interface {
-	//Init()
 	Type() reflect.Type
 	Order() Order
 	World() *World
@@ -44,9 +43,6 @@ func (s *System[T]) Call(label int) interface{} {
 }
 
 func (s *System[T]) SetRequirements(rqs ...IComponent) {
-	//s.lock.Lock()
-	//defer s.lock.Unlock()
-
 	if s.isInited {
 		return
 	}
@@ -54,14 +50,11 @@ func (s *System[T]) SetRequirements(rqs ...IComponent) {
 		s.requirements = map[reflect.Type]struct{}{}
 	}
 	for _, value := range rqs {
-		s.requirements[value.ComponentType()] = struct{}{}
+		s.requirements[value.Type()] = struct{}{}
 	}
 }
 
 func (s *System[T]) Requirements() map[reflect.Type]struct{} {
-	//s.lock.Lock()
-	//defer s.lock.Unlock()
-
 	return s.requirements
 }
 
@@ -78,9 +71,6 @@ func (s *System[T]) baseInit(world *World, ins ISystem) {
 }
 
 func (s *System[T]) Type() reflect.Type {
-	//s.lock.Lock()
-	//defer s.lock.Unlock()
-
 	if s.realType == nil {
 		s.realType = reflect.TypeOf(*new(T))
 	}
@@ -88,9 +78,6 @@ func (s *System[T]) Type() reflect.Type {
 }
 
 func (s *System[T]) SetOrder(order Order) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
 	if s.isInited {
 		return
 	}
@@ -99,9 +86,6 @@ func (s *System[T]) SetOrder(order Order) {
 }
 
 func (s *System[T]) Order() Order {
-	//s.lock.Lock()
-	//defer s.lock.Unlock()
-
 	return s.order
 }
 
