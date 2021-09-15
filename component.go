@@ -12,12 +12,10 @@ type IComponent interface {
 	Type() reflect.Type
 	ID() int64
 	Instance() IComponent
-	Template() IComponentTemplate
-}
+	Template() IComponent
 
-type IComponentTemplate interface {
-	SetOwner(owner *Entity) IComponentTemplate
-	SetID(id int64) IComponentTemplate
+	setOwner(owner *Entity)
+	SetID(id int64)
 	ComponentType() reflect.Type
 	AddToCollection(collection interface{}) IComponent
 	NewCollection() interface{}
@@ -31,33 +29,28 @@ type Component[T any] struct {
 	operation map[string]func()[]interface{}
 }
 
-func (c Component[T]) SetOwner(entity *Entity) IComponentTemplate {
-	c.owner = entity
-	return c
-}
-
-func (c Component[T]) SetID(id int64) IComponentTemplate {
+func (c *Component[T]) SetID(id int64)  {
 	c.id = id
-	return c
 }
 
-func (c Component[T]) ComponentType() reflect.Type {
+func (c *Component[T]) ComponentType() reflect.Type {
 	return reflect.TypeOf(*new(T))
 }
 
-func (c Component[T]) AddToCollection(collection interface{}) IComponent {
+func (c *Component[T]) AddToCollection(collection interface{}) IComponent {
 	cc, ok := collection.(*Collection[T])
 	if !ok {
 		Log.Info("add to collection, collecion is nil")
 		return nil
 	}
-	_, ins := cc.Add((&c).Ins())
+	Log.Info("AddToCollection:", )
+	_, ins := cc.Add(c.Ins())
 	var com IComponent
 	(*iface)(unsafe.Pointer(&com)).data = unsafe.Pointer(ins)
 	return com
 }
 
-func (c Component[T]) NewCollection() interface{} {
+func (c *Component[T]) NewCollection() interface{} {
 	return NewCollection[T]()
 }
 
@@ -83,8 +76,8 @@ func (c *Component[T]) Instance() IComponent {
 	return com
 }
 
-func (c *Component[T]) Template() IComponentTemplate {
-	return (*c)
+func (c *Component[T]) Template() IComponent {
+	return (c)
 }
 
 func (c *Component[T]) Owner() *Entity {
@@ -101,15 +94,7 @@ func (c *Component[T]) Type() reflect.Type {
 func (c *Component[T]) String() string {
 	return fmt.Sprintf("%+v", c.Ins())
 }
-//func (c *Component[T]) AddToCollection(collection interface{}) IComponent {
-//	cc, ok := collection.(*Collection[T])
-//	if !ok {
-//		return nil
-//	}
-//	_, ins := cc.Add(c.Ins())
-//	var com IComponent
-//	(*iface)(unsafe.Pointer(&com)).data = unsafe.Pointer(ins)
-//	return com
-//}
+
+
 
 

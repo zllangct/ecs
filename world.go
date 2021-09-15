@@ -145,7 +145,7 @@ func (w *World) DeleteEntityByID(id int64) {
 	w.entities.deleteByID(id)
 }
 
-func (w *World) ComponentTemplateAttach(target *Entity, com IComponentTemplate) {
+func (w *World) ComponentTemplateAttach(target *Entity, com IComponent) {
 	w.components.TempTemplateOperate(target, com, COLLECTION_OPERATE_ADD)
 }
 

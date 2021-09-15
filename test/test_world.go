@@ -63,16 +63,17 @@ type MoveSystem struct {
 
 func (m *MoveSystem) Init() {
 	//m.logger = m.GetWorld().logger
-	m.SetRequirements(Position{}, Movement{})
+	m.SetRequirements(&Position{}, &Movement{})
 }
 
 func (m *MoveSystem) Filter(ls map[reflect.Type][]ecs.ComponentOptResult) {
 	if len(ls) > 0 {
-		ecs.Log.Info("new component:", len(ls))
+		//ecs.Log.Info("new component:", len(ls))
 	}
 }
 
 func (m *MoveSystem) Update(event ecs.Event) {
+	ecs.Log.Info("new frame ================================================================")
 	delta := event.Delta
 
 	//当前帧新所有创建、删除的组件
@@ -111,13 +112,12 @@ func (m *MoveSystem) Update(event ecs.Event) {
 			d[c.Owner().ID()] = &MoveSystemData{P: c}
 		}
 	}
-	ecs.Log.Info(csMovement.Len())
 	for iter := ecs.NewIterator(csMovement); !iter.End(); iter.Next() {
 		c := iter.Val()
 		cb , _ := json.Marshal(c)
 		_=cb
 
-		ecs.Log.Info("movement: id:",c.Owner().ID(), string(cb), "type:", reflect.TypeOf(c))
+		ecs.Log.Info("movement: id:",c.Owner().ID(), string(cb), " type:", reflect.TypeOf(c))
 
 		fmt.Printf("%+v \n", *c) //TODO 无法正确获取到 Movement
 
@@ -135,18 +135,18 @@ func (m *MoveSystem) Update(event ecs.Event) {
 	      情况还有很多，此情况下，或者有意设计成独立逻辑的，且该系统计算量特别大的，导致本帧其他系统
 	      已经执行完成，会全部等待本系统完成的情况下，可进一步将操作放入线程池中并行处理，充分利用计算资源。
 	*/
-	ecs.Log.Info("main logic")
-	for e, data := range d {
-		if data.M == nil || data.P == nil {
-			//聚合数据组件不齐时，跳过处理
-			continue
-		}
-		data.P.X = data.P.X + int(float64(data.M.Dir[0]*data.M.V)*delta.Seconds())
-		data.P.Y = data.P.Y + int(float64(data.M.Dir[1]*data.M.V)*delta.Seconds())
-		data.P.Z = data.P.Z + int(float64(data.M.Dir[2]*data.M.V)*delta.Seconds())
-
-		ecs.Log.Info("target id:", e, " current position:", data.P.X, data.P.Y, data.P.Z)
-	}
+	_=delta
+	//for e, data := range d {
+	//	if data.M == nil || data.P == nil {
+	//		//聚合数据组件不齐时，跳过处理
+	//		continue
+	//	}
+	//	data.P.X = data.P.X + int(float64(data.M.Dir[0]*data.M.V)*delta.Seconds())
+	//	data.P.Y = data.P.Y + int(float64(data.M.Dir[1]*data.M.V)*delta.Seconds())
+	//	data.P.Z = data.P.Z + int(float64(data.M.Dir[2]*data.M.V)*delta.Seconds())
+	//
+	//	ecs.Log.Info("target id:", e, " current position:", data.P.X, data.P.Y, data.P.Z)
+	//}
 }
 
 //hp component
@@ -175,7 +175,7 @@ type DamageSystem struct {
 }
 
 func (d *DamageSystem) Init() {
-	d.SetRequirements(Position{}, HealthPoint{}, Force{}, Action{})
+	d.SetRequirements(&Position{}, &HealthPoint{}, &Force{}, &Action{})
 }
 
 

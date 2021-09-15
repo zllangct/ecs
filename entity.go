@@ -71,7 +71,7 @@ func (e *Entity) hasByType(types ...reflect.Type) bool {
 	return true
 }
 
-func (e *Entity) AddByTemplate(templates ...IComponentTemplate) {
+func (e *Entity) AddByTemplate(templates ...IComponent) {
 	for _, c := range templates {
 		if err := e.addByTemplate(c); err != nil{
 			Log.Error(err)
@@ -79,8 +79,10 @@ func (e *Entity) AddByTemplate(templates ...IComponentTemplate) {
 	}
 }
 
-func (e *Entity) addByTemplate(com IComponentTemplate) error {
-	com = com.SetOwner(e)
+func (e *Entity) addByTemplate(com IComponent) error {
+	Log.Info("addByTemplate 1: ", ObjectToString(com))
+	com.setOwner(e)
+	Log.Info("addByTemplate 2: ", ObjectToString(com))
 	typ := com.ComponentType()
 	if e.hasByType(typ) {
 		return fmt.Errorf("repeated component: %s", typ.Name())

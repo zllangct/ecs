@@ -43,7 +43,7 @@ func (s *System[T]) Call(label int) interface{} {
 	return nil
 }
 
-func (s *System[T]) SetRequirements(rqs ...IComponentTemplate) {
+func (s *System[T]) SetRequirements(rqs ...IComponent) {
 	//s.lock.Lock()
 	//defer s.lock.Unlock()
 
