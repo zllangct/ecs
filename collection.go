@@ -3,10 +3,10 @@ package ecs
 import "reflect"
 
 type Collection[T any] struct {
-	data  []T
-	ids map[int64]int64
-	seq int64
-	typ reflect.Type
+	data []T
+	ids  map[int64]int64
+	seq  int64
+	typ  reflect.Type
 }
 
 func NewCollection[T any]() *Collection[T] {
@@ -21,14 +21,14 @@ func (c *Collection[T]) getID() int64 {
 	ok := false
 	for !ok {
 		c.seq++
-		if _, exist :=c.ids[c.seq]; !exist {
+		if _, exist := c.ids[c.seq]; !exist {
 			break
 		}
 	}
 	return c.seq
 }
 
-func (c *Collection[T]) Add(element *T) (int64, *T)  {
+func (c *Collection[T]) Add(element *T) (int64, *T) {
 	idx := len(c.data)
 	Log.Info("collection Add:", ObjectToString(*element))
 	c.data = append(c.data, *element)
@@ -49,14 +49,14 @@ func (c *Collection[T]) Remove(id int64) {
 	if !ok {
 		return
 	}
-	l:=len(c.data)
+	l := len(c.data)
 	c.ids[c.ids[int64(l)]] = idx
 	delete(c.ids, c.ids[-idx])
 	c.ids[-idx] = c.ids[int64(l)]
 	delete(c.ids, int64(l))
 
-	c.data[idx], c.data[l-1] = c.data[l - 1], c.data[idx]
-	c.data = c.data[:l - 1]
+	c.data[idx], c.data[l-1] = c.data[l-1], c.data[idx]
+	c.data = c.data[:l-1]
 }
 
 func (c *Collection[T]) Get(id int64) *T {

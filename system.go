@@ -28,12 +28,12 @@ type ISystem interface {
 }
 
 type System[T any] struct {
-	lock sync.Mutex
+	lock         sync.Mutex
 	requirements map[reflect.Type]struct{}
-	order Order
-	world *World
-	realType reflect.Type
-	isInited  bool
+	order        Order
+	world        *World
+	realType     reflect.Type
+	isInited     bool
 }
 
 func (s *System[T]) Ins() *T {
@@ -64,7 +64,7 @@ func (s *System[T]) IsRequire(com IComponent) bool {
 	return s.isRequire(com.Type())
 }
 
-func (s *System[T]) isRequire(typ reflect.Type) bool  {
+func (s *System[T]) isRequire(typ reflect.Type) bool {
 	_, ok := s.requirements[typ]
 	return ok
 }
@@ -104,7 +104,7 @@ func (s *System[T]) World() *World {
 	return s.world
 }
 
-func (s *System[T]) GetInterested(typ reflect.Type) interface{}{
+func (s *System[T]) GetInterested(typ reflect.Type) interface{} {
 	if _, ok := s.requirements[typ]; !ok {
 		return nil
 	}
@@ -112,18 +112,17 @@ func (s *System[T]) GetInterested(typ reflect.Type) interface{}{
 	return s.World().getComponents(typ)
 }
 
-
 func (s *System[T]) GetInterestedNew() map[reflect.Type][]ComponentOptResult {
 	ls := map[reflect.Type][]ComponentOptResult{}
 	for typ, _ := range s.Requirements() {
-		if n :=s.World().getNewComponents(typ); n != nil {
+		if n := s.World().getNewComponents(typ); n != nil {
 			ls[typ] = n
 		}
 	}
 	return ls
 }
 
-func (s *System[T]) CheckComponent(entity *Entity, com IComponent) IComponent{
+func (s *System[T]) CheckComponent(entity *Entity, com IComponent) IComponent {
 	isRequire := s.IsRequire(com)
 	if !isRequire {
 		return nil
@@ -131,4 +130,3 @@ func (s *System[T]) CheckComponent(entity *Entity, com IComponent) IComponent{
 
 	return entity.getComponent(com)
 }
-

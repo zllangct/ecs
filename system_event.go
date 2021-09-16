@@ -33,4 +33,3 @@ type IEventDestroy interface {
 type IEventPostDestroy interface {
 	PostDestroy(event Event)
 }
-

@@ -9,7 +9,7 @@ func TestNewCollection(t *testing.T) {
 	type Item struct {
 		Count int
 		Name  string
-		o1 int
+		o1    int
 	}
 	caseCount := 10
 	var srcList []Item
@@ -35,7 +35,7 @@ func TestNewCollection(t *testing.T) {
 	}
 }
 
-func TestCollectionIterator(t *testing.T){
+func TestCollectionIterator(t *testing.T) {
 	type Item struct {
 		Count int
 		Name  string

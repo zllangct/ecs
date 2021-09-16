@@ -97,6 +97,7 @@ func (m *MoveSystem) Update(event ecs.Event) {
 	}
 
 	d := map[int64]*MoveSystemData{}
+
 	//聚合方式 1：根据组件的Owner（Entity.ID）来匹配数据
 	//for iter := ecs.NewIterator(csPosition); !iter.End(); iter.Next() {
 	//	c := iter.Val()

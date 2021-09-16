@@ -1,10 +1,10 @@
 package ecs
 
 import (
+	"fmt"
 	"reflect"
 	"sync"
 	"unsafe"
-	"fmt"
 )
 
 type IComponent interface {
@@ -24,11 +24,11 @@ type IComponent interface {
 }
 
 type Component[T any] struct {
-	lock     sync.Mutex
-	owner    *Entity
-	id 		 int64
+	lock      sync.Mutex
+	owner     *Entity
+	id        int64
 	realType  reflect.Type
-	operation map[string]func()[]interface{}
+	operation map[string]func() []interface{}
 }
 
 func (c *Component[T]) addToCollection(collection interface{}) IComponent {
@@ -62,11 +62,11 @@ func (c *Component[T]) setOwner(entity *Entity) {
 	c.owner = entity
 }
 
-func (c *Component[T]) setID(id int64){
+func (c *Component[T]) setID(id int64) {
 	c.id = id
 }
 
-func (c *Component[T]) ID() int64{
+func (c *Component[T]) ID() int64 {
 	return c.id
 }
 
@@ -98,7 +98,3 @@ func (c *Component[T]) Type() reflect.Type {
 func (c *Component[T]) String() string {
 	return fmt.Sprintf("%+v", c.Ins())
 }
-
-
-
-

@@ -6,7 +6,7 @@ var Runtime = NewRuntime()
 
 var Log = Runtime.Logger()
 
-const(
+const (
 	STATUS_INIT = iota
 	STATUS_RUNNING
 	STATUS_PAUSE
@@ -32,20 +32,19 @@ type ecsRuntime struct {
 	stop chan struct{}
 }
 
-
 //TODO world global event system
 
 func NewRuntime() *ecsRuntime {
 	config := NewDefaultRuntimeConfig()
 	rt := &ecsRuntime{
-		config:     config,
-		logger:     NewStdLogger(),
+		config: config,
+		logger: NewStdLogger(),
 	}
 	rt.workPool = NewPool(rt, config.MaxPoolThread, config.MaxPoolJobQueue)
 	return rt
 }
 
-func (r *ecsRuntime) NewWorld() *World{
+func (r *ecsRuntime) NewWorld() *World {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
@@ -83,7 +82,7 @@ func (r *ecsRuntime) Status() RuntimeStatus {
 }
 
 func (r *ecsRuntime) Run() {
-	 r.run()
+	r.run()
 }
 
 func (r *ecsRuntime) run() {
@@ -98,7 +97,7 @@ func (r *ecsRuntime) run() {
 	}
 }
 
-func (r *ecsRuntime) Stop()  {
+func (r *ecsRuntime) Stop() {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
@@ -108,12 +107,9 @@ func (r *ecsRuntime) Stop()  {
 		}
 	}
 
-	r.stop<- struct{}{}
+	r.stop <- struct{}{}
 }
 
 func (r *ecsRuntime) AddJob(handler func(JobContext, ...interface{}), args ...interface{}) {
 	r.workPool.AddJob(handler, args...)
 }
-
-
-

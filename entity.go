@@ -67,7 +67,7 @@ func (e *Entity) hasByType(types ...reflect.Type) bool {
 
 func (e *Entity) Add(components ...IComponent) {
 	for _, c := range components {
-		if err := e.addComponent(c); err != nil{
+		if err := e.addComponent(c); err != nil {
 			e.world.Logger().Error("repeat component:", err)
 		}
 	}
@@ -108,5 +108,3 @@ func (e *Entity) getComponent(com IComponent) IComponent {
 func (e *Entity) getComponentByType(typ reflect.Type) IComponent {
 	return e.components[typ]
 }
-
-

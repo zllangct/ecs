@@ -24,7 +24,7 @@ type TemplateOperateInfo struct {
 	target *Entity
 	com    IComponent
 	op     CollectionOperate
-	typ reflect.Type
+	typ    reflect.Type
 }
 
 func NewTemplateOperateInfo(entity *Entity, template IComponent, typ reflect.Type, op CollectionOperate) TemplateOperateInfo {
@@ -32,16 +32,16 @@ func NewTemplateOperateInfo(entity *Entity, template IComponent, typ reflect.Typ
 }
 
 type ComponentOptResult struct {
-	com IComponent
+	com    IComponent
 	opInfo TemplateOperateInfo
 }
 
 type ComponentCollection struct {
 	collections map[reflect.Type]interface{}
 	//new component cache
-	locks []sync.Mutex
-	base  int64
-	optTemp []map[reflect.Type][]TemplateOperateInfo
+	locks         []sync.Mutex
+	base          int64
+	optTemp       []map[reflect.Type][]TemplateOperateInfo
 	componentsNew map[reflect.Type][]ComponentOptResult
 }
 
@@ -58,13 +58,13 @@ func NewComponentCollection(k int) *ComponentCollection {
 	}
 
 	cc.locks = make([]sync.Mutex, cc.base+1)
-	for i:= int64(0); i < cc.base + 1; i++ {
+	for i := int64(0); i < cc.base+1; i++ {
 		cc.locks[i] = sync.Mutex{}
 	}
-	cc.optTemp =  make([]map[reflect.Type][]TemplateOperateInfo, cc.base+1)
+	cc.optTemp = make([]map[reflect.Type][]TemplateOperateInfo, cc.base+1)
 	cc.resetOptTemp()
 
-	cc.componentsNew =  make(map[reflect.Type][]ComponentOptResult)
+	cc.componentsNew = make(map[reflect.Type][]ComponentOptResult)
 	return cc
 }
 
@@ -80,21 +80,20 @@ func (c *ComponentCollection) TempTemplateOperate(entity *Entity, template IComp
 	c.locks[hash].Lock()
 	defer c.locks[hash].Unlock()
 
-
 	typ := template.Type()
 	newOpt := NewTemplateOperateInfo(entity, template, typ, op)
 	b := c.optTemp[hash]
 	if _, ok := b[typ]; ok {
 		b[typ] = append(b[typ], newOpt)
 	} else {
-		b[typ] = []TemplateOperateInfo{ newOpt }
+		b[typ] = []TemplateOperateInfo{newOpt}
 	}
 }
 
-func (c *ComponentCollection) GetTempTasks() []func()(reflect.Type, []ComponentOptResult) {
+func (c *ComponentCollection) GetTempTasks() []func() (reflect.Type, []ComponentOptResult) {
 	combination := make(map[reflect.Type][]TemplateOperateInfo)
 
-	for i:=0; i < len(c.optTemp); i++ {
+	for i := 0; i < len(c.optTemp); i++ {
 		for typ, op := range c.optTemp[i] {
 			if len(op) == 0 {
 				continue

@@ -35,12 +35,12 @@ func NewWorld(runtime *ecsRuntime) *World {
 	//default config
 	config := NewDefaultRuntimeConfig()
 	world := &World{
-		systemFlow: nil,
+		systemFlow:    nil,
 		frameInterval: config.DefaultFrameInterval,
-		components: NewComponentCollection(config.HashCount),
-		entities:   NewEntityCollection(config.HashCount),
-		logger:     runtime.logger,
-		status: STATUS_INIT,
+		components:    NewComponentCollection(config.HashCount),
+		entities:      NewEntityCollection(config.HashCount),
+		logger:        runtime.logger,
+		status:        STATUS_INIT,
 	}
 	//initialise system flow
 	sf := newSystemFlow(world)
@@ -103,11 +103,11 @@ func (w *World) run() {
 	}
 }
 
-func (w *World) Stop()  {
-	w.stop<- struct{}{}
+func (w *World) Stop() {
+	w.stop <- struct{}{}
 }
 
-func (w *World) SetStopHandler(handler func()){
+func (w *World) SetStopHandler(handler func()) {
 	w.mutex.Lock()
 	defer w.mutex.Unlock()
 
@@ -169,6 +169,6 @@ func (w *World) getComponents(typ reflect.Type) interface{} {
 	return w.components.GetCollection(typ)
 }
 
-func (w *World) NewEntity() *Entity{
+func (w *World) NewEntity() *Entity {
 	return NewEntity(w)
 }

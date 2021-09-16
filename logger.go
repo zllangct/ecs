@@ -41,8 +41,7 @@ func (p StdLogger) Error(v ...interface{}) {
 	p.logger.Output(2, s)
 }
 
-func (p StdLogger) Fatal(v ...interface{})  {
+func (p StdLogger) Fatal(v ...interface{}) {
 	p.Error(v...)
 	os.Exit(1)
 }
-
