@@ -22,6 +22,8 @@ type ISystem interface {
 	Requirements() map[reflect.Type]struct{}
 	Call(label int) interface{}
 
+	IsRequire(component IComponent) bool
+
 	baseInit(world *World, ins ISystem)
 }
 
@@ -56,6 +58,15 @@ func (s *System[T]) SetRequirements(rqs ...IComponent) {
 
 func (s *System[T]) Requirements() map[reflect.Type]struct{} {
 	return s.requirements
+}
+
+func (s *System[T]) IsRequire(com IComponent) bool {
+	return s.isRequire(com.Type())
+}
+
+func (s *System[T]) isRequire(typ reflect.Type) bool  {
+	_, ok := s.requirements[typ]
+	return ok
 }
 
 func (s *System[T]) baseInit(world *World, ins ISystem) {
@@ -110,5 +121,14 @@ func (s *System[T]) GetInterestedNew() map[reflect.Type][]ComponentOptResult {
 		}
 	}
 	return ls
+}
+
+func (s *System[T]) CheckComponent(entity *Entity, com IComponent) IComponent{
+	isRequire := s.IsRequire(com)
+	if !isRequire {
+		return nil
+	}
+
+	return entity.getComponent(com)
 }
 

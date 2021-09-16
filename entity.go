@@ -101,11 +101,11 @@ func (e *Entity) componentDeleted(typ reflect.Type, com IComponent) {
 	delete(e.components, typ)
 }
 
-func (e *Entity) GetComponent(com IComponent) IComponent {
-	return e.getComponent(reflect.TypeOf(com).Elem())
+func (e *Entity) getComponent(com IComponent) IComponent {
+	return e.getComponentByType(com.Type())
 }
 
-func (e *Entity) getComponent(typ reflect.Type) IComponent {
+func (e *Entity) getComponentByType(typ reflect.Type) IComponent {
 	return e.components[typ]
 }
 

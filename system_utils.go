@@ -1,5 +1,10 @@
 package ecs
 
+import (
+	"reflect"
+	"unsafe"
+)
+
 func GetInterestedComponents[T any](s ISystem) *Collection[T] {
 	typ := GetType[T]()
 	if _, ok := s.Requirements()[typ]; !ok {
@@ -14,4 +19,14 @@ func GetInterestedComponents[T any](s ISystem) *Collection[T] {
 		return nil
 	}
 	return c.(*Collection[T])
+}
+
+func CheckComponent[T any](s ISystem, entity *Entity) *T {
+	return getComponentWithSystem[T](s, entity)
+}
+
+func getComponentWithSystem[T any](s ISystem, entity *Entity) *T {
+	ins := *new(T)
+	c := entity.getComponentByType(reflect.TypeOf(ins))
+	return (*T)(unsafe.Pointer((*iface)(unsafe.Pointer(&c)).data))
 }

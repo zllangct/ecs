@@ -40,7 +40,7 @@ type TestSystem struct {
 	ID int
 }
 
-func NewTestSystem(ID int, rqs ...IComponentTemplate) *TestSystem {
+func NewTestSystem(ID int, rqs ...IComponent) *TestSystem {
 	s := &TestSystem{ID: ID}
 	s.SetRequirements(rqs...)
 	return s

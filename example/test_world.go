@@ -96,26 +96,41 @@ func (m *MoveSystem) Update(event ecs.Event) {
 		return
 	}
 
-	s:=&Action{}
-	_=ecs.IComponent(s)
-
 	d := map[int64]*MoveSystemData{}
+	//聚合方式 1：根据组件的Owner（Entity.ID）来匹配数据
+	//for iter := ecs.NewIterator(csPosition); !iter.End(); iter.Next() {
+	//	c := iter.Val()
+	//	if cd, ok := d[c.Owner().ID()]; ok {
+	//		cd.P = c
+	//	}else {
+	//		d[c.Owner().ID()] = &MoveSystemData{P: c}
+	//	}
+	//}
+	//for iter := ecs.NewIterator(csMovement); !iter.End(); iter.Next() {
+	//	c := iter.Val()
+	//	if cd, ok := d[c.Owner().ID()]; ok {
+	//		cd.M = c
+	//	}else{
+	//		d[c.Owner().ID()] = &MoveSystemData{M: c}
+	//	}
+	//}
+
+	//聚合方式 2：直接从Entity聚合相关组件
 	for iter := ecs.NewIterator(csPosition); !iter.End(); iter.Next() {
-		c := iter.Val()
-		if cd, ok := d[c.Owner().ID()]; ok {
-			cd.P = c
-		}else {
-			d[c.Owner().ID()] = &MoveSystemData{P: c}
+		position := iter.Val()
+		owner := position.Owner()
+		/*
+		  无法通过Entity直接获取到所有组件，故意如此设计，保证在系统中错误修改非必须的组件，CheckComponent
+		  能够检查需要获取的组件是否是该系统所必须组件。
+		 */
+		movement := ecs.CheckComponent[Movement](m, owner)
+		if movement == nil {
+			continue
 		}
+
+		d[position.Owner().ID()] = &MoveSystemData{P: position, M: movement}
 	}
-	for iter := ecs.NewIterator(csMovement); !iter.End(); iter.Next() {
-		c := iter.Val()
-		if cd, ok := d[c.Owner().ID()]; ok {
-			cd.M = c
-		}else{
-			d[c.Owner().ID()] = &MoveSystemData{M: c}
-		}
-	}
+
 	/* MoveSystem 主逻辑
 	    - 移动计算公式：最终位置 = 当前位置 + 移动速度 * 移动方向
 		- 本系统的移动逻辑非常简单，但可以进一步思考，各个实体的移动是相互独立的，无数据竞争，类似的
