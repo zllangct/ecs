@@ -36,7 +36,7 @@ func NewWorld(runtime *ecsRuntime) *World {
 	config := NewDefaultRuntimeConfig()
 	world := &World{
 		systemFlow: nil,
-		frameInterval: config.FrameInterval,
+		frameInterval: config.DefaultFrameInterval,
 		components: NewComponentCollection(config.HashCount),
 		entities:   NewEntityCollection(config.HashCount),
 		logger:     runtime.logger,
