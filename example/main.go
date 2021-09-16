@@ -2,11 +2,13 @@ package main
 
 import (
 	"github.com/zllangct/ecs"
+	"math/rand"
 	"reflect"
 	"time"
 )
 
 /* 一般设计思路
+
     - ecs有别于面向对象，ecs是数据驱动的设计思路，且提倡组合优于继承的设计原则。在面向对象盛行
   的情况下，开发者可能会先入为主的用面向对象的逻辑去思考、设计逻辑，当切换到ecs时，可能会有更高
   的心智成本。ecs不是通用的设计方式，在接近‘曾经’很简单的问题时，可能变得更复杂，‘曾经’很复杂的
@@ -172,76 +174,141 @@ type Action struct {
 	ActionType int
 }
 
+type Caster struct {
+	A *Action
+	F *Force
+	P *Position
+}
+
+type Target struct {
+	P *Position
+	HP *HealthPoint
+}
+
 type DamageSystem struct {
 	ecs.System[DamageSystem]
-	actions []ecs.ComponentOptResult
 }
 
 func (d *DamageSystem) Init() {
 	d.SetRequirements(&Position{}, &HealthPoint{}, &Force{}, &Action{})
 }
 
-
-func (d *DamageSystem) Filter() {
+func (d *DamageSystem) Filter() []ecs.ComponentOptResult{
 	/*
 	  获取当前帧新所有创建、删除的组件
 	*/
 	nc := d.GetInterestedNew()
 	if len(nc) == 0 {
-		return
+		return nil
 	}
 
 	as, ok := nc[ecs.GetType[Action]()]
 	if !ok {
-		return
+		return nil
 	}
 
-	d.actions = as
+	return as
 }
 
-func (d *DamageSystem) DataMatch(csPosition *ecs.Collection[Position],
-	csHealthPoint *ecs.Collection[HealthPoint],
-	csForce *ecs.Collection[Force]){
+func (d *DamageSystem) DataMatch() ([]Caster, []Target) {
+	action := ecs.GetInterestedComponents[Action](d)
+	if action == nil {
+		return nil, nil
+	}
 
+	idTemp := map[int64]struct{}{}
+	var casters []Caster
+	iter:= ecs.NewIterator(action)
+	for a := iter.Begin(); !iter.End(); iter.Next() {
+		caster := a.Owner()
+		p := ecs.CheckComponent[Position](d, caster)
+		if p == nil {
+			continue
+		}
+		f := ecs.CheckComponent[Force](d, caster)
+		if f == nil {
+			continue
+		}
+		casters = append(casters, Caster{
+			A: a,
+			P: p,
+			F: f,
+		})
+		idTemp[caster.ID()] = struct{}{}
+	}
 
+	position := ecs.GetInterestedComponents[Position](d)
+	if position == nil {
+		return nil, nil
+	}
+	var targets []Target
+	pIter := ecs.NewIterator(position)
+	for p := pIter.Begin(); !pIter.End(); pIter.Next() {
+		target := p.Owner()
+		if _, ok := idTemp[target.ID()]; ok {
+			continue
+		}
 
+		hp := ecs.CheckComponent[HealthPoint](d, target)
+		if hp == nil {
+			continue
+		}
+
+		targets = append(targets, Target{
+			P: p,
+			HP: hp,
+		})
+	}
+
+	return casters, targets
 }
 
 // Update will be called every frame
 func (d *DamageSystem) Update(event ecs.Event) {
-	/* 筛选攻击者
+	/*
 	    - 当前帧中挂载Action组件的实体即为正在进行攻击的实体，攻击结束后Action组件移除，符合'组件'即'能力'
 	  的设计思路，挂载攻击组件（Action）具备攻击能力，移除该组件后，失去攻击能力。当然这不是唯一的方法，
-	  当前example中攻击每帧结算，由于ecs系统中有缓存每帧新添加、新移除等组件操作，符合攻击每帧结算的特征，
-	  顾利用该缓存Filter方法将筛选出新添加Action。方法多种多样，比如处理攻击间隔时，可在可攻击时，再添加Action
-	  组件，每帧结算，亦可，将cooldown作为Attack组件的一个数据项，系统中进行逻辑判断，这样可以无需Action组件，
+	  当前example中攻击每帧结算，由于ecs系统中有缓存每帧新添加、新移除等组件操作，符合攻击每帧结算的特征. 方法
+	  很多，如果考虑攻击间隔时，也可以将cooldown作为Attack组件的一个数据项，系统中进行逻辑判断，这样可以无需Action组件，
 	  此处使用Action方式，仅简单处理。
 	 */
-	d.Filter()
 
 	/*  聚合数据
 	    - 分析'攻击'行为，我们需要考虑攻击的相关计算公式所需组件，如当前示例中的Force组件，包含基础攻击、力量、
 	  暴击倍率、暴击率、攻击范围等数据。考虑攻击范围时需要，知道位置相关信息，由Position组件提供数据支持，在全遍历
-	  所有位置关系时，消耗比较大，可由视野系统或其他系统，仅考虑视野内对象，减小遍历规模，此处示例不做额外处理。
+	  所有位置关系时，消耗比较大，可由网格、十字链表等算法做区域划分，减小遍历规模，优化搜索效率，此处示例不做额外处理。
 	  聚合数据时，需要匹配攻击者的位置、攻击基础信息，需要匹配被攻击者的位置和血量组件。此外提醒，Entity本身是聚合
 	  了'个体'的相关组件，天然聚合了相关组件，可以通过Entity得到攻击者或被攻击者的需要聚合的组件。
 	 */
-	csPosition := ecs.GetInterestedComponents[Position](d)
-	csHealthPoint := ecs.GetInterestedComponents[HealthPoint](d)
-	csForce := ecs.GetInterestedComponents[Force](d)
+	casters, targets := d.DataMatch()
 
-	d.DataMatch(csPosition, csHealthPoint,csForce)
+	// 伤害主逻辑
+	for _, caster := range casters{
+		for _, target := range targets {
+			//计算距离
+			distance := Distance2D(caster.P, target.P)
+			if distance > caster.F.AttackRange {
+				continue
+			}
 
+			//伤害公式：伤害=（基础攻击+力量）+ 暴击伤害， 暴击伤害=基础攻击 * 2
+			damage := caster.F.PhysicalBaseAttack * caster.F.Strength
+			critical := 0
+			if rand.Intn(100) < caster.F.CriticalChange {
+				critical = caster.F.PhysicalBaseAttack * caster.F.CriticalMultiple
+			}
+			damage = damage + critical
+			target.HP.HP -= damage
+			if target.HP.HP < 0 {
+				target.HP.HP =0
+			}
+		}
+	}
 
 }
 
 //main function
 func Runtime0() {
-	// pprof
-	//go func() {
-	//	log.Println(http.ListenAndServe("localhost:8888", nil))
-	//}()
-
 	// 创建运行时，运行时唯一
 	rt := ecs.Runtime
 	rt.Run()
@@ -270,24 +337,19 @@ func Runtime0() {
 		Dir: []int{1,0,0},
 	}
 	world.NewEntity().Add(p1, m1)
-	//p2 := &Position{
-	//	X: 100,
-	//	Y: 100,
-	//	Z: 100,
-	//}
-	//m2 := &Movement{
-	//	V: 2000,
-	//	Dir: []int{0,1,0},
-	//}
-	//e2 := world.NewEntity()
-	//e2.Add(p2, m2)
+	p2 := &Position{
+		X: 100,
+		Y: 100,
+		Z: 100,
+	}
+	m2 := &Movement{
+		V: 2000,
+		Dir: []int{0,1,0},
+	}
+	world.NewEntity().Add(p2, m2)
 
-	//ecs.Log.Info("test entity id e2:", e2.ID())
-
+	//示例仅运行1秒
 	time.Sleep(time.Second * 1)
-	//for {
-	//	time.Sleep(time.Second * 3)
-	//}
 }
 
 func main() {

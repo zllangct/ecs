@@ -3,64 +3,49 @@ package ecs
 import (
 	"strconv"
 	"testing"
+	"fmt"
 )
 
-func TestNewCollection(t *testing.T) {
-	type Item struct {
-		Count int
-		Name  string
-		o1    int
-	}
-	caseCount := 10
-	var srcList []Item
-	for i := 0; i < caseCount; i++ {
-		srcList = append(srcList, Item{
-			Count: i,
-			Name:  "foo" + strconv.Itoa(i),
-		})
-	}
-	c := NewCollection[Item]()
-
-	cmp := map[int64]int{}
-	for i := 0; i < caseCount; i++ {
-		id, _ := c.Add(&srcList[i])
-		cmp[id] = i
-	}
-
-	for id, idx := range cmp {
-		item := c.Get(id)
-		if *item != srcList[idx] {
-			t.Errorf("src item %v != container item %v", srcList[idx], item)
-		}
-	}
-}
-
 func TestCollectionIterator(t *testing.T) {
+	//待存储的数据定义
 	type Item struct {
 		Count int
 		Name  string
+		Arr []int
 	}
-	caseCount := 100
+
+	//准备数据
+	caseCount := 50
 	var srcList []Item
 	for i := 0; i < caseCount; i++ {
 		srcList = append(srcList, Item{
 			Count: i,
 			Name:  "foo" + strconv.Itoa(i),
+			Arr: []int{1,2,3},
 		})
 	}
 
+	//创建容器(无序数据集)
 	c := NewCollection[Item]()
 
+	//添加数据
 	cmp := map[int64]int{}
 	for i := 0; i < caseCount; i++ {
 		id, _ := c.Add(&srcList[i])
 		cmp[id] = i
 	}
 
-	//for iter := NewIterator(c) ; !iter.End(); iter.Next(){
-	//	v := iter.Val()
-	//	fmt.Printf("%+v", v)
-	//}
+	//遍历风格 1：
+	for iter := NewIterator(c) ; !iter.End(); iter.Next(){
+		v := iter.Val()
+		fmt.Printf("style 1: %+v\n", v)
+	}
+
+	//遍历风格 2:
+	iter := NewIterator(c)
+	for c := iter.Begin(); !iter.End(); c = iter.Next() {
+		fmt.Printf("style 2: %+v\n", c)
+	}
 }
 
 func BenchmarkCollectionWrite(b *testing.B) {
