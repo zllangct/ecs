@@ -1,8 +1,11 @@
 package ecs
 
-import "sync"
+import (
+	"runtime"
+	"sync"
+)
 
-var Runtime = NewRuntime()
+var Runtime = NewRuntime(NewDefaultRuntimeConfig())
 
 var Log = Runtime.Logger()
 
@@ -18,46 +21,45 @@ type RuntimeStatus int
 type ecsRuntime struct {
 	//mutex
 	mutex sync.Mutex
+	//config
+	config *RuntimeConfig
 	//world status
 	status RuntimeStatus
-	//world config
-	config *RuntimeConfig
 	//world worker pool
 	workPool *Pool
-	//logger
-	logger IInternalLogger
 	//world collections
 	world []*World
 
 	stop chan struct{}
 }
 
-func NewRuntime() *ecsRuntime {
-	config := NewDefaultRuntimeConfig()
-	rt := &ecsRuntime{
+func NewRuntime(config *RuntimeConfig) *ecsRuntime {
+
+	r := &ecsRuntime{
 		config: config,
-		logger: NewStdLogger(),
 	}
-	rt.workPool = NewPool(config.MaxPoolThread, config.MaxPoolJobQueue)
-	return rt
+
+	if r.config.MaxPoolThread <= 0 {
+		r.config.MaxPoolThread = uint32(runtime.NumCPU())
+	}
+
+	if r.config.MaxPoolJobQueue <= 0 {
+		r.config.MaxPoolJobQueue = 20
+	}
+
+	r.workPool = NewPool(config.MaxPoolThread, config.MaxPoolJobQueue)
+
+	return r
 }
 
-func (r *ecsRuntime) NewWorld() *World {
+func (r *ecsRuntime) NewWorld(config *WorldConfig) *World {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	world := NewWorld(r)
-	r.world = append(r.world, NewWorld(r))
+	world := NewWorld(r, config)
+	r.world = append(r.world, NewWorld(r, config))
 
 	return world
-}
-
-// SetConfig config the world
-func (r *ecsRuntime) SetConfig(config *RuntimeConfig) {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-
-	r.config = config
 }
 
 // SetLogger set logger
@@ -65,11 +67,12 @@ func (r *ecsRuntime) SetLogger(logger IInternalLogger) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	r.logger = logger
+	r.config.Logger = logger
+	Log = r.config.Logger
 }
 
 func (r *ecsRuntime) Logger() IInternalLogger {
-	return r.logger
+	return r.config.Logger
 }
 
 func (r *ecsRuntime) Status() RuntimeStatus {
@@ -109,5 +112,5 @@ func (r *ecsRuntime) Stop() {
 }
 
 func (r *ecsRuntime) AddJob(job func(), hashKey ...uint32) {
-	r.workPool.Add(job, hashKey ...)
+	r.workPool.Add(job, hashKey...)
 }

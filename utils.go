@@ -5,13 +5,13 @@ import "errors"
 func Try(task func()) {
 	defer func() {
 		r := recover()
-		if r != nil{
+		if r != nil {
 		}
 	}()
 	task()
 }
 
-func TryAndReport(task func()) (err error){
+func TryAndReport(task func()) (err error) {
 	defer func() {
 		r := recover()
 		switch typ := r.(type) {

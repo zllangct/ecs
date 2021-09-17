@@ -2,19 +2,32 @@ package ecs
 
 import (
 	"reflect"
+	"runtime"
 	"sync"
 	"time"
 )
 
 type WorldStatus int
 
+type WorldConfig struct {
+	HashCount            int           //容器桶数量
+	DefaultFrameInterval time.Duration //帧间隔
+}
+
+func NewDefaultWorldConfig() *WorldConfig {
+	return &WorldConfig{
+		HashCount:            runtime.NumCPU() * 4,
+		DefaultFrameInterval: time.Millisecond * 33,
+	}
+}
+
 type World struct {
 	//mutex
 	mutex sync.Mutex
 	//world status
 	status WorldStatus
-	//frame interval
-	frameInterval time.Duration
+	//config
+	config *WorldConfig
 	//runtime
 	runtime *ecsRuntime
 	//system flow,all systems
@@ -23,25 +36,29 @@ type World struct {
 	components *ComponentCollection
 	//all entities
 	entities *EntityCollection
-	//logger
-	logger IInternalLogger
 
 	stop chan struct{}
 	//do some work for world cleaning
 	stopHandler func()
 }
 
-func NewWorld(runtime *ecsRuntime) *World {
-	//default config
-	config := NewDefaultRuntimeConfig()
+func NewWorld(runtime *ecsRuntime, config *WorldConfig) *World {
 	world := &World{
-		systemFlow:    nil,
-		frameInterval: config.DefaultFrameInterval,
-		components:    NewComponentCollection(config.HashCount),
-		entities:      NewEntityCollection(config.HashCount),
-		logger:        runtime.logger,
-		status:        STATUS_INIT,
+		systemFlow: nil,
+		config:     config,
+		components: NewComponentCollection(config.HashCount),
+		entities:   NewEntityCollection(config.HashCount),
+		status:     STATUS_INIT,
 	}
+
+	if world.config.DefaultFrameInterval <= 0 {
+		world.config.DefaultFrameInterval = time.Millisecond * 33
+	}
+
+	if world.config.HashCount == 0 {
+		world.config.HashCount = runtime.config.CpuNum
+	}
+
 	//initialise system flow
 	sf := newSystemFlow(world)
 	world.systemFlow = sf
@@ -56,16 +73,16 @@ func (w *World) Run() {
 
 func (w *World) run() {
 	if Runtime.Status() != STATUS_RUNNING {
-		w.logger.Error("runtime is not running")
+		Log.Error("runtime is not running")
 		return
 	}
 
 	w.mutex.Lock()
 	if w.status != STATUS_INIT {
-		w.logger.Info("this world is already running.")
+		Log.Error("this world is already running.")
 		return
 	}
-	frameInterval := w.frameInterval
+	frameInterval := w.config.DefaultFrameInterval
 	w.status = STATUS_RUNNING
 	w.mutex.Unlock()
 
@@ -147,10 +164,6 @@ func (w *World) ComponentAttach(target *Entity, com IComponent) {
 
 func (w *World) ComponentRemove(target *Entity, com IComponent) {
 	w.components.TempTemplateOperate(target, com.Template(), COLLECTION_OPERATE_DELETE)
-}
-
-func (w *World) Logger() IInternalLogger {
-	return w.logger
 }
 
 func (w *World) getNewComponentsAll() map[reflect.Type][]ComponentOptResult {

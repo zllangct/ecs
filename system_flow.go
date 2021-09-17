@@ -148,7 +148,7 @@ func (p *systemFlow) run(delta time.Duration) {
 	for _, task := range tasks {
 		wg := p.wg
 		fn := task
-		Runtime.AddJob(func(){
+		Runtime.AddJob(func() {
 			typ, rn := fn()
 
 			lock.Lock()

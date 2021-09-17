@@ -1,5 +1,12 @@
 package ecs
 
+type IIterator[T any] interface {
+	Begin() *T
+	Val() *T
+	Next() *T
+	End() bool
+}
+
 type Iterator[T any] struct {
 	c     *Collection[T]
 	size  int

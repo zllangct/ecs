@@ -32,7 +32,7 @@ type Pool struct {
 	size         uint32
 	jobQueueSize uint32
 	jobQueue     chan func()
-	workers  	 []*Worker
+	workers      []*Worker
 }
 
 //NewPool news goroutine pool
@@ -59,9 +59,9 @@ func NewPool(size uint32, jobQueueSize uint32) *Pool {
 // Add hashKey is an optional parameter, job will be executed in a random worker
 // when hashKey is regardless, in fixed worker calculated by hash when hashKey is
 // specified
-func (p *Pool) Add(job func(), hashKey ... uint32) {
+func (p *Pool) Add(job func(), hashKey ...uint32) {
 	if len(hashKey) > 0 {
-		p.workers[hashKey[0] % p.size].jobQueue <- job
+		p.workers[hashKey[0]%p.size].jobQueue <- job
 		return
 	}
 	p.jobQueue <- job

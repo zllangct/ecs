@@ -1,9 +1,9 @@
 package ecs
 
 import (
+	"fmt"
 	"strconv"
 	"testing"
-	"fmt"
 )
 
 func TestCollectionIterator(t *testing.T) {
@@ -11,7 +11,7 @@ func TestCollectionIterator(t *testing.T) {
 	type Item struct {
 		Count int
 		Name  string
-		Arr []int
+		Arr   []int
 	}
 
 	//准备数据
@@ -21,7 +21,7 @@ func TestCollectionIterator(t *testing.T) {
 		srcList = append(srcList, Item{
 			Count: i,
 			Name:  "foo" + strconv.Itoa(i),
-			Arr: []int{1,2,3},
+			Arr:   []int{1, 2, 3},
 		})
 	}
 
@@ -36,7 +36,7 @@ func TestCollectionIterator(t *testing.T) {
 	}
 
 	//遍历风格 1：
-	for iter := NewIterator(c) ; !iter.End(); iter.Next(){
+	for iter := NewIterator(c); !iter.End(); iter.Next() {
 		v := iter.Val()
 		fmt.Printf("style 1: %+v\n", v)
 	}

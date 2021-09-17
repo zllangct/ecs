@@ -150,7 +150,7 @@ func (m *MoveSystem) Update(event ecs.Event) {
 		data.P.Y = data.P.Y + int(float64(data.M.Dir[1]*data.M.V)*delta.Seconds())
 		data.P.Z = data.P.Z + int(float64(data.M.Dir[2]*data.M.V)*delta.Seconds())
 
-		ecs.Log.Info("target id:", e, " current position:", data.P.X, data.P.Y, data.P.Z)
+		ecs.Log.Info("target id:", e, "delta:", delta, " current position:", data.P.X, data.P.Y, data.P.Z)
 	}
 }
 
@@ -314,7 +314,7 @@ func Runtime0() {
 	rt.Run()
 
 	// 创建世界，世界可以多个
-	world := rt.NewWorld()
+	world := rt.NewWorld(ecs.NewDefaultWorldConfig())
 	world.Run()
 
 	// 注册系统

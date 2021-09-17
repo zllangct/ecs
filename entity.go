@@ -68,7 +68,7 @@ func (e *Entity) hasByType(types ...reflect.Type) bool {
 func (e *Entity) Add(components ...IComponent) {
 	for _, c := range components {
 		if err := e.addComponent(c); err != nil {
-			e.world.Logger().Error("repeat component:", err)
+			Log.Error("repeat component:", err)
 		}
 	}
 }
@@ -90,7 +90,7 @@ func (e *Entity) Remove(com ...IComponent) {
 	for _, c := range com {
 		typ := c.Type()
 		if !e.has(c) {
-			e.world.Logger().Error(errors.New("repeat component:" + typ.Name()))
+			Log.Error(errors.New("repeat component:" + typ.Name()))
 			continue
 		}
 		e.world.ComponentRemove(c.Owner(), c)
