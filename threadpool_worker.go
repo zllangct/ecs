@@ -1,6 +1,34 @@
 package ecs
 
+
 const WORKER_ID_RANDOM int32 = -1
+
+const JOB_TYPE_PARALLEL JobType = 1
+const JOB_TYPE_SERIAL JobType = 2
+const JOB_TYPE_DEFAULT = JOB_TYPE_PARALLEL
+
+// JobType job type: Parallel;Serial
+type JobType int
+
+type JobContext struct {
+	WorkerID int32
+	Runtime  *ecsRuntime
+}
+
+//Job is a function for doing jobs.
+type Job struct {
+	WorkerID int32
+	Args     []interface{}
+	Job      func(ctx JobContext, args ...interface{})
+}
+
+// Init initialize the job
+func (p *Job) Init() *Job {
+	p.WorkerID = -1
+	p.Args = nil
+	p.Job = nil
+	return p
+}
 
 //Worker goroutine struct.
 type Worker struct {
