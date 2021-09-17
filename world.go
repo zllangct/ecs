@@ -121,10 +121,6 @@ func (w *World) GetStatus() WorldStatus {
 	return w.status
 }
 
-func (w *World) AddJob(handler func(JobContext, ...interface{}), args ...interface{}) {
-	Runtime.AddJob(handler, args...)
-}
-
 // Register register system
 func (w *World) Register(system ISystem) {
 	w.systemFlow.register(system)

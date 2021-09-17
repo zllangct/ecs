@@ -125,13 +125,11 @@ func (p *systemFlow) run(delta time.Duration) {
 						}
 
 						p.wg.Add(1)
-						Runtime.AddJob(func(ctx JobContext, args ...interface{}) {
-							fn := args[0].(func(event Event))
-							delta := args[1].(time.Duration)
-							wg := args[2].(*sync.WaitGroup)
+						wg := p.wg
+						Runtime.AddJob(func() {
 							fn(Event{Delta: delta})
 							wg.Done()
-						}, fn, delta, p.wg)
+						})
 					}
 				}
 			}
@@ -145,23 +143,19 @@ func (p *systemFlow) run(delta time.Duration) {
 	tasks := p.world.components.GetTempTasks()
 	//Log.Info("temp task count:", len(tasks))
 	newList := map[reflect.Type][]ComponentOptResult{}
-	l := sync.Mutex{}
+	lock := sync.Mutex{}
 	p.wg.Add(len(tasks))
 	for _, task := range tasks {
-		Runtime.AddJob(func(context JobContext, args ...interface{}) {
-			t := args[0].(TempTask)
-			typ, rn := t.fn()
+		wg := p.wg
+		fn := task
+		Runtime.AddJob(func(){
+			typ, rn := fn()
 
-			t.lock.Lock()
-			t.m[typ] = rn
-			t.lock.Unlock()
+			lock.Lock()
+			newList[typ] = rn
+			lock.Unlock()
 
-			t.wg.Done()
-		}, TempTask{
-			fn:   task,
-			wg:   p.wg,
-			m:    newList,
-			lock: &l,
+			wg.Done()
 		})
 	}
 	p.wg.Wait()
@@ -173,13 +167,9 @@ func (p *systemFlow) run(delta time.Duration) {
 //register method only in world init or func init(){}
 func (p *systemFlow) register(system ISystem) {
 	//init function call
-	err := Try(func() {
+	Try(func() {
 		system.baseInit(p.world, system)
 	})
-	if err != nil && p.world.logger != nil {
-		p.world.logger.Error(err)
-		return
-	}
 
 	order := system.Order()
 	for _, period := range p.periodList {

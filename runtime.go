@@ -32,15 +32,13 @@ type ecsRuntime struct {
 	stop chan struct{}
 }
 
-//TODO world global event system
-
 func NewRuntime() *ecsRuntime {
 	config := NewDefaultRuntimeConfig()
 	rt := &ecsRuntime{
 		config: config,
 		logger: NewStdLogger(),
 	}
-	rt.workPool = NewPool(rt, config.MaxPoolThread, config.MaxPoolJobQueue)
+	rt.workPool = NewPool(config.MaxPoolThread, config.MaxPoolJobQueue)
 	return rt
 }
 
@@ -110,6 +108,6 @@ func (r *ecsRuntime) Stop() {
 	r.stop <- struct{}{}
 }
 
-func (r *ecsRuntime) AddJob(handler func(JobContext, ...interface{}), args ...interface{}) {
-	r.workPool.AddJob(handler, args...)
+func (r *ecsRuntime) AddJob(job func(), hashKey ...uint32) {
+	r.workPool.Add(job, hashKey ...)
 }

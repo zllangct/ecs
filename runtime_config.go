@@ -10,8 +10,8 @@ type RuntimeConfig struct {
 	CpuNum               int           //使用的最大cpu数量
 	HashCount            int           //容器散列数量
 	DefaultFrameInterval time.Duration //帧间隔
-	MaxPoolThread        int           //线程池最大线程数量
-	MaxPoolJobQueue      int           //线程池最大任务队列长度
+	MaxPoolThread        uint32        //线程池最大线程数量
+	MaxPoolJobQueue      uint32        //线程池最大任务队列长度
 }
 
 func NewDefaultRuntimeConfig() *RuntimeConfig {
