@@ -178,6 +178,7 @@ type Caster struct {
 	A *Action
 	F *Force
 	P *Position
+	E *ecs.Entity
 }
 
 type Target struct {
@@ -233,6 +234,7 @@ func (d *DamageSystem) DataMatch() ([]Caster, []Target) {
 			A: a,
 			P: p,
 			F: f,
+			E: caster,
 		})
 		idTemp[caster.ID()] = struct{}{}
 	}
@@ -303,6 +305,9 @@ func (d *DamageSystem) Update(event ecs.Event) {
 				target.HP.HP =0
 			}
 		}
+
+		caster.E.Remove(caster.A)
+
 	}
 
 }
