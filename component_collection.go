@@ -8,16 +8,16 @@ import (
 type CollectionOperate uint8
 
 const (
-	COLLECTION_OPERATE_NONE   CollectionOperate = iota
-	COLLECTION_OPERATE_ADD                      //add component operation
-	COLLECTION_OPERATE_DELETE                   //delete component operation
+	CollectionOperateNone   CollectionOperate = iota
+	CollectionOperateAdd                      //add component operation
+	CollectionOperateDelete                   //delete component operation
 )
 
 type ComponentOperate = CollectionOperate
 
 const (
-	COMPONENT_OPERATE_ADD    = COLLECTION_OPERATE_ADD    //add component operation
-	COMPONENT_OPERATE_DELETE = COLLECTION_OPERATE_DELETE //delete component operation
+	ComponentOperateAdd    = CollectionOperateAdd    //add component operation
+	ComponentOperateDelete = CollectionOperateDelete //delete component operation
 )
 
 type TemplateOperateInfo struct {
@@ -122,11 +122,11 @@ func (c *ComponentCollection) GetTempTasks() []func() (reflect.Type, []Component
 			for _, operate := range oopList {
 				t = operate.typ
 				switch operate.op {
-				case COLLECTION_OPERATE_ADD:
+				case CollectionOperateAdd:
 					ret := operate.com.addToCollection(collection)
 					operate.target.componentAdded(t, ret)
 					n = append(n, ComponentOptResult{com: ret, opInfo: operate})
-				case COLLECTION_OPERATE_DELETE:
+				case CollectionOperateDelete:
 					operate.com.addToCollection(collection)
 					operate.target.componentDeleted(t, operate.com)
 					n = append(n, ComponentOptResult{com: operate.com, opInfo: operate})

@@ -11,7 +11,7 @@ type IComponent interface {
 	Owner() *Entity
 	Type() reflect.Type
 	ID() int64
-	Instance() IComponent
+	Ins() IComponent
 	Template() IComponent
 
 	setOwner(owner *Entity)
@@ -37,7 +37,7 @@ func (c *Component[T]) addToCollection(collection interface{}) IComponent {
 		Log.Info("add to collection, collecion is nil")
 		return nil
 	}
-	id, ins := cc.Add(c.Ins())
+	id, ins := cc.Add(c.InsT())
 	c.setID(id)
 	var com IComponent
 	(*iface)(unsafe.Pointer(&com)).data = unsafe.Pointer(ins)
@@ -70,11 +70,11 @@ func (c *Component[T]) ID() int64 {
 	return c.id
 }
 
-func (c *Component[T]) Ins() *T {
+func (c *Component[T]) InsT() *T {
 	return (*T)(unsafe.Pointer(c))
 }
 
-func (c *Component[T]) Instance() IComponent {
+func (c *Component[T]) Ins() IComponent {
 	var com IComponent
 	(*iface)(unsafe.Pointer(&com)).data = unsafe.Pointer(c)
 	return com
@@ -96,5 +96,5 @@ func (c *Component[T]) Type() reflect.Type {
 }
 
 func (c *Component[T]) String() string {
-	return fmt.Sprintf("%+v", c.Ins())
+	return fmt.Sprintf("%+v", c.InsT())
 }

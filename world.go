@@ -48,7 +48,7 @@ func NewWorld(runtime *ecsRuntime, config *WorldConfig) *World {
 		config:     config,
 		components: NewComponentCollection(config.HashCount),
 		entities:   NewEntityCollection(config.HashCount),
-		status:     STATUS_INIT,
+		status:     StatusInit,
 	}
 
 	if world.config.DefaultFrameInterval <= 0 {
@@ -72,25 +72,25 @@ func (w *World) Run() {
 }
 
 func (w *World) run() {
-	if Runtime.Status() != STATUS_RUNNING {
+	if Runtime.Status() != StatusRunning {
 		Log.Error("runtime is not running")
 		return
 	}
 
 	w.mutex.Lock()
-	if w.status != STATUS_INIT {
+	if w.status != StatusInit {
 		Log.Error("this world is already running.")
 		return
 	}
 	frameInterval := w.config.DefaultFrameInterval
-	w.status = STATUS_RUNNING
+	w.status = StatusRunning
 	w.mutex.Unlock()
 
 	Log.Info("start world success")
 
 	defer func() {
 		w.mutex.Lock()
-		w.status = STATUS_STOP
+		w.status = StatusStop
 		w.mutex.Unlock()
 	}()
 
@@ -159,11 +159,11 @@ func (w *World) DeleteEntityByID(id int64) {
 }
 
 func (w *World) ComponentAttach(target *Entity, com IComponent) {
-	w.components.TempTemplateOperate(target, com.Template(), COLLECTION_OPERATE_ADD)
+	w.components.TempTemplateOperate(target, com.Template(), CollectionOperateAdd)
 }
 
 func (w *World) ComponentRemove(target *Entity, com IComponent) {
-	w.components.TempTemplateOperate(target, com.Template(), COLLECTION_OPERATE_DELETE)
+	w.components.TempTemplateOperate(target, com.Template(), CollectionOperateDelete)
 }
 
 func (w *World) getNewComponentsAll() map[reflect.Type][]ComponentOptResult {

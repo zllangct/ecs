@@ -10,10 +10,10 @@ var Runtime = NewRuntime(NewDefaultRuntimeConfig())
 var Log = Runtime.Logger()
 
 const (
-	STATUS_INIT = iota
-	STATUS_RUNNING
-	STATUS_PAUSE
-	STATUS_STOP
+	StatusInit = iota
+	StatusRunning
+	StatusPause
+	StatusStop
 )
 
 type RuntimeStatus int
@@ -91,10 +91,10 @@ func (r *ecsRuntime) run() {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	if r.status == STATUS_INIT {
+	if r.status == StatusInit {
 		//start the work pool
 		r.workPool.Start()
-		r.status = STATUS_RUNNING
+		r.status = StatusRunning
 	}
 }
 
@@ -103,7 +103,7 @@ func (r *ecsRuntime) Stop() {
 	defer r.mutex.Unlock()
 
 	for _, world := range r.world {
-		if status := world.GetStatus(); status != STATUS_STOP {
+		if status := world.GetStatus(); status != StatusStop {
 			world.Stop()
 		}
 	}

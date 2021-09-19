@@ -8,13 +8,6 @@ import (
 
 type SystemLifeCircleType int
 
-const (
-	SYSTEM_LIFE_CIRCLE_TYPE_NONE SystemLifeCircleType = iota
-	SYSTEM_LIFE_CIRCLE_TYPE_Default
-	SYSTEM_LIFE_CIRCLE_TYPE_ONCE
-	SYSTEM_LIFE_CIRCLE_TYPE_REPEAT
-)
-
 type ISystem interface {
 	Type() reflect.Type
 	Order() Order
@@ -71,7 +64,7 @@ func (s *System[T]) isRequire(typ reflect.Type) bool {
 
 func (s *System[T]) baseInit(world *World, ins ISystem) {
 	s.requirements = map[reflect.Type]struct{}{}
-	s.SetOrder(ORDER_DEFAULT)
+	s.SetOrder(OrderDefault)
 	s.world = world
 
 	if i, ok := ins.(IEventInit); ok {

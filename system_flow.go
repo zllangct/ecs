@@ -6,31 +6,31 @@ import (
 	"time"
 )
 
-//system execute Order, 32bit + 32bit: period + suborder
+// SystemOrder system execute Order, 32bit + 32bit: period + suborder
 type SystemOrder uint64
 
-//system execute period:start->pre_update->update->pre_destroy->destroy
+// SystemPeriod system execute period:start->pre_update->update->pre_destroy->destroy
 type SystemPeriod uint32
 
 const (
-	PERIOD_PRE_START SystemPeriod = iota
-	PERIOD_START
-	PERIOD_POST_START
-	PERIOD_PRE_UPDATE
-	PERIOD_UPDATE
-	PERIOD_POST_UPDATE
-	PERIOD_PER_DESTROY
-	PERIOD_DESTROY
-	PERIOD_POST_DESTROY
+	PeriodPreStart SystemPeriod = iota
+	PeriodStart
+	PeriodPostStart
+	PeriodPreUpdate
+	PeriodUpdate
+	PeriodPostUpdate
+	PeriodPerDestroy
+	PeriodDestroy
+	PeriodPostDestroy
 )
 
 // Order default suborder of system
 type Order int32
 
 const (
-	ORDER_FRONT   Order = -1
-	ORDER_APPEND  Order = 999999
-	ORDER_DEFAULT Order = ORDER_APPEND
+	OrderFront    Order = -1
+	OrderAppend  Order = 999999
+	OrderDefault Order = OrderAppend
 )
 
 type TempTask struct {
@@ -64,20 +64,20 @@ func newSystemFlow(runtime *World) *systemFlow {
 //initialize the system flow
 func (p *systemFlow) init() {
 	p.periodList = []SystemPeriod{
-		PERIOD_START,
-		PERIOD_POST_START,
-		PERIOD_UPDATE,
-		PERIOD_POST_UPDATE,
-		PERIOD_DESTROY,
-		PERIOD_POST_DESTROY,
+		PeriodStart,
+		PeriodPostStart,
+		PeriodUpdate,
+		PeriodPostUpdate,
+		PeriodDestroy,
+		PeriodPostDestroy,
 	}
 	p.systemPeriod = make(map[SystemPeriod]OrderSequence)
 	for _, value := range p.periodList {
 		p.systemPeriod[value] = OrderSequence{}
 		sgFront := NewSystemGroup()
-		sgFront.order = ORDER_FRONT
+		sgFront.order = OrderFront
 		sgAppend := NewSystemGroup()
-		sgAppend.order = ORDER_APPEND
+		sgAppend.order = OrderAppend
 		p.systemPeriod[value] = append(p.systemPeriod[value], sgFront, sgAppend)
 	}
 }
@@ -94,27 +94,27 @@ func (p *systemFlow) run(delta time.Duration) {
 						imp := false
 						var fn func(event Event)
 						switch period {
-						case PERIOD_START:
+						case PeriodStart:
 							system, ok := ss[i].(IEventStart)
 							fn = system.Start
 							imp = ok
-						case PERIOD_POST_START:
+						case PeriodPostStart:
 							system, ok := ss[i].(IEventPostStart)
 							fn = system.PostStart
 							imp = ok
-						case PERIOD_UPDATE:
+						case PeriodUpdate:
 							system, ok := ss[i].(IEventUpdate)
 							fn = system.Update
 							imp = ok
-						case PERIOD_POST_UPDATE:
+						case PeriodPostUpdate:
 							system, ok := ss[i].(IEventPostUpdate)
 							fn = system.PostUpdate
 							imp = ok
-						case PERIOD_DESTROY:
+						case PeriodDestroy:
 							system, ok := ss[i].(IEventDestroy)
 							fn = system.Destroy
 							imp = ok
-						case PERIOD_POST_DESTROY:
+						case PeriodPostDestroy:
 							system, ok := ss[i].(IEventPostDestroy)
 							fn = system.PostDestroy
 							imp = ok
@@ -175,17 +175,17 @@ func (p *systemFlow) register(system ISystem) {
 	for _, period := range p.periodList {
 		imp := false
 		switch period {
-		case PERIOD_START:
+		case PeriodStart:
 			_, imp = system.(IEventStart)
-		case PERIOD_POST_START:
+		case PeriodPostStart:
 			_, imp = system.(IEventPostStart)
-		case PERIOD_UPDATE:
+		case PeriodUpdate:
 			_, imp = system.(IEventUpdate)
-		case PERIOD_POST_UPDATE:
+		case PeriodPostUpdate:
 			_, imp = system.(IEventPostUpdate)
-		case PERIOD_DESTROY:
+		case PeriodDestroy:
 			_, imp = system.(IEventDestroy)
-		case PERIOD_POST_DESTROY:
+		case PeriodPostDestroy:
 			_, imp = system.(IEventPostDestroy)
 		}
 
@@ -194,9 +194,9 @@ func (p *systemFlow) register(system ISystem) {
 		}
 
 		sl := p.systemPeriod[period]
-		if order == ORDER_FRONT {
+		if order == OrderFront {
 			p.systemPeriod[period][0].insert(system)
-		} else if order == ORDER_APPEND {
+		} else if order == OrderAppend {
 			p.systemPeriod[period][len(sl)-1].insert(system)
 		} else {
 			for i, v := range sl {
