@@ -39,7 +39,7 @@ type World struct {
 
 	stop chan struct{}
 	//do some work for world cleaning
-	stopHandler func()
+	stopHandler func(world *World)
 }
 
 func NewWorld(runtime *ecsRuntime, config *WorldConfig) *World {
@@ -102,7 +102,7 @@ func (w *World) run() {
 		case <-w.stop:
 			w.mutex.Lock()
 			if w.stopHandler != nil {
-				w.stopHandler()
+				w.stopHandler(w)
 			}
 			w.mutex.Unlock()
 			return
@@ -124,7 +124,7 @@ func (w *World) Stop() {
 	w.stop <- struct{}{}
 }
 
-func (w *World) SetStopHandler(handler func()) {
+func (w *World) SetStopHandler(handler func(world *World)) {
 	w.mutex.Lock()
 	defer w.mutex.Unlock()
 
