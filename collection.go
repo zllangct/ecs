@@ -30,7 +30,7 @@ func (c *Collection[T]) getID() int64 {
 
 func (c *Collection[T]) Add(element *T) (int64, *T) {
 	idx := len(c.data)
-	Log.Info("collection Add:", ObjectToString(*element))
+	Log.Info("collection Add:", ObjectToString(element))
 	c.data = append(c.data, *element)
 	id := c.getID()
 	c.ids[id] = int64(idx)
