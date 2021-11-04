@@ -22,7 +22,7 @@ type ISystem interface {
 	eventDispatch()
 }
 
-type SysEventHandler func(...interface{}) interface{}
+type SysEventHandler func(...interface{})
 
 type SystemCustomEventParam struct {
 	Event string
@@ -44,9 +44,8 @@ func (s *System[T]) Ins() *T {
 	return (*T)(unsafe.Pointer(s))
 }
 
-func (s *System[T]) EventRegister(fn SysEventHandler) {
-	fnType := reflect.TypeOf(fn)
-	s.events[fnType.Name()] = fn
+func (s *System[T]) EventRegister(event string, fn SysEventHandler) {
+	s.events[event] = fn
 }
 
 func (s *System[T]) Emit(event string, args ...interface{}) {
