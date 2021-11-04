@@ -1,6 +1,7 @@
 package ecs
 
 import (
+	"container/list"
 	"reflect"
 	"sync"
 	"unsafe"
@@ -13,16 +14,26 @@ type ISystem interface {
 	Order() Order
 	World() *World
 	Requirements() map[reflect.Type]struct{}
-	Call(label int) interface{}
+	Emit(event string, args ...interface{})
 
 	IsRequire(component IComponent) bool
 
 	baseInit(world *World, ins ISystem)
+	eventDispatch()
+}
+
+type SysEventHandler func(...interface{}) interface{}
+
+type SystemCustomEventParam struct {
+	Event string
+	Args  []interface{}
 }
 
 type System[T any] struct {
 	lock         sync.Mutex
 	requirements map[reflect.Type]struct{}
+	events       map[string]SysEventHandler
+	eventQueue   *list.List
 	order        Order
 	world        *World
 	realType     reflect.Type
@@ -33,8 +44,40 @@ func (s *System[T]) Ins() *T {
 	return (*T)(unsafe.Pointer(s))
 }
 
-func (s *System[T]) Call(label int) interface{} {
-	return nil
+func (s *System[T]) EventRegister(fn SysEventHandler) {
+	fnType := reflect.TypeOf(fn)
+	s.events[fnType.Name()] = fn
+}
+
+func (s *System[T]) Emit(event string, args ...interface{}) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	s.eventQueue.PushBack(SystemCustomEventParam{
+		Event: event,
+		Args:  args,
+	})
+}
+
+func (s *System[T]) eventDispatch() {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	for i := s.eventQueue.Front(); i != nil; i = i.Next() {
+		e := i.Value.(SystemCustomEventParam)
+		if fn, ok := s.events[e.Event]; ok {
+			err := TryAndReport(func() {
+				fn(e.Args...)
+			})
+			if err != nil {
+				Log.Error(err)
+			}
+		} else {
+			Log.Errorf("event not found: %s", e.Event)
+		}
+	}
+
+	s.eventQueue.Init()
 }
 
 func (s *System[T]) SetRequirements(rqs ...IComponent) {
@@ -64,6 +107,7 @@ func (s *System[T]) isRequire(typ reflect.Type) bool {
 
 func (s *System[T]) baseInit(world *World, ins ISystem) {
 	s.requirements = map[reflect.Type]struct{}{}
+	s.eventQueue = list.New()
 	s.SetOrder(OrderDefault)
 	s.world = world
 

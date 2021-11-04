@@ -14,6 +14,7 @@ type SystemPeriod uint32
 
 const (
 	PeriodPreStart SystemPeriod = iota
+	PeriodCustomEvent
 	PeriodStart
 	PeriodPostStart
 	PeriodPreUpdate
@@ -28,7 +29,7 @@ const (
 type Order int32
 
 const (
-	OrderFront    Order = -1
+	OrderFront   Order = -1
 	OrderAppend  Order = 999999
 	OrderDefault Order = OrderAppend
 )
@@ -64,6 +65,7 @@ func newSystemFlow(runtime *World) *systemFlow {
 //initialize the system flow
 func (p *systemFlow) init() {
 	p.periodList = []SystemPeriod{
+		PeriodCustomEvent,
 		PeriodStart,
 		PeriodPostStart,
 		PeriodUpdate,
@@ -94,6 +96,8 @@ func (p *systemFlow) run(delta time.Duration) {
 						imp := false
 						var fn func(event Event)
 						switch period {
+						case PeriodCustomEvent:
+							ss[i].eventDispatch()
 						case PeriodStart:
 							system, ok := ss[i].(IEventStart)
 							fn = system.Start
