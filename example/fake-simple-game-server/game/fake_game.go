@@ -4,17 +4,20 @@ import (
 	"context"
 	"github.com/zllangct/ecs"
 	"reflect"
+	"strconv"
+	"strings"
+	"sync"
 	"test_ecs/network"
 )
+
 type FakeGame struct {
-	clients map[int]*Session
-	world *ecs.World
+	clients  sync.Map
+	world    *ecs.World
+	chatRoom *ChatRoom
 }
 
 func NewGame() *FakeGame {
-	return &FakeGame{
-		clients: map[int]*Session{},
-	}
+	return &FakeGame{}
 }
 
 func (f *FakeGame) Run(ctx context.Context) {
@@ -41,6 +44,8 @@ func (f *FakeGame) EnterGame(sess *Session) {
 		Y: 100,
 		Z: 100,
 	})
+
+	sess.EntityId = e.ID()
 }
 
 func (f *FakeGame) InitNetwork() {
@@ -50,36 +55,68 @@ func (f *FakeGame) InitNetwork() {
 	}
 
 	seq := 0
-	for{
+	for {
 		conn := lis.Accept()
 		seq++
 		sess := &Session{
 			SessionID: seq,
-			Conn: conn,
+			Conn:      conn,
 		}
 
 		go func(conn *network.TcpConn, sess *Session) {
-			for{
+			f.OnClientEnter(sess)
+			for {
 				pkg := conn.Read()
-				f.Dispatch(pkg)
+				f.Dispatch(pkg, sess)
 			}
 		}(conn, sess)
 	}
 }
 
 func (f *FakeGame) OnClientEnter(sess *Session) {
-	f.clients[sess.SessionID] = sess
+	f.clients.Store(sess.SessionID, sess)
 	f.EnterGame(sess)
 }
 
-func (f *FakeGame) Dispatch(pkg interface{}) {
-	//TODO for controller system
+func (f *FakeGame) Dispatch(pkg interface{}, sess *Session) {
+	content, ok := pkg.(string)
+	if !ok {
+		return
+	}
+
+	split := strings.Split(content, ":")
+	op := split[0]
+
+	switch op {
+	case "chat":
+		// not handle by ecs
+		f.chatRoom.Talk(split[1])
+	case "move":
+		// handle by ecs
+		if len(split) != 3 {
+			return
+		}
+		d := strings.Split(split[1], ",")
+		var dir []int
+		for _, s := range d {
+			value, _ := strconv.Atoi(s)
+			dir = append(dir, value)
+		}
+
+		v, _ := strconv.Atoi(split[2])
+		s, _ := f.world.GetSystem(ecs.TypeOf[InputSystem]())
+		s.Emit("Change", dir, v)
+	}
 }
 
-func (f *FakeGame) ChangeMovementTimeScale() {
+func (f *FakeGame) ChangeMovementTimeScale(timeScale float64) {
 	sys, ok := f.world.GetSystem(reflect.TypeOf(&MoveSystem{}))
 	if !ok {
 		return
 	}
-	sys.Emit("UpdateTimeScale", float64(1.2))
+	sys.Emit("UpdateTimeScale", timeScale)
+}
+
+func (f *FakeGame) InitChat() {
+	f.chatRoom = NewChatRoom(&f.clients)
 }

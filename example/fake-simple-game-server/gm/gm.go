@@ -1,0 +1,34 @@
+package gm
+
+import (
+	"context"
+	"math/rand"
+	"test_ecs/game"
+	"time"
+)
+
+type GM struct {
+	game *game.FakeGame
+}
+
+func NewGM() *GM {
+	return &GM{}
+}
+
+func (g *GM) Run(ctx context.Context, game *game.FakeGame) {
+	g.game = game
+
+	timeScale := 0
+	for {
+		time.Sleep(time.Second * time.Duration(rand.Intn(5)))
+		if timeScale == 0 {
+			g.ChangeMovementTimeScale(float64(1.2))
+		} else {
+			g.ChangeMovementTimeScale(float64(1.0))
+		}
+	}
+}
+
+func (g *GM) ChangeMovementTimeScale(timeScale float64) {
+	g.game.ChangeMovementTimeScale(timeScale)
+}

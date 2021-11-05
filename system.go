@@ -22,13 +22,6 @@ type ISystem interface {
 	eventDispatch()
 }
 
-type SysEventHandler func(...interface{})
-
-type SystemCustomEventParam struct {
-	Event string
-	Args  []interface{}
-}
-
 type System[T any] struct {
 	lock         sync.Mutex
 	requirements map[reflect.Type]struct{}
@@ -57,7 +50,7 @@ func (s *System[T]) Emit(event string, args ...interface{}) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	s.eventQueue.PushBack(SystemCustomEventParam{
+	s.eventQueue.PushBack(SystemCustomEvent{
 		Event: event,
 		Args:  args,
 	})
@@ -68,7 +61,7 @@ func (s *System[T]) eventDispatch() {
 	defer s.lock.Unlock()
 
 	for i := s.eventQueue.Front(); i != nil; i = i.Next() {
-		e := i.Value.(SystemCustomEventParam)
+		e := i.Value.(SystemCustomEvent)
 		if fn, ok := s.events[e.Event]; ok {
 			err := TryAndReport(func() {
 				fn(e.Args...)

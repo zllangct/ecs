@@ -4,5 +4,6 @@ import "test_ecs/network"
 
 type Session struct {
 	SessionID int
-	Conn *network.TcpConn
+	Conn      *network.TcpConn
+	EntityId  int64
 }
