@@ -1,7 +1,6 @@
 package ecs
 
 import (
-	"reflect"
 	"unsafe"
 )
 
@@ -26,7 +25,6 @@ func CheckComponent[T any](s ISystem, entity *Entity) *T {
 }
 
 func getComponentWithSystem[T any](s ISystem, entity *Entity) *T {
-	ins := *new(T)
-	c := entity.getComponentByType(reflect.TypeOf(ins))
+	c := entity.getComponentByType(TypeOf[T]())
 	return (*T)(unsafe.Pointer((*iface)(unsafe.Pointer(&c)).data))
 }

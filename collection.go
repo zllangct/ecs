@@ -12,7 +12,7 @@ type Collection[T any] struct {
 func NewCollection[T any]() *Collection[T] {
 	c := &Collection[T]{
 		ids: map[int64]int64{},
-		typ: reflect.TypeOf(*new(T)),
+		typ: TypeOf[T](),
 	}
 	return c
 }

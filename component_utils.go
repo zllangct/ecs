@@ -6,7 +6,7 @@ import (
 )
 
 func GetType[T any]() reflect.Type {
-	return reflect.TypeOf(*new(T))
+	return TypeOf[T]()
 }
 
 func ObjectToString(in interface{}) string {

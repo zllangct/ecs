@@ -37,7 +37,7 @@ func (c *Component[T]) addToCollection(collection interface{}) IComponent {
 		Log.Info("add to collection, collecion is nil")
 		return nil
 	}
-	id, ins := cc.Add(c.InsT())
+	id, ins := cc.Add(c.RawIns())
 	c.setID(id)
 	var com IComponent
 	(*iface)(unsafe.Pointer(&com)).data = unsafe.Pointer(ins)
@@ -70,18 +70,17 @@ func (c *Component[T]) ID() int64 {
 	return c.id
 }
 
-func (c *Component[T]) InsT() *T {
+func (c *Component[T]) RawIns() *T {
 	return (*T)(unsafe.Pointer(c))
 }
 
-func (c *Component[T]) Ins() IComponent {
-	var com IComponent
+func (c *Component[T]) Ins() (com IComponent) {
 	(*iface)(unsafe.Pointer(&com)).data = unsafe.Pointer(c)
-	return com
+	return
 }
 
 func (c *Component[T]) Template() IComponent {
-	return (c)
+	return c
 }
 
 func (c *Component[T]) Owner() *Entity {
@@ -90,11 +89,11 @@ func (c *Component[T]) Owner() *Entity {
 
 func (c *Component[T]) Type() reflect.Type {
 	if c.realType == nil {
-		c.realType = reflect.TypeOf(*(new(T)))
+		c.realType = TypeOf[T]()
 	}
 	return c.realType
 }
 
 func (c *Component[T]) String() string {
-	return fmt.Sprintf("%+v", c.InsT())
+	return fmt.Sprintf("%+v", c.RawIns())
 }

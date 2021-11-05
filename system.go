@@ -40,7 +40,12 @@ type System[T any] struct {
 	isInited     bool
 }
 
-func (s *System[T]) Ins() *T {
+func (s *System[T]) Ins() (sys ISystem) {
+	(*iface)(unsafe.Pointer(&sys)).data = unsafe.Pointer(s)
+	return
+}
+
+func (s *System[T]) RawIns() *T {
 	return (*T)(unsafe.Pointer(s))
 }
 
@@ -119,7 +124,7 @@ func (s *System[T]) baseInit(world *World, ins ISystem) {
 
 func (s *System[T]) Type() reflect.Type {
 	if s.realType == nil {
-		s.realType = reflect.TypeOf(*new(T))
+		s.realType = TypeOf[T]()
 	}
 	return s.realType
 }

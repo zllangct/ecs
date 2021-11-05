@@ -32,7 +32,7 @@ type World struct {
 	runtime *ecsRuntime
 	//system flow,all systems
 	systemFlow *systemFlow
-	systems sync.Map
+	systems    sync.Map
 	//all components
 	components *ComponentCollection
 	//all entities
@@ -141,6 +141,9 @@ func (w *World) GetStatus() WorldStatus {
 
 // Register register system
 func (w *World) Register(system ISystem) {
+	w.mutex.Lock()
+	defer w.mutex.Unlock()
+
 	w.systemFlow.register(system)
 	w.systems.Store(reflect.TypeOf(system), system)
 }
@@ -189,6 +192,6 @@ func (w *World) NewEntity() *Entity {
 	return NewEntity(w)
 }
 
-func GetSystem[T ISystem](w *World) {
-	//TODO
+func GetSystem[T ISystem](w *World) (ISystem, bool) {
+	return w.GetSystem(TypeOf[T]())
 }

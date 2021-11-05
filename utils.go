@@ -2,6 +2,7 @@ package ecs
 
 import (
 	"errors"
+	"reflect"
 	"runtime/debug"
 )
 
@@ -46,4 +47,8 @@ func StrHash(str string, groupCount int) int {
 		total += int(str[i])
 	}
 	return total % groupCount
+}
+
+func TypeOf[T any]() reflect.Type {
+	return reflect.TypeOf((*T)(nil))
 }

@@ -31,7 +31,7 @@ func (p StdLogger) Info(v ...interface{}) {
 	p.logger.Output(2, fmt.Sprint(v...))
 }
 
-func (p StdLogger) Infof(format string, v ...interface{}){
+func (p StdLogger) Infof(format string, v ...interface{}) {
 	p.logger.Output(2, fmt.Sprintf(format, v...))
 }
 
