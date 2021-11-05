@@ -5,9 +5,9 @@ import (
 	"sync"
 )
 
-var Runtime = NewRuntime(NewDefaultRuntimeConfig())
+var Runtime = newRuntime()
 
-var Log = Runtime.Logger()
+var Log ILogger = NewStdLogger()
 
 const (
 	StatusInit = iota
@@ -23,22 +23,26 @@ type ecsRuntime struct {
 	mutex sync.Mutex
 	//config
 	config *RuntimeConfig
-	//world status
-	status RuntimeStatus
+	//world rtStatus
+	rtStatus RuntimeStatus
 	//world worker pool
 	workPool *Pool
 	//world collections
 	world []*World
 
-	stop chan struct{}
+	isInited bool
+	rtStop   chan struct{}
 }
 
-func NewRuntime(config *RuntimeConfig) *ecsRuntime {
+func newRuntime() *ecsRuntime {
+	return &ecsRuntime{}
+}
 
-	r := &ecsRuntime{
-		config: config,
-	}
+func (r *ecsRuntime) Configure(config *RuntimeConfig) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
 
+	r.config = config
 	if r.config.MaxPoolThread <= 0 {
 		r.config.MaxPoolThread = uint32(runtime.NumCPU())
 	}
@@ -49,41 +53,66 @@ func NewRuntime(config *RuntimeConfig) *ecsRuntime {
 
 	r.workPool = NewPool(config.MaxPoolThread, config.MaxPoolJobQueue)
 
-	return r
+	r.isInited = true
 }
 
-func (r *ecsRuntime) NewWorld(config *WorldConfig) *World {
+func (r *ecsRuntime) newWorld(config *WorldConfig) *World {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	world := NewWorld(r, config)
-	r.world = append(r.world, NewWorld(r, config))
+	if !r.isInited {
+		panic("you must config the runtime first")
+	}
+
+	world := newWorld(r, config)
+	r.world = append(r.world, newWorld(r, config))
 
 	return world
 }
 
-// SetLogger set logger
-func (r *ecsRuntime) SetLogger(logger IInternalLogger) {
+func (r *ecsRuntime) destroyWorld(world *World) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
+
+	for i := 0; i < len(r.world); i++ {
+		if r.world[i].id == world.id {
+			r.world = append(r.world[:i], r.world[i+1:]...)
+			return
+		}
+	}
+
+	world.stop()
+}
+
+// SetLogger set logger
+func (r *ecsRuntime) setLogger(logger ILogger) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	if !r.isInited {
+		panic("you must config the runtime first")
+	}
 
 	r.config.Logger = logger
 	Log = r.config.Logger
 }
 
-func (r *ecsRuntime) Logger() IInternalLogger {
-	return r.config.Logger
-}
-
-func (r *ecsRuntime) Status() RuntimeStatus {
+func (r *ecsRuntime) logger() ILogger {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	return r.status
+	if !r.isInited {
+		panic("you must config the runtime first")
+	}
+
+	return r.config.Logger
 }
 
-func (r *ecsRuntime) Run() {
-	r.run()
+func (r *ecsRuntime) status() RuntimeStatus {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	return r.rtStatus
 }
 
 func (r *ecsRuntime) run() {
@@ -91,26 +120,37 @@ func (r *ecsRuntime) run() {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	if r.status == StatusInit {
+	if !r.isInited {
+		panic("you must config the runtime first")
+	}
+
+	if r.rtStatus == StatusInit {
 		//start the work pool
 		r.workPool.Start()
-		r.status = StatusRunning
+		r.rtStatus = StatusRunning
 	}
 }
 
-func (r *ecsRuntime) Stop() {
+func (r *ecsRuntime) stop() {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
+	if !r.isInited {
+		panic("you must config the runtime first")
+	}
+
 	for _, world := range r.world {
 		if status := world.GetStatus(); status != StatusStop {
-			world.Stop()
+			world.stop()
 		}
 	}
 
-	r.stop <- struct{}{}
+	r.rtStop <- struct{}{}
 }
 
-func (r *ecsRuntime) AddJob(job func(), hashKey ...uint32) {
+func (r *ecsRuntime) addJob(job func(), hashKey ...uint32) {
+	if !r.isInited {
+		panic("you must config the runtime first")
+	}
 	r.workPool.Add(job, hashKey...)
 }

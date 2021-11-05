@@ -36,6 +36,8 @@ func BenchmarkGoroutine(b *testing.B) {
 //BenchmarkGpool benchmarks the goroutine pool.
 func BenchmarkGpool(b *testing.B) {
 	pool := NewPool(poolSize, queueSize)
+	pool.Start()
+
 	defer pool.Release()
 	var wg sync.WaitGroup
 

@@ -22,6 +22,10 @@ type ISystem interface {
 	eventDispatch()
 }
 
+type ISystemTemplate interface {
+	d074634084a1556083fcd17c0254b557()
+}
+
 type System[T any] struct {
 	lock         sync.Mutex
 	requirements map[reflect.Type]struct{}
@@ -32,6 +36,8 @@ type System[T any] struct {
 	realType     reflect.Type
 	isInited     bool
 }
+
+func (s System[T]) d074634084a1556083fcd17c0254b557() {}
 
 func (s *System[T]) Ins() (sys ISystem) {
 	(*iface)(unsafe.Pointer(&sys)).data = unsafe.Pointer(s)
@@ -146,8 +152,8 @@ func (s *System[T]) GetInterested(typ reflect.Type) interface{} {
 	return s.World().getComponents(typ)
 }
 
-func (s *System[T]) GetInterestedNew() map[reflect.Type][]ComponentOptResult {
-	ls := map[reflect.Type][]ComponentOptResult{}
+func (s *System[T]) GetInterestedNew() map[reflect.Type][]OperateInfo {
+	ls := map[reflect.Type][]OperateInfo{}
 	for typ, _ := range s.Requirements() {
 		if n := s.World().getNewComponents(typ); n != nil {
 			ls[typ] = n

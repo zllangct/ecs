@@ -57,7 +57,7 @@ type MoveSystemData struct {
 
 type MoveSystem struct {
 	ecs.System[MoveSystem]
-	logger     ecs.IInternalLogger
+	logger     ecs.ILogger
 }
 
 func (m *MoveSystem) Init() {
@@ -65,7 +65,7 @@ func (m *MoveSystem) Init() {
 	m.SetRequirements(&Position{}, &Movement{})
 }
 
-func (m *MoveSystem) Filter(ls map[reflect.Type][]ecs.ComponentOptResult) {
+func (m *MoveSystem) Filter(ls map[reflect.Type][]ecs.OperateInfo) {
 	if len(ls) > 0 {
 		//ecs.Log.Info("new component:", len(ls))
 	}
@@ -100,21 +100,21 @@ func (m *MoveSystem) Update(event ecs.Event) {
 
 	d := map[int64]*MoveSystemData{}
 
-	//聚合方式 1：根据组件的Owner（Entity.ID）来匹配数据
+	//聚合方式 1：根据组件的Owner（Entity.GetID）来匹配数据
 	//for iter := ecs.NewIterator(csPosition); !iter.End(); iter.Next() {
 	//	c := iter.Val()
-	//	if cd, ok := d[c.Owner().ID()]; ok {
+	//	if cd, ok := d[c.Owner().GetID()]; ok {
 	//		cd.P = c
 	//	}else {
-	//		d[c.Owner().ID()] = &MoveSystemData{P: c}
+	//		d[c.Owner().GetID()] = &MoveSystemData{P: c}
 	//	}
 	//}
 	//for iter := ecs.NewIterator(csMovement); !iter.End(); iter.Next() {
 	//	c := iter.Val()
-	//	if cd, ok := d[c.Owner().ID()]; ok {
+	//	if cd, ok := d[c.Owner().GetID()]; ok {
 	//		cd.M = c
 	//	}else{
-	//		d[c.Owner().ID()] = &MoveSystemData{M: c}
+	//		d[c.Owner().GetID()] = &MoveSystemData{M: c}
 	//	}
 	//}
 
@@ -131,7 +131,7 @@ func (m *MoveSystem) Update(event ecs.Event) {
 			continue
 		}
 
-		d[position.Owner().ID()] = &MoveSystemData{P: position, M: movement}
+		d[position.Owner().GetID()] = &MoveSystemData{P: position, M: movement}
 	}
 
 	/* MoveSystem 主逻辑
@@ -194,7 +194,7 @@ func (d *DamageSystem) Init() {
 	d.SetRequirements(&Position{}, &HealthPoint{}, &Force{}, &Action{})
 }
 
-func (d *DamageSystem) Filter() []ecs.ComponentOptResult{
+func (d *DamageSystem) Filter() []ecs.OperateInfo{
 	/*
 	  获取当前帧新所有创建、删除的组件
 	*/
@@ -236,7 +236,7 @@ func (d *DamageSystem) DataMatch() ([]Caster, []Target) {
 			F: f,
 			E: caster,
 		})
-		idTemp[caster.ID()] = struct{}{}
+		idTemp[caster.GetID()] = struct{}{}
 	}
 
 	position := ecs.GetInterestedComponents[Position](d)
@@ -247,7 +247,7 @@ func (d *DamageSystem) DataMatch() ([]Caster, []Target) {
 	pIter := ecs.NewIterator(position)
 	for p := pIter.Begin(); !pIter.End(); pIter.Next() {
 		target := p.Owner()
-		if _, ok := idTemp[target.ID()]; ok {
+		if _, ok := idTemp[target.GetID()]; ok {
 			continue
 		}
 
@@ -314,23 +314,25 @@ func (d *DamageSystem) Update(event ecs.Event) {
 
 //main function
 func Runtime0() {
-	// 创建运行时，运行时唯一
-	rt := ecs.Runtime
-	rt.Run()
+	// 配置运行时，运行时唯一
+	ecs.RuntimeConfigure(ecs.NewDefaultRuntimeConfig())
+	ecs.Run()
 
 	// 创建世界，世界可以多个
-	world := rt.NewWorld(ecs.NewDefaultWorldConfig())
+	world := ecs.CreateWorld(ecs.NewDefaultWorldConfig())
 	world.Run()
 
 	// 注册系统
-	world.Register(&MoveSystem{})
+	//world.Register(&MoveSystem{})
+	ecs.RegisterSystem[MoveSystem](world)
+
 
 	// 创建实体并添加组件
 	ee1 := world.NewEntity()
 	ee2 := world.NewEntity()
 	ee3 := world.NewEntity()
 
-	ecs.Log.Info(ee1.ID(), ee2.ID(), ee3.ID())
+	ecs.Log.Info(ee1.GetID(), ee2.GetID(), ee3.GetID())
 
 	p1 := &Position{
 		X: 100,

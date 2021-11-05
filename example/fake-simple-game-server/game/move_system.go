@@ -12,7 +12,7 @@ type MoveSystemData struct {
 type MoveSystem struct {
 	ecs.System[MoveSystem]
 	timeScale  float64
-	logger     ecs.IInternalLogger
+	logger     ecs.ILogger
 }
 
 func (m *MoveSystem) Init() {

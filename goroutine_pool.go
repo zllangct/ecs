@@ -52,7 +52,15 @@ func NewPool(size uint32, jobQueueSize uint32) *Pool {
 		jobQueue:     jobQueue,
 		workers:      workerQueue,
 	}
-	pool.Start()
+	for i := 0; i < cap(pool.workers); i++ {
+		worker := &Worker{
+			p:        pool,
+			jobQueue: make(chan func(), pool.jobQueueSize),
+			stop:     make(chan struct{}),
+		}
+		pool.workers[i] = worker
+		worker.Start()
+	}
 	return pool
 }
 
@@ -69,13 +77,9 @@ func (p *Pool) Add(job func(), hashKey ...uint32) {
 
 //Start all workers
 func (p *Pool) Start() {
+	var worker *Worker
 	for i := 0; i < cap(p.workers); i++ {
-		worker := &Worker{
-			p:        p,
-			jobQueue: make(chan func(), p.jobQueueSize),
-			stop:     make(chan struct{}),
-		}
-		p.workers[i] = worker
+		worker = p.workers[i]
 		worker.Start()
 	}
 }
@@ -85,7 +89,7 @@ func (p *Pool) Size() uint32 {
 	return p.size
 }
 
-//Release stop all workers
+//Release rtStop all workers
 func (p *Pool) Release() {
 	for _, worker := range p.workers {
 		worker.stop <- struct{}{}

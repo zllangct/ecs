@@ -20,20 +20,14 @@ const (
 	ComponentOperateDelete = CollectionOperateDelete //delete component operation
 )
 
-type TemplateOperateInfo struct {
+type OperateInfo struct {
 	target *Entity
 	com    IComponent
 	op     CollectionOperate
-	typ    reflect.Type
 }
 
-func NewTemplateOperateInfo(entity *Entity, template IComponent, typ reflect.Type, op CollectionOperate) TemplateOperateInfo {
-	return TemplateOperateInfo{target: entity, com: template, op: op, typ: typ}
-}
-
-type ComponentOptResult struct {
-	com    IComponent
-	opInfo TemplateOperateInfo
+func NewTemplateOperateInfo(entity *Entity, template IComponent, op CollectionOperate) OperateInfo {
+	return OperateInfo{target: entity, com: template, op: op}
 }
 
 type ComponentCollection struct {
@@ -41,8 +35,8 @@ type ComponentCollection struct {
 	//new component cache
 	locks         []sync.Mutex
 	base          int64
-	optTemp       []map[reflect.Type][]TemplateOperateInfo
-	componentsNew map[reflect.Type][]ComponentOptResult
+	optTemp       []map[reflect.Type][]OperateInfo
+	componentsNew map[reflect.Type][]OperateInfo
 }
 
 func NewComponentCollection(k int) *ComponentCollection {
@@ -61,37 +55,37 @@ func NewComponentCollection(k int) *ComponentCollection {
 	for i := int64(0); i < cc.base+1; i++ {
 		cc.locks[i] = sync.Mutex{}
 	}
-	cc.optTemp = make([]map[reflect.Type][]TemplateOperateInfo, cc.base+1)
+	cc.optTemp = make([]map[reflect.Type][]OperateInfo, cc.base+1)
 	cc.resetOptTemp()
 
-	cc.componentsNew = make(map[reflect.Type][]ComponentOptResult)
+	cc.componentsNew = make(map[reflect.Type][]OperateInfo)
 	return cc
 }
 
 func (c *ComponentCollection) resetOptTemp() {
 	for index := range c.optTemp {
-		c.optTemp[index] = make(map[reflect.Type][]TemplateOperateInfo)
+		c.optTemp[index] = make(map[reflect.Type][]OperateInfo)
 	}
 }
 
 func (c *ComponentCollection) TempTemplateOperate(entity *Entity, template IComponent, op CollectionOperate) {
-	hash := entity.ID() & c.base
+	hash := entity.GetID() & c.base
 
 	c.locks[hash].Lock()
 	defer c.locks[hash].Unlock()
 
 	typ := template.Type()
-	newOpt := NewTemplateOperateInfo(entity, template, typ, op)
+	newOpt := NewTemplateOperateInfo(entity, template, op)
 	b := c.optTemp[hash]
 	if _, ok := b[typ]; ok {
 		b[typ] = append(b[typ], newOpt)
 	} else {
-		b[typ] = []TemplateOperateInfo{newOpt}
+		b[typ] = []OperateInfo{newOpt}
 	}
 }
 
-func (c *ComponentCollection) GetTempTasks() []func() (reflect.Type, []ComponentOptResult) {
-	combination := make(map[reflect.Type][]TemplateOperateInfo)
+func (c *ComponentCollection) GetTempTasks() []func() (reflect.Type, []OperateInfo) {
+	combination := make(map[reflect.Type][]OperateInfo)
 
 	for i := 0; i < len(c.optTemp); i++ {
 		for typ, op := range c.optTemp[i] {
@@ -106,7 +100,7 @@ func (c *ComponentCollection) GetTempTasks() []func() (reflect.Type, []Component
 		}
 	}
 
-	var tasks []func() (reflect.Type, []ComponentOptResult)
+	var tasks []func() (reflect.Type, []OperateInfo)
 	for typ, opList := range combination {
 		typTemp := typ
 		oopList := opList
@@ -116,20 +110,21 @@ func (c *ComponentCollection) GetTempTasks() []func() (reflect.Type, []Component
 			collection = c.collections[typTemp]
 		}
 
-		fn := func() (reflect.Type, []ComponentOptResult) {
-			n := make([]ComponentOptResult, len(oopList))
+		fn := func() (reflect.Type, []OperateInfo) {
+			n := make([]OperateInfo, len(oopList))
 			var t reflect.Type
 			for _, operate := range oopList {
-				t = operate.typ
+				t = operate.com.Type()
 				switch operate.op {
 				case CollectionOperateAdd:
 					ret := operate.com.addToCollection(collection)
 					operate.target.componentAdded(t, ret)
-					n = append(n, ComponentOptResult{com: ret, opInfo: operate})
+					operate.com = ret
+					n = append(n, operate)
 				case CollectionOperateDelete:
 					operate.com.addToCollection(collection)
 					operate.target.componentDeleted(t, operate.com)
-					n = append(n, ComponentOptResult{com: operate.com, opInfo: operate})
+					n = append(n, operate)
 				}
 			}
 			return t, n
@@ -139,16 +134,16 @@ func (c *ComponentCollection) GetTempTasks() []func() (reflect.Type, []Component
 	return tasks
 }
 
-func (c *ComponentCollection) TempTasksDone(newList map[reflect.Type][]ComponentOptResult) {
+func (c *ComponentCollection) TempTasksDone(newList map[reflect.Type][]OperateInfo) {
 	c.componentsNew = newList
 	c.resetOptTemp()
 }
 
-func (c *ComponentCollection) GetNewComponentsAll() map[reflect.Type][]ComponentOptResult {
+func (c *ComponentCollection) GetNewComponentsAll() map[reflect.Type][]OperateInfo {
 	return c.componentsNew
 }
 
-func (c *ComponentCollection) GetNewComponents(typ reflect.Type) []ComponentOptResult {
+func (c *ComponentCollection) GetNewComponents(typ reflect.Type) []OperateInfo {
 	return c.componentsNew[typ]
 }
 

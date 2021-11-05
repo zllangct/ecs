@@ -7,7 +7,7 @@ import (
 	"runtime"
 )
 
-type IInternalLogger interface {
+type ILogger interface {
 	Info(v ...interface{})
 	Error(v ...interface{})
 	Fatal(v ...interface{})

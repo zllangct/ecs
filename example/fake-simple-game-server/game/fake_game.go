@@ -29,7 +29,7 @@ func (f *FakeGame) InitEcs() {
 	rt := ecs.Runtime
 	rt.Run()
 
-	f.world = rt.NewWorld(ecs.NewDefaultWorldConfig())
+	f.world = rt.newWorld(ecs.NewDefaultWorldConfig())
 	f.world.Run()
 
 	f.world.Register(&MoveSystem{})
@@ -45,7 +45,7 @@ func (f *FakeGame) EnterGame(sess *Session) {
 		Z: 100,
 	})
 
-	sess.EntityId = e.ID()
+	sess.EntityId = e.GetID()
 }
 
 func (f *FakeGame) InitNetwork() {

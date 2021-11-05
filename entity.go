@@ -16,24 +16,26 @@ type Entity struct {
 	id int64
 }
 
-func NewEntity(world *World) *Entity {
+func newEntity(world *World) *Entity {
 	entity := &Entity{
 		world:      world,
 		components: make(map[reflect.Type]IComponent),
-		id:         UniqueID(),
+		id:         UniqueEntityID(),
 	}
-	world.AddEntity(entity)
+	world.addEntity(entity)
 	return entity
 }
 
 func (e *Entity) Destroy() {
+	var components []IComponent
 	for _, c := range e.components {
-		e.world.ComponentRemove(c.Owner(), c)
+		components = append(components, c)
 	}
-	e.world.DeleteEntity(e)
+	e.Remove(components...)
+	e.world.deleteEntity(e)
 }
 
-func (e *Entity) ID() int64 {
+func (e *Entity) GetID() int64 {
 	return e.id
 }
 
@@ -41,12 +43,12 @@ func (e *Entity) HasByType(types ...reflect.Type) bool {
 	return e.hasByType(types...)
 }
 
-func (e *Entity) Has(cs ...IComponent) bool {
-	return e.has(cs...)
+func (e *Entity) Has(components ...IComponent) bool {
+	return e.has(components...)
 }
 
-func (e *Entity) has(cs ...IComponent) bool {
-	for _, c := range cs {
+func (e *Entity) has(components ...IComponent) bool {
+	for _, c := range components {
 		_, ok := e.components[c.Type()]
 		if !ok {
 			return false
@@ -73,28 +75,28 @@ func (e *Entity) Add(components ...IComponent) {
 	}
 }
 
-func (e *Entity) addComponent(com IComponent) error {
-	com.setOwner(e)
-	if e.has(com) {
-		return fmt.Errorf("repeated component: %s", com.Type().Name())
-	}
-	e.world.ComponentAttach(e, com)
-	return nil
-}
-
-func (e *Entity) componentAdded(typ reflect.Type, com IComponent) {
-	e.components[typ] = com
-}
-
-func (e *Entity) Remove(com ...IComponent) {
-	for _, c := range com {
+func (e *Entity) Remove(components ...IComponent) {
+	for _, c := range components {
 		typ := c.Type()
 		if !e.has(c) {
 			Log.Error(errors.New("repeat component:" + typ.Name()))
 			continue
 		}
-		e.world.ComponentRemove(c.Owner(), c)
+		e.world.components.TempTemplateOperate(e, c.Template(), CollectionOperateDelete)
 	}
+}
+
+func (e *Entity) addComponent(com IComponent) error {
+	com.setOwner(e)
+	if e.has(com) {
+		return fmt.Errorf("repeated component: %s", com.Type().Name())
+	}
+	e.world.components.TempTemplateOperate(e, com.Template(), CollectionOperateAdd)
+	return nil
+}
+
+func (e *Entity) componentAdded(typ reflect.Type, com IComponent) {
+	e.components[typ] = com
 }
 
 func (e *Entity) componentDeleted(typ reflect.Type, com IComponent) {

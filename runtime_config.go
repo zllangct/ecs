@@ -9,7 +9,7 @@ type RuntimeConfig struct {
 	CpuNum          int    //使用的最大cpu数量
 	MaxPoolThread   uint32 //线程池最大线程数量
 	MaxPoolJobQueue uint32 //线程池最大任务队列长度
-	Logger          IInternalLogger
+	Logger ILogger
 }
 
 func NewDefaultRuntimeConfig() *RuntimeConfig {

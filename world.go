@@ -12,6 +12,7 @@ type WorldStatus int
 type WorldConfig struct {
 	HashCount            int           //容器桶数量
 	DefaultFrameInterval time.Duration //帧间隔
+	StopCallback         func(world *World)
 }
 
 func NewDefaultWorldConfig() *WorldConfig {
@@ -24,6 +25,8 @@ func NewDefaultWorldConfig() *WorldConfig {
 type World struct {
 	//mutex
 	mutex sync.Mutex
+	//id
+	id int64
 	//world status
 	status WorldStatus
 	//config
@@ -38,13 +41,14 @@ type World struct {
 	//all entities
 	entities *EntityCollection
 
-	stop chan struct{}
+	wStop chan struct{}
 	//do some work for world cleaning
 	stopHandler func(world *World)
 }
 
-func NewWorld(runtime *ecsRuntime, config *WorldConfig) *World {
+func newWorld(runtime *ecsRuntime, config *WorldConfig) *World {
 	world := &World{
+		id:         UniqueID(),
 		systemFlow: nil,
 		config:     config,
 		components: NewComponentCollection(config.HashCount),
@@ -67,13 +71,17 @@ func NewWorld(runtime *ecsRuntime, config *WorldConfig) *World {
 	return world
 }
 
+func (w *World) GetID() int64 {
+	return w.id
+}
+
 // Run start ecs world
 func (w *World) Run() {
 	go w.run()
 }
 
 func (w *World) run() {
-	if Runtime.Status() != StatusRunning {
+	if Runtime.status() != StatusRunning {
 		Log.Error("runtime is not running")
 		return
 	}
@@ -100,7 +108,7 @@ func (w *World) run() {
 	//main loop
 	for {
 		select {
-		case <-w.stop:
+		case <-w.wStop:
 			w.mutex.Lock()
 			if w.stopHandler != nil {
 				w.stopHandler(w)
@@ -121,15 +129,8 @@ func (w *World) run() {
 	}
 }
 
-func (w *World) Stop() {
-	w.stop <- struct{}{}
-}
-
-func (w *World) SetStopHandler(handler func(world *World)) {
-	w.mutex.Lock()
-	defer w.mutex.Unlock()
-
-	w.stopHandler = handler
+func (w *World) stop() {
+	w.wStop <- struct{}{}
 }
 
 func (w *World) GetStatus() WorldStatus {
@@ -148,39 +149,35 @@ func (w *World) Register(system ISystem) {
 	w.systems.Store(reflect.TypeOf(system), system)
 }
 
+func (w *World) registerForT(system interface{}) {
+	w.Register(system.(ISystem))
+}
+
 func (w *World) GetSystem(sys reflect.Type) (ISystem, bool) {
 	s, ok := w.systems.Load(sys)
 	return s.(ISystem), ok
 }
 
 // AddEntity entity operate : add
-func (w *World) AddEntity(entity *Entity) {
+func (w *World) addEntity(entity *Entity) {
 	w.entities.add(entity)
 }
 
-// DeleteEntity entity operate : delete
-func (w *World) DeleteEntity(entity *Entity) {
+// deleteEntity entity operate : delete
+func (w *World) deleteEntity(entity *Entity) {
 	w.entities.delete(entity)
 }
 
-// DeleteEntityByID entity operate : delete
-func (w *World) DeleteEntityByID(id int64) {
+// deleteEntityByID entity operate : delete
+func (w *World) deleteEntityByID(id int64) {
 	w.entities.deleteByID(id)
 }
 
-func (w *World) ComponentAttach(target *Entity, com IComponent) {
-	w.components.TempTemplateOperate(target, com.Template(), CollectionOperateAdd)
-}
-
-func (w *World) ComponentRemove(target *Entity, com IComponent) {
-	w.components.TempTemplateOperate(target, com.Template(), CollectionOperateDelete)
-}
-
-func (w *World) getNewComponentsAll() map[reflect.Type][]ComponentOptResult {
+func (w *World) getNewComponentsAll() map[reflect.Type][]OperateInfo {
 	return w.components.GetNewComponentsAll()
 }
 
-func (w *World) getNewComponents(typ reflect.Type) []ComponentOptResult {
+func (w *World) getNewComponents(typ reflect.Type) []OperateInfo {
 	return w.components.GetNewComponents(typ)
 }
 
@@ -189,9 +186,7 @@ func (w *World) getComponents(typ reflect.Type) interface{} {
 }
 
 func (w *World) NewEntity() *Entity {
-	return NewEntity(w)
+	return newEntity(w)
 }
 
-func GetSystem[T ISystem](w *World) (ISystem, bool) {
-	return w.GetSystem(TypeOf[T]())
-}
+

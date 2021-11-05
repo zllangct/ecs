@@ -36,9 +36,9 @@ const (
 
 type TempTask struct {
 	lock *sync.Mutex
-	m    map[reflect.Type][]ComponentOptResult
+	m    map[reflect.Type][]OperateInfo
 	wg   *sync.WaitGroup
-	fn   func() (reflect.Type, []ComponentOptResult)
+	fn   func() (reflect.Type, []OperateInfo)
 }
 
 // OrderSequence extension of system group slice
@@ -130,7 +130,7 @@ func (p *systemFlow) run(delta time.Duration) {
 
 						p.wg.Add(1)
 						wg := p.wg
-						Runtime.AddJob(func() {
+						Runtime.addJob(func() {
 							fn(Event{Delta: delta})
 							wg.Done()
 						})
@@ -146,13 +146,13 @@ func (p *systemFlow) run(delta time.Duration) {
 
 	tasks := p.world.components.GetTempTasks()
 	//Log.Info("temp task count:", len(tasks))
-	newList := map[reflect.Type][]ComponentOptResult{}
+	newList := map[reflect.Type][]OperateInfo{}
 	lock := sync.Mutex{}
 	p.wg.Add(len(tasks))
 	for _, task := range tasks {
 		wg := p.wg
 		fn := task
-		Runtime.AddJob(func() {
+		Runtime.addJob(func() {
 			typ, rn := fn()
 
 			lock.Lock()

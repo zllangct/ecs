@@ -15,7 +15,15 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
-func UniqueID() EntityID {
+func UniqueEntityID() EntityID {
+	return uniqueID()
+}
+
+func UniqueID() int64 {
+	return uniqueID()
+}
+
+func uniqueID() int64 {
 	tNow := int64(time.Now().UnixNano()) << 32
 	tTemp := atomic.LoadInt64(&timestamp)
 	if tTemp != tNow {
