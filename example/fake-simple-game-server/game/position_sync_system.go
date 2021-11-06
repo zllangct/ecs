@@ -4,7 +4,7 @@ import "github.com/zllangct/ecs"
 
 type SyncSystem struct {
 	ecs.System[SyncSystem]
-	logger     ecs.ILogger
+	logger     ecs.Logger
 }
 
 func (m *SyncSystem) Init() {

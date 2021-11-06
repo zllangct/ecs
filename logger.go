@@ -7,7 +7,7 @@ import (
 	"runtime"
 )
 
-type ILogger interface {
+type Logger interface {
 	Info(v ...interface{})
 	Error(v ...interface{})
 	Fatal(v ...interface{})
@@ -17,25 +17,25 @@ type ILogger interface {
 	Fatalf(fmt string, args ...interface{})
 }
 
-type StdLogger struct {
+type StdLog struct {
 	logger *log.Logger
 }
 
-func NewStdLogger() *StdLogger {
-	return &StdLogger{
+func NewStdLog() *StdLog {
+	return &StdLog{
 		logger: log.New(os.Stdout, "", log.Lshortfile),
 	}
 }
 
-func (p StdLogger) Info(v ...interface{}) {
+func (p StdLog) Info(v ...interface{}) {
 	p.logger.Output(2, fmt.Sprint(v...))
 }
 
-func (p StdLogger) Infof(format string, v ...interface{}) {
+func (p StdLog) Infof(format string, v ...interface{}) {
 	p.logger.Output(2, fmt.Sprintf(format, v...))
 }
 
-func (p StdLogger) Error(v ...interface{}) {
+func (p StdLog) Error(v ...interface{}) {
 	buf := make([]byte, 1024)
 	for {
 		n := runtime.Stack(buf, false)
@@ -49,7 +49,7 @@ func (p StdLogger) Error(v ...interface{}) {
 	p.logger.Output(2, s)
 }
 
-func (p StdLogger) Errorf(format string, v ...interface{}) {
+func (p StdLog) Errorf(format string, v ...interface{}) {
 	buf := make([]byte, 1024)
 	for {
 		n := runtime.Stack(buf, false)
@@ -63,12 +63,12 @@ func (p StdLogger) Errorf(format string, v ...interface{}) {
 	p.logger.Output(2, s)
 }
 
-func (p StdLogger) Fatal(v ...interface{}) {
+func (p StdLog) Fatal(v ...interface{}) {
 	p.Error(v...)
 	os.Exit(1)
 }
 
-func (p StdLogger) Fatalf(format string, v ...interface{}) {
+func (p StdLog) Fatalf(format string, v ...interface{}) {
 	p.Errorf(format, v...)
 	os.Exit(1)
 }

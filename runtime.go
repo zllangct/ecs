@@ -7,7 +7,7 @@ import (
 
 var Runtime = newRuntime()
 
-var Log ILogger = NewStdLogger()
+var Log Logger = NewStdLog()
 
 const (
 	StatusInit = iota
@@ -85,7 +85,7 @@ func (r *ecsRuntime) destroyWorld(world *World) {
 }
 
 // SetLogger set logger
-func (r *ecsRuntime) setLogger(logger ILogger) {
+func (r *ecsRuntime) setLogger(logger Logger) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
@@ -97,7 +97,7 @@ func (r *ecsRuntime) setLogger(logger ILogger) {
 	Log = r.config.Logger
 }
 
-func (r *ecsRuntime) logger() ILogger {
+func (r *ecsRuntime) logger() Logger {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 

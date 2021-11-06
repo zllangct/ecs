@@ -57,7 +57,7 @@ type MoveSystemData struct {
 
 type MoveSystem struct {
 	ecs.System[MoveSystem]
-	logger     ecs.ILogger
+	logger     ecs.Logger
 }
 
 func (m *MoveSystem) Init() {

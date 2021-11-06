@@ -1,48 +1,48 @@
 package ecs
 
-type IIterator[T any] interface {
+type Iterator[T any] interface {
 	Begin() *T
 	Val() *T
 	Next() *T
 	End() bool
 }
 
-type Iterator[T any] struct {
+type Iter[T any] struct {
 	c     *Collection[T]
-	size  int
-	index int
-	cur   *T
+	len    int
+	offset int
+	cur    *T
 }
 
-func NewIterator[T any](collection *Collection[T]) IIterator[T] {
-	iter := &Iterator[T]{
-		c:     collection,
-		size:  collection.Len(),
-		index: 0,
-		cur:   &(collection.data[0]),
+func NewIterator[T any](collection *Collection[T]) Iterator[T] {
+	iter := &Iter[T]{
+		c:      collection,
+		len:    collection.Len(),
+		offset: 0,
+		cur:    &(collection.data[0]),
 	}
 	return iter
 }
 
-func (i *Iterator[T]) End() bool {
-	if i.index > i.size-1 || i.size == 0 {
+func (i *Iter[T]) End() bool {
+	if i.offset > i.len-1 || i.len == 0 {
 		return true
 	}
 	return false
 }
 
-func (i *Iterator[T]) Begin() *T {
-	return &(i.c.data[i.index])
+func (i *Iter[T]) Begin() *T {
+	return &(i.c.data[i.offset])
 }
 
-func (i *Iterator[T]) Val() *T {
+func (i *Iter[T]) Val() *T {
 	return i.cur
 }
 
-func (i *Iterator[T]) Next() *T {
-	i.index++
+func (i *Iter[T]) Next() *T {
+	i.offset++
 	if !i.End() {
-		i.cur = &(i.c.data[i.index])
+		i.cur = &(i.c.data[i.offset])
 	}
 	return i.cur
 }
