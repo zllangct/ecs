@@ -159,18 +159,17 @@ func (w *World) GetSystem(sys reflect.Type) (ISystem, bool) {
 }
 
 // AddEntity entity operate : add
-func (w *World) addEntity(entity *Entity) {
+func (w *World) addEntity(entity *EntityInfo) {
 	w.entities.add(entity)
 }
 
-// deleteEntity entity operate : delete
-func (w *World) deleteEntity(entity *Entity) {
-	w.entities.delete(entity)
+func (w *World) getEntityInfo(id Entity) *EntityInfo {
+	return w.entities.getInfo(id)
 }
 
-// deleteEntityByID entity operate : delete
-func (w *World) deleteEntityByID(id int64) {
-	w.entities.deleteByID(id)
+// deleteEntity entity operate : delete
+func (w *World) deleteEntity(info *EntityInfo) {
+	w.entities.delete(info.entity)
 }
 
 func (w *World) getNewComponentsAll() map[reflect.Type][]OperateInfo {
@@ -185,8 +184,8 @@ func (w *World) getComponents(typ reflect.Type) interface{} {
 	return w.components.GetCollection(typ)
 }
 
-func (w *World) NewEntity() *Entity {
-	return newEntity(w)
+func (w *World) NewEntity() *EntityInfo {
+	return newEntityInfo(w)
 }
 
 

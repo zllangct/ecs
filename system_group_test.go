@@ -1,6 +1,7 @@
 package ecs
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -81,7 +82,7 @@ func TestNewSystemGroup(t *testing.T) {
 	for ss := sg.next(); len(ss) > 0; ss = sg.next() {
 		println("========== batch:")
 		for _, s := range ss {
-			s.Emit(1)
+			fmt.Printf("%s\n", ObjectToString(s))
 		}
 	}
 }

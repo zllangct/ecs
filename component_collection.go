@@ -21,12 +21,12 @@ const (
 )
 
 type OperateInfo struct {
-	target *Entity
+	target *EntityInfo
 	com    IComponent
 	op     CollectionOperate
 }
 
-func NewTemplateOperateInfo(entity *Entity, template IComponent, op CollectionOperate) OperateInfo {
+func NewTemplateOperateInfo(entity *EntityInfo, template IComponent, op CollectionOperate) OperateInfo {
 	return OperateInfo{target: entity, com: template, op: op}
 }
 
@@ -68,8 +68,8 @@ func (c *ComponentCollection) resetOptTemp() {
 	}
 }
 
-func (c *ComponentCollection) TempTemplateOperate(entity *Entity, template IComponent, op CollectionOperate) {
-	hash := entity.GetID() & c.base
+func (c *ComponentCollection) TempTemplateOperate(entity *EntityInfo, template IComponent, op CollectionOperate) {
+	hash := entity.hashKey() & c.base
 
 	c.locks[hash].Lock()
 	defer c.locks[hash].Unlock()

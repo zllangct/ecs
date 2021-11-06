@@ -8,13 +8,13 @@ import (
 )
 
 type IComponent interface {
-	Owner() *Entity
+	Owner() *EntityInfo //TODO 切换到 Entity
 	Type() reflect.Type
 	ID() int64
 	Ins() IComponent
 	Template() IComponent
 
-	setOwner(owner *Entity)
+	setOwner(owner *EntityInfo)
 	setID(id int64)
 
 	addToCollection(collection interface{}) IComponent
@@ -25,7 +25,7 @@ type IComponent interface {
 
 type Component[T any] struct {
 	lock      sync.Mutex
-	owner     *Entity
+	owner     *EntityInfo
 	id        int64
 	realType  reflect.Type
 	operation map[string]func() []interface{}
@@ -58,7 +58,7 @@ func (c *Component[T]) NewCollection() interface{} {
 	return NewCollection[T]()
 }
 
-func (c *Component[T]) setOwner(entity *Entity) {
+func (c *Component[T]) setOwner(entity *EntityInfo) {
 	c.owner = entity
 }
 
@@ -83,7 +83,7 @@ func (c *Component[T]) Template() IComponent {
 	return c
 }
 
-func (c *Component[T]) Owner() *Entity {
+func (c *Component[T]) Owner() *EntityInfo {
 	return c.owner
 }
 

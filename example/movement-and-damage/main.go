@@ -98,7 +98,7 @@ func (m *MoveSystem) Update(event ecs.Event) {
 		return
 	}
 
-	d := map[int64]*MoveSystemData{}
+	d := map[ecs.Entity]*MoveSystemData{}
 
 	//聚合方式 1：根据组件的Owner（Entity.GetID）来匹配数据
 	//for iter := ecs.NewIterator(csPosition); !iter.End(); iter.Next() {
@@ -131,7 +131,7 @@ func (m *MoveSystem) Update(event ecs.Event) {
 			continue
 		}
 
-		d[position.Owner().GetID()] = &MoveSystemData{P: position, M: movement}
+		d[position.Owner().Entity()] = &MoveSystemData{P: position, M: movement}
 	}
 
 	/* MoveSystem 主逻辑
@@ -178,7 +178,7 @@ type Caster struct {
 	A *Action
 	F *Force
 	P *Position
-	E *ecs.Entity
+	E *ecs.EntityInfo
 }
 
 type Target struct {
@@ -217,7 +217,7 @@ func (d *DamageSystem) DataMatch() ([]Caster, []Target) {
 		return nil, nil
 	}
 
-	idTemp := map[int64]struct{}{}
+	idTemp := map[ecs.Entity]struct{}{}
 	var casters []Caster
 	iter:= ecs.NewIterator(action)
 	for a := iter.Begin(); !iter.End(); iter.Next() {
@@ -236,7 +236,7 @@ func (d *DamageSystem) DataMatch() ([]Caster, []Target) {
 			F: f,
 			E: caster,
 		})
-		idTemp[caster.GetID()] = struct{}{}
+		idTemp[caster.Entity()] = struct{}{}
 	}
 
 	position := ecs.GetInterestedComponents[Position](d)
@@ -247,7 +247,7 @@ func (d *DamageSystem) DataMatch() ([]Caster, []Target) {
 	pIter := ecs.NewIterator(position)
 	for p := pIter.Begin(); !pIter.End(); pIter.Next() {
 		target := p.Owner()
-		if _, ok := idTemp[target.GetID()]; ok {
+		if _, ok := idTemp[target.Entity()]; ok {
 			continue
 		}
 
@@ -332,7 +332,7 @@ func Runtime0() {
 	ee2 := world.NewEntity()
 	ee3 := world.NewEntity()
 
-	ecs.Log.Info(ee1.GetID(), ee2.GetID(), ee3.GetID())
+	ecs.Log.Info(ee1.Entity(), ee2.Entity(), ee3.Entity())
 
 	p1 := &Position{
 		X: 100,

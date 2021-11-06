@@ -26,14 +26,19 @@ func (f *FakeGame) Run(ctx context.Context) {
 }
 
 func (f *FakeGame) InitEcs() {
-	rt := ecs.Runtime
-	rt.Run()
+	//run your ecs runtime
+	ecs.RuntimeConfigure(ecs.NewDefaultRuntimeConfig())
+	ecs.Run()
 
-	f.world = rt.newWorld(ecs.NewDefaultWorldConfig())
-	f.world.Run()
+	//create a world
+	f.world = ecs.CreateWorld(ecs.NewDefaultWorldConfig())
+	//world.Run() or ecs.WorldRun(world)
+	ecs.WorldRun(f.world)
 
-	f.world.Register(&MoveSystem{})
-	f.world.Register(&SyncSystem{})
+	//register your system
+	// ecs.RegisterSystem[System](world) or world.Register(system)
+	ecs.RegisterSystem[MoveSystem](f.world)
+	ecs.RegisterSystem[SyncSystem](f.world)
 }
 
 func (f *FakeGame) EnterGame(sess *Session) {
@@ -45,7 +50,7 @@ func (f *FakeGame) EnterGame(sess *Session) {
 		Z: 100,
 	})
 
-	sess.EntityId = e.GetID()
+	sess.EntityId = e.hashKey()
 }
 
 func (f *FakeGame) InitNetwork() {
@@ -104,8 +109,8 @@ func (f *FakeGame) Dispatch(pkg interface{}, sess *Session) {
 		}
 
 		v, _ := strconv.Atoi(split[2])
-		s, _ := f.world.GetSystem(ecs.TypeOf[InputSystem]())
-		s.Emit("Change", dir, v)
+		e := ecs.GetEntity(f.world, sess.EntityId)
+		e.Add()
 	}
 }
 

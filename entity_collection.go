@@ -5,7 +5,7 @@ import (
 )
 
 type EntityCollection struct {
-	collection []map[int64]*Entity
+	collection []map[Entity]*EntityInfo
 	base       int64
 	locks      []sync.RWMutex
 }
@@ -20,42 +20,38 @@ func NewEntityCollection(k int) *EntityCollection {
 		}
 	}
 
-	ec.collection = make([]map[int64]*Entity, ec.base+1)
+	ec.collection = make([]map[Entity]*EntityInfo, ec.base+1)
 	ec.locks = make([]sync.RWMutex, ec.base+1)
 	for index := range ec.collection {
-		ec.collection[index] = map[int64]*Entity{}
+		ec.collection[index] = map[Entity]*EntityInfo{}
 		ec.locks[index] = sync.RWMutex{}
 	}
 	return ec
 }
 
-func (p *EntityCollection) get(id int64) *Entity {
-	hash := id & p.base
+func (p *EntityCollection) getInfo(entity Entity) *EntityInfo {
+	hash := int64(entity) & p.base
 
 	p.locks[hash].RLock()
 	defer p.locks[hash].RUnlock()
 
-	return p.collection[hash][id]
+	return p.collection[hash][entity]
 }
 
-func (p *EntityCollection) add(entity *Entity) {
-	hash := entity.id & p.base
+func (p *EntityCollection) add(entity *EntityInfo) {
+	hash := entity.hashKey() & p.base
 
 	p.locks[hash].Lock()
 	defer p.locks[hash].Unlock()
 
-	p.collection[hash][entity.id] = entity
+	p.collection[hash][entity.entity] = entity
 }
 
-func (p *EntityCollection) delete(entity *Entity) {
-	p.deleteByID(entity.id)
-}
-
-func (p *EntityCollection) deleteByID(id int64) {
-	hash := id & p.base
+func (p *EntityCollection) delete(entity Entity) {
+	hash := int64(entity) & p.base
 
 	p.locks[hash].Lock()
 	defer p.locks[hash].Unlock()
 
-	delete(p.collection[hash], id)
+	delete(p.collection[hash], entity)
 }

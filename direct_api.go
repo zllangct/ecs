@@ -50,18 +50,26 @@ func GetSystem[T ISystem](w *World) (ISystem, bool) {
 	return w.GetSystem(TypeOf[T]())
 }
 
-func NewEntity(world *World) *Entity {
-	return newEntity(world)
+func NewEntity(world *World) *EntityInfo {
+	return newEntityInfo(world)
+}
+
+func GetEntity(world *World, entity Entity) *EntityInfo {
+	return world.getEntityInfo(entity)
 }
 
 // entity api
 
-func GetEntityID(entity *Entity) EntityID {
-	return entity.GetID()
+func GetEntityInfo(world *World, entity Entity) *EntityInfo {
+	return world.getEntityInfo(entity)
 }
 
-func EntityDestroy(entity *Entity) {
+func EntityDestroy(entity *EntityInfo) {
 	entity.Destroy()
+}
+
+func AddComponent[T Component[T]](entity *EntityInfo) {
+
 }
 
 // system api
@@ -82,7 +90,7 @@ func GetInterestedComponents[T any](s ISystem) *Collection[T] {
 	return c.(*Collection[T])
 }
 
-func CheckComponent[T any](s ISystem, entity *Entity) *T {
+func CheckComponent[T any](s ISystem, entity *EntityInfo) *T {
 	c := entity.getComponentByType(TypeOf[T]())
 	return (*T)(unsafe.Pointer((*iface)(unsafe.Pointer(&c)).data))
 }

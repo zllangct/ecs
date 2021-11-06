@@ -162,7 +162,7 @@ func (s *System[T]) GetInterestedNew() map[reflect.Type][]OperateInfo {
 	return ls
 }
 
-func (s *System[T]) CheckComponent(entity *Entity, com IComponent) IComponent {
+func (s *System[T]) CheckComponent(entity *EntityInfo, com IComponent) IComponent {
 	isRequire := s.IsRequire(com)
 	if !isRequire {
 		return nil
