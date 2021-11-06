@@ -7,6 +7,7 @@ type Collection[T any] struct {
 	ids  map[int64]int64
 	seq  int64
 	typ  reflect.Type
+	len  int64
 }
 
 func NewCollection[T any]() *Collection[T] {
@@ -31,13 +32,16 @@ func (c *Collection[T]) getID() int64 {
 func (c *Collection[T]) Add(element *T) (int64, *T) {
 	idx := len(c.data)
 	Log.Info("collection Add:", ObjectToString(element))
-	c.data = append(c.data, *element)
+	if int64(len(c.data)) > c.len {
+		c.data[c.len] = *element
+	}else{
+		c.data = append(c.data, *element)
+	}
 	id := c.getID()
 	c.ids[id] = int64(idx)
 	c.ids[int64(-idx)] = -id
 	ret := &(c.data[idx])
-	//ss := (*T)(unsafe.Pointer(ret))
-	//c.data[idx].setID(id)
+	c.len++
 	return id, ret
 }
 
@@ -56,7 +60,21 @@ func (c *Collection[T]) Remove(id int64) {
 	delete(c.ids, int64(l))
 
 	c.data[idx], c.data[l-1] = c.data[l-1], c.data[idx]
-	c.data = c.data[:l-1]
+	//c.data = c.data[:l-1]
+	c.shrink()
+	c.len--
+}
+
+func (c *Collection[T]) shrink() {
+	var threshold int64
+	if len(c.data) < 1024 {
+		threshold = c.len * 2
+	} else {
+		threshold = int64(float64(c.len) * 1.25)
+	}
+	if int64(len(c.data)) > threshold {
+		c.data = c.data[:c.len]
+	}
 }
 
 func (c *Collection[T]) Get(id int64) *T {
@@ -71,7 +89,7 @@ func (c *Collection[T]) Get(id int64) *T {
 }
 
 func (c *Collection[T]) Len() int {
-	return len(c.data)
+	return int(c.len)
 }
 
 func (c *Collection[T]) EleType() reflect.Type {
