@@ -136,9 +136,8 @@ func (p *systemFlow) run(delta time.Duration) {
 						})
 					}
 				}
+				p.wg.Wait()
 			}
-			//waiting for all complete
-			p.wg.Wait()
 		}
 	}
 
