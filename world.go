@@ -31,6 +31,8 @@ type IWorld interface {
 	register(system ISystem)
 	getComponents(typ reflect.Type) interface{}
 	getNewComponents(typ reflect.Type) []OperateInfo
+	getEntityInfo(id Entity) *EntityInfo
+	getSystem(sys reflect.Type) (ISystem, bool)
 	b14d94e462795b8bd42a0bf62ae90826()
 }
 
@@ -171,7 +173,7 @@ func (w *ecsWorld) registerForT(system interface{}, order ...Order) {
 	w.register(system.(ISystem))
 }
 
-func (w *ecsWorld) GetSystem(sys reflect.Type) (ISystem, bool) {
+func (w *ecsWorld) getSystem(sys reflect.Type) (ISystem, bool) {
 	s, ok := w.systems.Load(sys)
 	return s.(ISystem), ok
 }
@@ -206,4 +208,15 @@ func (w *ecsWorld) NewEntity() *EntityInfo {
 	return newEntityInfo(w)
 }
 
+func (w *ecsWorld) addComponent(info *EntityInfo, component IComponent) {
+	w.components.TempTemplateOperate(info, component, CollectionOperateAdd)
+}
+
+func (w *ecsWorld) deleteComponent(info *EntityInfo, component IComponent) {
+	w.components.TempTemplateOperate(info, component, CollectionOperateDelete)
+}
+
+func (w *ecsWorld) AddFreeComponent(component IComponent) {
+	w.addComponent(nil, component)
+}
 

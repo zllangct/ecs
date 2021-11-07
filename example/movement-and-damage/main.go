@@ -323,9 +323,6 @@ func Runtime0() {
 	// 注册系统
 	ecs.RegisterSystem[MoveSystem](world)
 
-	a := &ecs.TestA[int]{}
-	_=a
-
 	// 创建实体并添加组件
 	ee1 := world.NewEntity()
 	ee2 := world.NewEntity()

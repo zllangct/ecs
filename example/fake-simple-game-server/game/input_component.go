@@ -3,7 +3,7 @@ package game
 import "github.com/zllangct/ecs"
 
 type MoveChange struct {
-	ecs.Component[MoveChange]
+	ecs.DisposableComponent[MoveChange]
 	V   int
 	Dir []int
 }

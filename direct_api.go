@@ -47,11 +47,11 @@ func RegisterSystem[T ISystemTemplate](world IWorld, order ...Order) {
 }
 
 func GetSystem[T ISystem](w IWorld) (ISystem, bool) {
-	return w.(*ecsWorld).GetSystem(TypeOf[T]())
+	return w.getSystem(TypeOf[T]())
 }
 
 func GetEntityInfo(world IWorld, entity Entity) *EntityInfo {
-	return world.(*ecsWorld).getEntityInfo(entity)
+	return world.getEntityInfo(entity)
 }
 
 // entity api
@@ -60,12 +60,15 @@ func NewEntity(world IWorld) *EntityInfo {
 	return newEntityInfo(world.(*ecsWorld))
 }
 
-func EntityDestroy(entity *EntityInfo) {
-	entity.Destroy()
+func EntityDestroyByInfo(info *EntityInfo) {
+	info.Destroy()
 }
 
-func AddComponent[T Component[T]](entity *EntityInfo) {
-
+func EntityDestroy(world IWorld, entity Entity) {
+	info := world.getEntityInfo(entity)
+	if info != nil {
+		info.Destroy()
+	}
 }
 
 // system api

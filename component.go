@@ -14,38 +14,78 @@ type IComponent interface {
 
 	setOwner(owner *EntityInfo)
 	setID(id int64)
+	setState(state ComponentState)
+	getState() ComponentState
+	getComponentType() ComponentType
+	//init()
 
-	ins() IComponent
+	instance() IComponent
 	newCollection() interface{}
 	addToCollection(collection interface{}) IComponent
 	deleteFromCollection(collection interface{})
 }
 
 const (
-	h4 = uint8(240)
-	l4 = uint8(15)
+	h4   = uint8(240)
+	l4   = uint8(15)
 	zero = uint8(0)
 )
 
 type ComponentState uint8
+
 const (
-	ComponentInvalid ComponentState = iota
-	ComponentActive
+	ComponentStateInvalid ComponentState = iota
+	ComponentStateActive
+	ComponentStateDisable
 )
 
 type ComponentType uint8
+
 const (
-	ComponentTypeNormal ComponentState = iota
-	ComponentTypeOnce
+	ComponentTypeNormal ComponentType = iota
+	ComponentTypeDisposable
 	ComponentTypeFree
-	ComponentTypeFreeAndOnce
+	ComponentTypeFreeDisposable
 )
 
+type FreeComponent[T any] struct {
+	Component[T]
+}
+
+func (f *FreeComponent[T]) getComponentType() ComponentType{
+	return ComponentTypeFree
+}
+
+type DisposableComponent[T any] struct {
+	Component[T]
+}
+
+func (f *DisposableComponent[T]) getComponentType() ComponentType {
+	return ComponentTypeDisposable
+}
+
+type FreeDisposableComponent[T any] struct {
+	Component[T]
+}
+
+func (f *FreeDisposableComponent[T]) getComponentType() ComponentType {
+	return ComponentTypeFreeDisposable
+}
+
 type Component[T any] struct {
-	owner     *EntityInfo
-	id        int64
-	realType  reflect.Type
-	st     	  uint8
+	owner    *EntityInfo
+	id       int64
+	realType reflect.Type
+	st       uint8
+}
+
+func (c *Component[T]) init() {
+	c.setType(c.getComponentType())
+	c.setState(ComponentStateInvalid)
+}
+
+func (c *Component[T]) getComponentType() ComponentType{
+	return ComponentTypeNormal
 }
 
 func (c *Component[T]) addToCollection(collection interface{}) IComponent {
@@ -54,8 +94,9 @@ func (c *Component[T]) addToCollection(collection interface{}) IComponent {
 		Log.Info("add to collection, collecion is nil")
 		return nil
 	}
-	id, ins := cc.Add(c.RawIns())
+	id, ins := cc.Add(c.rawInstance())
 	c.setID(id)
+	c.setState(ComponentStateActive)
 	var com IComponent
 	(*iface)(unsafe.Pointer(&com)).data = unsafe.Pointer(ins)
 	return com
@@ -68,6 +109,7 @@ func (c *Component[T]) deleteFromCollection(collection interface{}) {
 		return
 	}
 	cc.Remove(c.ID())
+	c.setState(ComponentStateDisable)
 	return
 }
 
@@ -87,11 +129,11 @@ func (c *Component[T]) ID() int64 {
 	return c.id
 }
 
-func (c *Component[T]) RawIns() *T {
+func (c *Component[T]) rawInstance() *T {
 	return (*T)(unsafe.Pointer(c))
 }
 
-func (c *Component[T]) ins() (com IComponent) {
+func (c *Component[T]) instance() (com IComponent) {
 	(*iface)(unsafe.Pointer(&com)).data = unsafe.Pointer(c)
 	return
 }
@@ -113,11 +155,11 @@ func (c *Component[T]) getType() ComponentType {
 }
 
 func (c *Component[T]) Invalidate() {
-	c.setState(ComponentInvalid)
+	c.setState(ComponentStateDisable)
 }
 
 func (c *Component[T]) Active() {
-	c.setState(ComponentActive)
+	c.setState(ComponentStateActive)
 }
 
 func (c *Component[T]) Remove() {
@@ -143,5 +185,5 @@ func (c *Component[T]) Type() reflect.Type {
 }
 
 func (c *Component[T]) String() string {
-	return fmt.Sprintf("%+v", c.RawIns())
+	return fmt.Sprintf("%+v", c.rawInstance())
 }

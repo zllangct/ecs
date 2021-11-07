@@ -104,17 +104,21 @@ func (e *EntityInfo) Remove(components ...IComponent) {
 			Log.Error(errors.New("repeat component:" + typ.Name()))
 			continue
 		}
-		e.world.components.TempTemplateOperate(e, c.Template(), CollectionOperateDelete)
+		e.world.deleteComponent(e, c)
 	}
 }
 
 func (e *EntityInfo) addComponent(com IComponent) error {
+	switch com.getComponentType() {
+	case ComponentTypeFree, ComponentTypeFreeDisposable:
+		return errors.New("this type of component can not add to entity")
+	}
 	com.setOwner(e)
 	if e.has(com) {
 		return fmt.Errorf("repeated component: %s", com.Type().Name())
 	}
 	e.adding[com.Type()] = Empty
-	e.world.components.TempTemplateOperate(e, com.Template(), CollectionOperateAdd)
+	e.world.addComponent(e, com)
 	return nil
 }
 

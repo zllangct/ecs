@@ -23,10 +23,4 @@ func (is *InputSystem) PreUpdate(event ecs.Event) {
 	}
 }
 
-func (is *InputSystem) PostUpdate(event ecs.Event) {
-	iterMC := ecs.GetInterestedComponents[MoveChange](is)
-	for mc:=iterMC.Begin(); !iterMC.End(); iterMC.Next() {
-		mc.Invalidate()
-	}
-}
 

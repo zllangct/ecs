@@ -3,6 +3,7 @@ package ecs
 import (
 	"reflect"
 	"sync"
+	"unsafe"
 )
 
 type CollectionOperate uint8
@@ -11,13 +12,6 @@ const (
 	CollectionOperateNone   CollectionOperate = iota
 	CollectionOperateAdd                      //add component operation
 	CollectionOperateDelete                   //delete component operation
-)
-
-type ComponentOperate = CollectionOperate
-
-const (
-	ComponentOperateAdd    = CollectionOperateAdd    //add component operation
-	ComponentOperateDelete = CollectionOperateDelete //delete component operation
 )
 
 type OperateInfo struct {
@@ -37,6 +31,7 @@ type ComponentCollection struct {
 	locks   []sync.RWMutex
 	optTemp []map[reflect.Type][]OperateInfo
 	componentsNew map[reflect.Type][]OperateInfo
+	once    []map[reflect.Type]struct{}
 }
 
 func NewComponentCollection(k int) *ComponentCollection {
@@ -57,8 +52,11 @@ func NewComponentCollection(k int) *ComponentCollection {
 	}
 	cc.optTemp = make([]map[reflect.Type][]OperateInfo, cc.bucket+1)
 	cc.resetOptTemp()
+	cc.once = make([]map[reflect.Type]struct{}, cc.bucket+1)
+	cc.resetOnce()
 
 	cc.componentsNew = make(map[reflect.Type][]OperateInfo)
+
 	return cc
 }
 
@@ -70,13 +68,45 @@ func (c *ComponentCollection) resetOptTemp() {
 	}
 }
 
-func (c *ComponentCollection) TempTemplateOperate(entity *EntityInfo, template IComponent, op CollectionOperate) {
-	hash := entity.hashKey() & c.bucket
+func (c *ComponentCollection) resetOnce() {
+	for index := range c.once {
+		c.locks[index].Lock()
+		c.once[index] = make(map[reflect.Type]struct{})
+		c.locks[index].Unlock()
+	}
+}
 
-	typ := template.Type()
-	newOpt := NewTemplateOperateInfo(entity, template, op)
+func (c *ComponentCollection) TempTemplateOperate(entity *EntityInfo, component IComponent, op CollectionOperate) {
+	var hash int64
+	var isOnce bool
+	switch component.getComponentType() {
+	case ComponentTypeFree:
+		hash = int64((uintptr)(unsafe.Pointer(&hash))) & c.bucket
+		isOnce = false
+	case ComponentTypeFreeDisposable:
+		hash = int64((uintptr)(unsafe.Pointer(&hash))) & c.bucket
+		isOnce = true
+	case ComponentTypeNormal:
+		if entity == nil {
+			Log.Errorf("invalid operate, entity is nil")
+			return
+		}
+		hash = entity.hashKey() & c.bucket
+		isOnce = false
+	case ComponentTypeDisposable:
+		if entity == nil {
+			Log.Errorf("invalid operate, entity is nil")
+			return
+		}
+		hash = entity.hashKey() & c.bucket
+		isOnce = true
+	}
+
+	typ := component.Type()
+	newOpt := NewTemplateOperateInfo(entity, component, op)
 
 	b := c.optTemp[hash]
+	o := c.once[hash]
 
 	c.locks[hash].Lock()
 	defer c.locks[hash].Unlock()
@@ -85,6 +115,23 @@ func (c *ComponentCollection) TempTemplateOperate(entity *EntityInfo, template I
 		b[typ] = append(b[typ], newOpt)
 	} else {
 		b[typ] = []OperateInfo{newOpt}
+	}
+
+	if isOnce {
+		if _, ok := o[typ]; !ok {
+			o[typ] = Empty
+		}
+	}
+}
+
+func (c *ComponentCollection) ClearDisposable() {
+	for index := range c.once {
+		c.locks[index].Lock()
+		m :=c.once[index]
+		for typ, _ := range m {
+			c.RemoveAllByType(typ)
+		}
+		c.locks[index].Unlock()
 	}
 }
 
@@ -124,12 +171,18 @@ func (c *ComponentCollection) GetTempTasks() []func() (reflect.Type, []OperateIn
 				switch operate.op {
 				case CollectionOperateAdd:
 					ret := operate.com.addToCollection(collection)
-					operate.target.componentAdded(t, ret)
+					switch operate.com.getComponentType() {
+					case ComponentTypeNormal, ComponentTypeDisposable:
+						operate.target.componentAdded(t, ret)
+					}
 					operate.com = ret
 					n = append(n, operate)
 				case CollectionOperateDelete:
-					operate.com.addToCollection(collection)
-					operate.target.componentDeleted(t, operate.com)
+					operate.com.deleteFromCollection(collection)
+					switch operate.com.getComponentType() {
+					case ComponentTypeNormal, ComponentTypeDisposable:
+						operate.target.componentDeleted(t, operate.com)
+					}
 					n = append(n, operate)
 				}
 			}
@@ -155,4 +208,8 @@ func (c *ComponentCollection) GetNewComponents(typ reflect.Type) []OperateInfo {
 
 func (c *ComponentCollection) GetCollection(typ reflect.Type) interface{} {
 	return c.collections[typ]
+}
+
+func (c *ComponentCollection) RemoveAllByType(typ reflect.Type) {
+	delete(c.collections,typ)
 }

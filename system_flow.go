@@ -7,15 +7,11 @@ import (
 )
 
 const (
-	PeriodPreStart Period = iota
-	PeriodStart
-	PeriodPostStart
+	PeriodStart Period = iota
 	PeriodPreUpdate
 	PeriodUpdate
 	PeriodPostUpdate
-	PeriodPreDestroy
 	PeriodDestroy
-	PeriodPostDestroy
 )
 
 // Period system execute period:start->pre_update->update->pre_destroy->destroy
@@ -47,7 +43,7 @@ type systemFlow struct {
 	world        *ecsWorld
 	systemPeriod map[Period]OrderSequence
 	periodList   []Period
-	wg           *sync.WaitGroup
+	wg            *sync.WaitGroup
 }
 
 func newSystemFlow(runtime *ecsWorld) *systemFlow {
@@ -62,15 +58,11 @@ func newSystemFlow(runtime *ecsWorld) *systemFlow {
 //initialize the system flow
 func (p *systemFlow) init() {
 	p.periodList = []Period{
-		PeriodPreStart,
 		PeriodStart,
-		PeriodPostStart,
 		PeriodPreUpdate,
 		PeriodUpdate,
 		PeriodPostUpdate,
-		PeriodPreDestroy,
 		PeriodDestroy,
-		PeriodPostDestroy,
 	}
 	p.systemPeriod = make(map[Period]OrderSequence)
 	for _, value := range p.periodList {
@@ -92,45 +84,41 @@ func (p *systemFlow) run(delta time.Duration) {
 			for ss := sl.next(); len(ss) > 0; ss = sl.next() {
 				if systemCount := len(ss); systemCount != 0 {
 					for i := 0; i < systemCount; i++ {
+						sys := ss[i]
 						imp := false
 						var fn func(event Event)
-						switch period {
-						case PeriodPreStart:
-							system, ok := ss[i].(IEventPreStart)
-							fn = system.PreStart
-							imp = ok
-						case PeriodStart:
-							system, ok := ss[i].(IEventStart)
-							fn = system.Start
-							imp = ok
-						case PeriodPostStart:
-							system, ok := ss[i].(IEventPostStart)
-							fn = system.PostStart
-							imp = ok
-						case PeriodPreUpdate:
-							system, ok := ss[i].(IEventPreUpdate)
-							fn = system.PreUpdate
-							imp = ok
-						case PeriodUpdate:
-							system, ok := ss[i].(IEventUpdate)
-							fn = system.Update
-							imp = ok
-						case PeriodPostUpdate:
-							system, ok := ss[i].(IEventPostUpdate)
-							fn = system.PostUpdate
-							imp = ok
-						case PeriodPreDestroy:
-							system, ok := ss[i].(IEventPreDestroy)
-							fn = system.PreDestroy
-							imp = ok
-						case PeriodDestroy:
-							system, ok := ss[i].(IEventDestroy)
-							fn = system.Destroy
-							imp = ok
-						case PeriodPostDestroy:
-							system, ok := ss[i].(IEventPostDestroy)
-							fn = system.PostDestroy
-							imp = ok
+						state := ss[i].getState()
+						if state == SystemStateInit {
+							switch period {
+							case PeriodStart:
+								system, ok := ss[i].(IEventStart)
+								fn = system.Start
+								imp = ok
+							}
+							sys.setState(SystemStateUpdate)
+						} else if state == SystemStateUpdate {
+							switch period {
+							case PeriodPreUpdate:
+								system, ok := sys.(IEventPreUpdate)
+								fn = system.PreUpdate
+								imp = ok
+							case PeriodUpdate:
+								system, ok := ss[i].(IEventUpdate)
+								fn = system.Update
+								imp = ok
+							case PeriodPostUpdate:
+								system, ok := ss[i].(IEventPostUpdate)
+								fn = system.PostUpdate
+								imp = ok
+							}
+						} else if state == SystemStateDestroy {
+							switch period {
+							case PeriodDestroy:
+								system, ok := ss[i].(IEventDestroy)
+								fn = system.Destroy
+								imp = ok
+								sys.setState(SystemStateInvalid)
+							}
 						}
 
 						if !imp {
@@ -175,6 +163,8 @@ func (p *systemFlow) run(delta time.Duration) {
 
 	p.wg.Wait()
 
+	p.world.components.ClearDisposable()
+
 	tasks := p.world.components.GetTempTasks()
 	//Log.Info("temp task count:", len(tasks))
 	newList := map[reflect.Type][]OperateInfo{}
@@ -215,24 +205,16 @@ func (p *systemFlow) register(system ISystem) {
 	for _, period := range p.periodList {
 		imp := false
 		switch period {
-		case PeriodPreStart:
-			_, imp = system.(IEventPreStart)
 		case PeriodStart:
 			_, imp = system.(IEventStart)
-		case PeriodPostStart:
-			_, imp = system.(IEventPostStart)
 		case PeriodPreUpdate:
 			_, imp = system.(IEventPreUpdate)
 		case PeriodUpdate:
 			_, imp = system.(IEventUpdate)
 		case PeriodPostUpdate:
 			_, imp = system.(IEventPostUpdate)
-		case PeriodPreDestroy:
-			_, imp = system.(IEventPreDestroy)
 		case PeriodDestroy:
 			_, imp = system.(IEventDestroy)
-		case PeriodPostDestroy:
-			_, imp = system.(IEventPostDestroy)
 		}
 
 		if !imp {

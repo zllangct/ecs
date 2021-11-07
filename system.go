@@ -7,7 +7,15 @@ import (
 	"unsafe"
 )
 
-type SystemLifeCircleType int
+type SystemState uint8
+const (
+	SystemStateInvalid SystemState = iota
+	SystemStateInit
+	SystemStateStart
+	SystemStatePause
+	SystemStateUpdate
+	SystemStateDestroy
+)
 
 type ISystem interface {
 	Type() reflect.Type
@@ -22,6 +30,8 @@ type ISystem interface {
 	setOrder(order Order)
 	setRequirements(rqs ...IComponent)
 	setRequirementsByType(rqs ...reflect.Type)
+	getState() SystemState
+	setState(state SystemState)
 	checkComponent(entity *EntityInfo, com IComponent) IComponent
 	baseInit(world *ecsWorld, ins ISystem)
 	eventDispatch()
@@ -39,22 +49,8 @@ type System[T any] struct {
 	order        Order
 	world        *ecsWorld
 	realType     reflect.Type
-	isInited     bool
+	state     	 SystemState
 }
-
-type ITest interface {
-	Test()
-}
-
-type TestA[T any] struct {
-	base testA[T]
-}
-
-type testA[T any] struct {
-
-}
-
-func (t *testA[T]) Test() {}
 
 func (s System[T]) d074634084a1556083fcd17c0254b557() {}
 
@@ -68,6 +64,9 @@ func (s *System[T]) RawIns() *T {
 }
 
 func (s *System[T]) EventRegister(event string, fn SysEventHandler) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	s.events[event] = fn
 }
 
@@ -106,8 +105,12 @@ func (s *System[T]) SetRequirements(rqs ...IComponent) {
 	s.setRequirements(rqs...)
 }
 
+func (s *System[T]) isInitialized() bool {
+	return s.state >= SystemStateInit
+}
+
 func (s *System[T]) setRequirements(rqs ...IComponent) {
-	if s.isInited {
+	if s.isInitialized() {
 		return
 	}
 	if s.requirements == nil {
@@ -118,8 +121,26 @@ func (s *System[T]) setRequirements(rqs ...IComponent) {
 	}
 }
 
+func (s *System[T]) Pause(e ...interface{}) {
+	if s.getState() == SystemStateUpdate {
+		s.setState(SystemStatePause)
+	}
+}
+
+func (s *System[T]) Resume(e ...interface{}){
+	s.setState(SystemStateUpdate)
+}
+
+func (s *System[T]) getState() SystemState {
+	return s.state
+}
+
+func (s *System[T]) setState(state SystemState) {
+	s.state = state
+}
+
 func (s *System[T]) setRequirementsByType(rqs ...reflect.Type) {
-	if s.isInited {
+	if s.isInitialized() {
 		return
 	}
 	if s.requirements == nil {
@@ -152,11 +173,14 @@ func (s *System[T]) baseInit(world *ecsWorld, ins ISystem) {
 	}
 	s.world = world
 
+	//TODO a bug of golang, internal compiler error: mismatched
+	//s.EventRegister("Pause", s.Pause)
+
 	if i, ok := ins.(IEventInit); ok {
 		i.Init()
 	}
 
-	s.isInited = true
+	s.state = SystemStateInit
 }
 
 func (s *System[T]) Type() reflect.Type {
@@ -167,7 +191,7 @@ func (s *System[T]) Type() reflect.Type {
 }
 
 func (s *System[T]) setOrder(order Order) {
-	if s.isInited {
+	if s.isInitialized() {
 		return
 	}
 
