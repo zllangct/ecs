@@ -12,7 +12,6 @@ type MoveSystemData struct {
 type MoveSystem struct {
 	ecs.System[MoveSystem]
 	timeScale  float64
-	logger     ecs.Logger
 }
 
 func (m *MoveSystem) Init() {
@@ -21,6 +20,7 @@ func (m *MoveSystem) Init() {
 }
 
 func (m *MoveSystem) UpdateTimeScale(timeScale ...interface{}) {
+	ecs.Log.Infof("time scale change to %+v", timeScale)
 	m.timeScale = timeScale[0].(float64)
 }
 

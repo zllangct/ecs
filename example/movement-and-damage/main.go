@@ -80,46 +80,46 @@ func (m *MoveSystem) Update(event ecs.Event) {
 
 	//获取系统所需的组件
 	//方式 1:
-	//csPosition := m.GetInterested(ecs.GetType[Position]()).(*ecs.Collection[Position])
+	//iterPos := m.GetInterested(ecs.GetType[Position]()).(*ecs.Collection[Position])
 	//方式 2:
-	//csPosition := ecs.GetInterestedComponents[Position](m)
+	//iterPos := ecs.GetInterestedComponents[Position](m)
 
 	/* 聚合数据
 	    - 移动系统关心的是Position、Movement两个组件，Position包含位置数据，Movement中包含速度、方向数据，
 	  我们可以知道Position和Movement应该是同一个实体的两组件配合使用，组件的配对，在数据聚合阶段完成，可知，
 	  当两组件拥有相同的Owner时，完成匹配。
 	*/
-	csPosition := ecs.GetInterestedComponents[Position](m)
-	if csPosition == nil {
+	iterPos := ecs.GetInterestedComponents[Position](m)
+	if iterPos == nil {
 		return
 	}
-	csMovement := ecs.GetInterestedComponents[Movement](m)
-	if csMovement == nil {
+	iterMov := ecs.GetInterestedComponents[Movement](m)
+	if iterMov == nil {
 		return
 	}
 
 	d := map[ecs.Entity]*MoveSystemData{}
 
-	//聚合方式 1：根据组件的Owner（Entity.GetID）来匹配数据
-	//for iter := ecs.NewIterator(csPosition); !iter.End(); iter.Next() {
+	//聚合方式 1：根据组件的Owner（EntityInfo.Entity）来匹配数据
+	//for iter := iterPos; !iter.End(); iter.Next() {
 	//	c := iter.Val()
-	//	if cd, ok := d[c.Owner().GetID()]; ok {
+	//	if cd, ok := d[c.Owner().Entity()]; ok {
 	//		cd.P = c
 	//	}else {
-	//		d[c.Owner().GetID()] = &MoveSystemData{P: c}
+	//		d[c.Owner().Entity()] = &MoveSystemData{P: c}
 	//	}
 	//}
-	//for iter := ecs.NewIterator(csMovement); !iter.End(); iter.Next() {
+	//for iter := iterMov; !iter.End(); iter.Next() {
 	//	c := iter.Val()
-	//	if cd, ok := d[c.Owner().GetID()]; ok {
+	//	if cd, ok := d[c.Owner().Entity()]; ok {
 	//		cd.M = c
 	//	}else{
-	//		d[c.Owner().GetID()] = &MoveSystemData{M: c}
+	//		d[c.Owner().Entity()] = &MoveSystemData{M: c}
 	//	}
 	//}
 
 	//聚合方式 2：直接从Entity聚合相关组件
-	for iter := ecs.NewIterator(csPosition); !iter.End(); iter.Next() {
+	for iter := iterPos; !iter.End(); iter.Next() {
 		position := iter.Val()
 		owner := position.Owner()
 		/*
@@ -212,15 +212,14 @@ func (d *DamageSystem) Filter() []ecs.OperateInfo{
 }
 
 func (d *DamageSystem) DataMatch() ([]Caster, []Target) {
-	action := ecs.GetInterestedComponents[Action](d)
-	if action == nil {
+	iterAction := ecs.GetInterestedComponents[Action](d)
+	if iterAction == nil {
 		return nil, nil
 	}
 
 	idTemp := map[ecs.Entity]struct{}{}
 	var casters []Caster
-	iter:= ecs.NewIterator(action)
-	for a := iter.Begin(); !iter.End(); iter.Next() {
+	for a := iterAction.Begin(); !iterAction.End(); iterAction.Next() {
 		caster := a.Owner()
 		p := ecs.CheckComponent[Position](d, caster)
 		if p == nil {
@@ -239,13 +238,12 @@ func (d *DamageSystem) DataMatch() ([]Caster, []Target) {
 		idTemp[caster.Entity()] = struct{}{}
 	}
 
-	position := ecs.GetInterestedComponents[Position](d)
-	if position == nil {
+	iterPos := ecs.GetInterestedComponents[Position](d)
+	if iterPos == nil {
 		return nil, nil
 	}
 	var targets []Target
-	pIter := ecs.NewIterator(position)
-	for p := pIter.Begin(); !pIter.End(); pIter.Next() {
+	for p := iterPos.Begin(); !iterPos.End(); iterPos.Next() {
 		target := p.Owner()
 		if _, ok := idTemp[target.Entity()]; ok {
 			continue
@@ -323,9 +321,10 @@ func Runtime0() {
 	world.Run()
 
 	// 注册系统
-	//world.Register(&MoveSystem{})
 	ecs.RegisterSystem[MoveSystem](world)
 
+	a := &ecs.TestA[int]{}
+	_=a
 
 	// 创建实体并添加组件
 	ee1 := world.NewEntity()

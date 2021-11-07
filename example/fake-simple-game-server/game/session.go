@@ -1,9 +1,12 @@
 package game
 
-import "test_ecs/network"
+import (
+	"github.com/zllangct/ecs"
+	"test_ecs/network"
+)
 
 type Session struct {
 	SessionID int
 	Conn      *network.TcpConn
-	EntityId  int64
+	Entity  ecs.Entity
 }

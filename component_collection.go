@@ -33,9 +33,9 @@ func NewTemplateOperateInfo(entity *EntityInfo, template IComponent, op Collecti
 type ComponentCollection struct {
 	collections map[reflect.Type]interface{}
 	//new component cache
-	locks         []sync.Mutex
-	base          int64
-	optTemp       []map[reflect.Type][]OperateInfo
+	bucket  int64
+	locks   []sync.RWMutex
+	optTemp []map[reflect.Type][]OperateInfo
 	componentsNew map[reflect.Type][]OperateInfo
 }
 
@@ -46,16 +46,16 @@ func NewComponentCollection(k int) *ComponentCollection {
 
 	for i := 1; ; i++ {
 		if c := int64(1 << i); int64(k) < c {
-			cc.base = c - 1
+			cc.bucket = c - 1
 			break
 		}
 	}
 
-	cc.locks = make([]sync.Mutex, cc.base+1)
-	for i := int64(0); i < cc.base+1; i++ {
-		cc.locks[i] = sync.Mutex{}
+	cc.locks = make([]sync.RWMutex, cc.bucket+1)
+	for i := int64(0); i < cc.bucket+1; i++ {
+		cc.locks[i] = sync.RWMutex{}
 	}
-	cc.optTemp = make([]map[reflect.Type][]OperateInfo, cc.base+1)
+	cc.optTemp = make([]map[reflect.Type][]OperateInfo, cc.bucket+1)
 	cc.resetOptTemp()
 
 	cc.componentsNew = make(map[reflect.Type][]OperateInfo)
@@ -64,19 +64,23 @@ func NewComponentCollection(k int) *ComponentCollection {
 
 func (c *ComponentCollection) resetOptTemp() {
 	for index := range c.optTemp {
+		c.locks[index].Lock()
 		c.optTemp[index] = make(map[reflect.Type][]OperateInfo)
+		c.locks[index].Unlock()
 	}
 }
 
 func (c *ComponentCollection) TempTemplateOperate(entity *EntityInfo, template IComponent, op CollectionOperate) {
-	hash := entity.hashKey() & c.base
+	hash := entity.hashKey() & c.bucket
+
+	typ := template.Type()
+	newOpt := NewTemplateOperateInfo(entity, template, op)
+
+	b := c.optTemp[hash]
 
 	c.locks[hash].Lock()
 	defer c.locks[hash].Unlock()
 
-	typ := template.Type()
-	newOpt := NewTemplateOperateInfo(entity, template, op)
-	b := c.optTemp[hash]
 	if _, ok := b[typ]; ok {
 		b[typ] = append(b[typ], newOpt)
 	} else {
@@ -88,6 +92,7 @@ func (c *ComponentCollection) GetTempTasks() []func() (reflect.Type, []OperateIn
 	combination := make(map[reflect.Type][]OperateInfo)
 
 	for i := 0; i < len(c.optTemp); i++ {
+		c.locks[i].RLock()
 		for typ, op := range c.optTemp[i] {
 			if len(op) == 0 {
 				continue
@@ -98,6 +103,7 @@ func (c *ComponentCollection) GetTempTasks() []func() (reflect.Type, []OperateIn
 				combination[typ] = op
 			}
 		}
+		c.locks[i].RUnlock()
 	}
 
 	var tasks []func() (reflect.Type, []OperateInfo)
@@ -106,7 +112,7 @@ func (c *ComponentCollection) GetTempTasks() []func() (reflect.Type, []OperateIn
 		oopList := opList
 		collection, ok := c.collections[typTemp]
 		if !ok {
-			c.collections[typTemp] = oopList[0].com.NewCollection()
+			c.collections[typTemp] = oopList[0].com.newCollection()
 			collection = c.collections[typTemp]
 		}
 

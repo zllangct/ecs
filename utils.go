@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+var Empty struct{} = struct{}{}
+
 var seq uint32
 var timestamp int64
 

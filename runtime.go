@@ -28,7 +28,7 @@ type ecsRuntime struct {
 	//world worker pool
 	workPool *Pool
 	//world collections
-	world []*World
+	world []*ecsWorld
 
 	isInited bool
 	rtStop   chan struct{}
@@ -56,7 +56,7 @@ func (r *ecsRuntime) Configure(config *RuntimeConfig) {
 	r.isInited = true
 }
 
-func (r *ecsRuntime) newWorld(config *WorldConfig) *World {
+func (r *ecsRuntime) newWorld(config *WorldConfig) *ecsWorld {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
@@ -70,7 +70,7 @@ func (r *ecsRuntime) newWorld(config *WorldConfig) *World {
 	return world
 }
 
-func (r *ecsRuntime) destroyWorld(world *World) {
+func (r *ecsRuntime) destroyWorld(world *ecsWorld) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 

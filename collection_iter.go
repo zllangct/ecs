@@ -32,7 +32,7 @@ func (i *Iter[T]) End() bool {
 }
 
 func (i *Iter[T]) Begin() *T {
-	return &(i.c.data[i.offset])
+	return i.cur
 }
 
 func (i *Iter[T]) Val() *T {

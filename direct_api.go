@@ -16,12 +16,12 @@ func Stop() {
 	Runtime.stop()
 }
 
-func CreateWorld(config *WorldConfig) *World {
+func CreateWorld(config *WorldConfig) IWorld {
 	return Runtime.newWorld(config)
 }
 
-func DestroyWorld(world *World) {
-	Runtime.destroyWorld(world)
+func DestroyWorld(world IWorld) {
+	Runtime.destroyWorld(world.(*ecsWorld))
 }
 
 func AddJob(job func(), hashKey ...uint32) {
@@ -30,38 +30,34 @@ func AddJob(job func(), hashKey ...uint32) {
 
 // world api
 
-func WorldRun(world *World) {
+func WorldRun(world IWorld) {
 	world.Run()
 }
 
-func GetWorldID(world *World) int64 {
+func GetWorldID(world IWorld) int64 {
 	return world.GetID()
 }
 
-func GetWorldStatus(world *World) WorldStatus {
+func GetWorldStatus(world IWorld) WorldStatus {
 	return world.GetStatus()
 }
 
-func RegisterSystem[T ISystemTemplate](world *World) {
-	world.registerForT(new(T))
+func RegisterSystem[T ISystemTemplate](world IWorld, order ...Order) {
+	world.(*ecsWorld).registerForT(new(T), order...)
 }
 
-func GetSystem[T ISystem](w *World) (ISystem, bool) {
-	return w.GetSystem(TypeOf[T]())
+func GetSystem[T ISystem](w IWorld) (ISystem, bool) {
+	return w.(*ecsWorld).GetSystem(TypeOf[T]())
 }
 
-func NewEntity(world *World) *EntityInfo {
-	return newEntityInfo(world)
-}
-
-func GetEntity(world *World, entity Entity) *EntityInfo {
-	return world.getEntityInfo(entity)
+func GetEntityInfo(world IWorld, entity Entity) *EntityInfo {
+	return world.(*ecsWorld).getEntityInfo(entity)
 }
 
 // entity api
 
-func GetEntityInfo(world *World, entity Entity) *EntityInfo {
-	return world.getEntityInfo(entity)
+func NewEntity(world IWorld) *EntityInfo {
+	return newEntityInfo(world.(*ecsWorld))
 }
 
 func EntityDestroy(entity *EntityInfo) {
@@ -74,24 +70,33 @@ func AddComponent[T Component[T]](entity *EntityInfo) {
 
 // system api
 
-func GetInterestedComponents[T any](s ISystem) *Collection[T] {
+func AddRequireComponent[T IComponent](sys ISystem) {
+	sys.setRequirementsByType(TypeOf[T]())
+}
+
+func GetInterestedComponents[T any](sys ISystem) Iterator[T] {
 	typ := GetType[T]()
-	if _, ok := s.Requirements()[typ]; !ok {
+	if _, ok := sys.Requirements()[typ]; !ok {
 		Log.Error("not require, typ:", typ)
 		return nil
 	}
-	if s.World() == nil {
+	if sys.World() == nil {
 		Log.Error("world is nil")
 	}
-	c := s.World().getComponents(typ)
+	c := sys.World().getComponents(typ)
 	if c == nil {
 		return nil
 	}
-	return c.(*Collection[T])
+	return NewIterator(c.(*Collection[T]))
 }
 
-func CheckComponent[T any](s ISystem, entity *EntityInfo) *T {
-	c := entity.getComponentByType(TypeOf[T]())
+func CheckComponent[T any](sys ISystem, entity *EntityInfo) *T {
+	typ := TypeOf[T]()
+	isRequire := sys.isRequire(typ)
+	if !isRequire {
+		return nil
+	}
+	c := entity.getComponentByType(typ)
 	return (*T)(unsafe.Pointer((*iface)(unsafe.Pointer(&c)).data))
 }
 

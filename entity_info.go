@@ -8,18 +8,18 @@ import (
 )
 
 type EntityInfo struct {
-	lock sync.RWMutex
-	//private
-	world      *World
+	world      *ecsWorld
+	mu  sync.RWMutex
 	components map[reflect.Type]IComponent
-	//public
-	entity Entity
+	adding     map[reflect.Type]struct{}
+	entity     Entity
 }
 
-func newEntityInfo(world *World) *EntityInfo {
+func newEntityInfo(world *ecsWorld) *EntityInfo {
 	entity := &EntityInfo{
 		world:      world,
 		components: make(map[reflect.Type]IComponent),
+		adding	: make(map[reflect.Type]struct{}),
 		entity:     newEntity(),
 	}
 	world.addEntity(entity)
@@ -27,6 +27,9 @@ func newEntityInfo(world *World) *EntityInfo {
 }
 
 func (e *EntityInfo) Destroy() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
 	var components []IComponent
 	for _, c := range e.components {
 		components = append(components, c)
@@ -34,7 +37,6 @@ func (e *EntityInfo) Destroy() {
 	e.Remove(components...)
 	e.world.deleteEntity(e)
 }
-
 
 func (e *EntityInfo) Entity() Entity {
 	return e.entity
@@ -45,10 +47,16 @@ func (e *EntityInfo) hashKey() int64 {
 }
 
 func (e *EntityInfo) HasByType(types ...reflect.Type) bool {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
 	return e.hasByType(types...)
 }
 
 func (e *EntityInfo) Has(components ...IComponent) bool {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
 	return e.has(components...)
 }
 
@@ -56,7 +64,10 @@ func (e *EntityInfo) has(components ...IComponent) bool {
 	for _, c := range components {
 		_, ok := e.components[c.Type()]
 		if !ok {
-			return false
+			_, ok = e.adding[c.Type()]
+			if !ok {
+				return false
+			}
 		}
 	}
 	return true
@@ -73,6 +84,9 @@ func (e *EntityInfo) hasByType(types ...reflect.Type) bool {
 }
 
 func (e *EntityInfo) Add(components ...IComponent) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
 	for _, c := range components {
 		if err := e.addComponent(c); err != nil {
 			Log.Error("repeat component:", err)
@@ -81,6 +95,9 @@ func (e *EntityInfo) Add(components ...IComponent) {
 }
 
 func (e *EntityInfo) Remove(components ...IComponent) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
 	for _, c := range components {
 		typ := c.Type()
 		if !e.has(c) {
@@ -96,15 +113,22 @@ func (e *EntityInfo) addComponent(com IComponent) error {
 	if e.has(com) {
 		return fmt.Errorf("repeated component: %s", com.Type().Name())
 	}
+	e.adding[com.Type()] = Empty
 	e.world.components.TempTemplateOperate(e, com.Template(), CollectionOperateAdd)
 	return nil
 }
 
 func (e *EntityInfo) componentAdded(typ reflect.Type, com IComponent) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
 	e.components[typ] = com
 }
 
 func (e *EntityInfo) componentDeleted(typ reflect.Type, com IComponent) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
 	delete(e.components, typ)
 }
 
@@ -113,5 +137,8 @@ func (e *EntityInfo) getComponent(com IComponent) IComponent {
 }
 
 func (e *EntityInfo) getComponentByType(typ reflect.Type) IComponent {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
 	return e.components[typ]
 }

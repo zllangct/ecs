@@ -3,7 +3,6 @@ package ecs
 import (
 	"fmt"
 	"reflect"
-	"sync"
 	"unsafe"
 )
 
@@ -11,24 +10,42 @@ type IComponent interface {
 	Owner() *EntityInfo //TODO 切换到 Entity
 	Type() reflect.Type
 	ID() int64
-	Ins() IComponent
 	Template() IComponent
 
 	setOwner(owner *EntityInfo)
 	setID(id int64)
 
+	ins() IComponent
+	newCollection() interface{}
 	addToCollection(collection interface{}) IComponent
 	deleteFromCollection(collection interface{})
-
-	NewCollection() interface{}
 }
 
+const (
+	h4 = uint8(240)
+	l4 = uint8(15)
+	zero = uint8(0)
+)
+
+type ComponentState uint8
+const (
+	ComponentInvalid ComponentState = iota
+	ComponentActive
+)
+
+type ComponentType uint8
+const (
+	ComponentTypeNormal ComponentState = iota
+	ComponentTypeOnce
+	ComponentTypeFree
+	ComponentTypeFreeAndOnce
+)
+
 type Component[T any] struct {
-	lock      sync.Mutex
 	owner     *EntityInfo
 	id        int64
 	realType  reflect.Type
-	operation map[string]func() []interface{}
+	st     	  uint8
 }
 
 func (c *Component[T]) addToCollection(collection interface{}) IComponent {
@@ -54,7 +71,7 @@ func (c *Component[T]) deleteFromCollection(collection interface{}) {
 	return
 }
 
-func (c *Component[T]) NewCollection() interface{} {
+func (c *Component[T]) newCollection() interface{} {
 	return NewCollection[T]()
 }
 
@@ -74,9 +91,40 @@ func (c *Component[T]) RawIns() *T {
 	return (*T)(unsafe.Pointer(c))
 }
 
-func (c *Component[T]) Ins() (com IComponent) {
+func (c *Component[T]) ins() (com IComponent) {
 	(*iface)(unsafe.Pointer(&com)).data = unsafe.Pointer(c)
 	return
+}
+
+func (c *Component[T]) setState(state ComponentState) {
+	c.st = (c.st & l4) | (uint8(state) << 4)
+}
+
+func (c *Component[T]) getState() ComponentState {
+	return ComponentState(c.st & h4 >> 4)
+}
+
+func (c *Component[T]) setType(typ ComponentType) {
+	c.st = (c.st & h4) | uint8(typ)
+}
+
+func (c *Component[T]) getType() ComponentType {
+	return ComponentType(c.st & l4)
+}
+
+func (c *Component[T]) Invalidate() {
+	c.setState(ComponentInvalid)
+}
+
+func (c *Component[T]) Active() {
+	c.setState(ComponentActive)
+}
+
+func (c *Component[T]) Remove() {
+	if c.owner == nil {
+		return
+	}
+	c.owner.Remove(c)
 }
 
 func (c *Component[T]) Template() IComponent {

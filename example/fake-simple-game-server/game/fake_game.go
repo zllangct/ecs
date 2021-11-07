@@ -3,7 +3,6 @@ package game
 import (
 	"context"
 	"github.com/zllangct/ecs"
-	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -12,7 +11,7 @@ import (
 
 type FakeGame struct {
 	clients  sync.Map
-	world    *ecs.World
+	world    ecs.IWorld
 	chatRoom *ChatRoom
 }
 
@@ -42,15 +41,15 @@ func (f *FakeGame) InitEcs() {
 }
 
 func (f *FakeGame) EnterGame(sess *Session) {
-	e := f.world.NewEntity()
-	e.Add(&PlayerComponent{})
-	e.Add(&Position{
+	info := f.world.NewEntity()
+	info.Add(&PlayerComponent{})
+	info.Add(&Position{
 		X: 100,
 		Y: 100,
 		Z: 100,
 	})
 
-	sess.EntityId = e.hashKey()
+	sess.Entity = info.Entity()
 }
 
 func (f *FakeGame) InitNetwork() {
@@ -109,13 +108,17 @@ func (f *FakeGame) Dispatch(pkg interface{}, sess *Session) {
 		}
 
 		v, _ := strconv.Atoi(split[2])
-		e := ecs.GetEntity(f.world, sess.EntityId)
-		e.Add()
+
+		e := ecs.GetEntityInfo(f.world, sess.Entity)
+		e.Add(&MoveChange{
+			V: v,
+			Dir: dir,
+		})
 	}
 }
 
 func (f *FakeGame) ChangeMovementTimeScale(timeScale float64) {
-	sys, ok := f.world.GetSystem(reflect.TypeOf(&MoveSystem{}))
+	sys, ok := ecs.GetSystem[MoveSystem](f.world)
 	if !ok {
 		return
 	}

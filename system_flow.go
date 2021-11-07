@@ -6,31 +6,28 @@ import (
 	"time"
 )
 
-// SystemOrder system execute Order, 32bit + 32bit: period + suborder
-type SystemOrder uint64
-
-// SystemPeriod system execute period:start->pre_update->update->pre_destroy->destroy
-type SystemPeriod uint32
-
 const (
-	PeriodPreStart SystemPeriod = iota
-	PeriodCustomEvent
+	PeriodPreStart Period = iota
 	PeriodStart
 	PeriodPostStart
 	PeriodPreUpdate
 	PeriodUpdate
 	PeriodPostUpdate
-	PeriodPerDestroy
+	PeriodPreDestroy
 	PeriodDestroy
 	PeriodPostDestroy
 )
+
+// Period system execute period:start->pre_update->update->pre_destroy->destroy
+type Period uint32
 
 // Order default suborder of system
 type Order int32
 
 const (
 	OrderFront   Order = -1
-	OrderAppend  Order = 999999
+	OrderInvalid Order = 0
+	OrderAppend  Order = 99999999
 	OrderDefault Order = OrderAppend
 )
 
@@ -47,13 +44,13 @@ type OrderSequence []*SystemGroup
 //system execute flow
 type systemFlow struct {
 	sync.Mutex
-	world        *World
-	systemPeriod map[SystemPeriod]OrderSequence
-	periodList   []SystemPeriod
+	world        *ecsWorld
+	systemPeriod map[Period]OrderSequence
+	periodList   []Period
 	wg           *sync.WaitGroup
 }
 
-func newSystemFlow(runtime *World) *systemFlow {
+func newSystemFlow(runtime *ecsWorld) *systemFlow {
 	sf := &systemFlow{
 		world: runtime,
 		wg:    &sync.WaitGroup{},
@@ -64,16 +61,18 @@ func newSystemFlow(runtime *World) *systemFlow {
 
 //initialize the system flow
 func (p *systemFlow) init() {
-	p.periodList = []SystemPeriod{
-		PeriodCustomEvent,
+	p.periodList = []Period{
+		PeriodPreStart,
 		PeriodStart,
 		PeriodPostStart,
+		PeriodPreUpdate,
 		PeriodUpdate,
 		PeriodPostUpdate,
+		PeriodPreDestroy,
 		PeriodDestroy,
 		PeriodPostDestroy,
 	}
-	p.systemPeriod = make(map[SystemPeriod]OrderSequence)
+	p.systemPeriod = make(map[Period]OrderSequence)
 	for _, value := range p.periodList {
 		p.systemPeriod[value] = OrderSequence{}
 		sgFront := NewSystemGroup()
@@ -96,8 +95,10 @@ func (p *systemFlow) run(delta time.Duration) {
 						imp := false
 						var fn func(event Event)
 						switch period {
-						case PeriodCustomEvent:
-							ss[i].eventDispatch()
+						case PeriodPreStart:
+							system, ok := ss[i].(IEventPreStart)
+							fn = system.PreStart
+							imp = ok
 						case PeriodStart:
 							system, ok := ss[i].(IEventStart)
 							fn = system.Start
@@ -106,6 +107,10 @@ func (p *systemFlow) run(delta time.Duration) {
 							system, ok := ss[i].(IEventPostStart)
 							fn = system.PostStart
 							imp = ok
+						case PeriodPreUpdate:
+							system, ok := ss[i].(IEventPreUpdate)
+							fn = system.PreUpdate
+							imp = ok
 						case PeriodUpdate:
 							system, ok := ss[i].(IEventUpdate)
 							fn = system.Update
@@ -113,6 +118,10 @@ func (p *systemFlow) run(delta time.Duration) {
 						case PeriodPostUpdate:
 							system, ok := ss[i].(IEventPostUpdate)
 							fn = system.PostUpdate
+							imp = ok
+						case PeriodPreDestroy:
+							system, ok := ss[i].(IEventPreDestroy)
+							fn = system.PreDestroy
 							imp = ok
 						case PeriodDestroy:
 							system, ok := ss[i].(IEventDestroy)
@@ -131,8 +140,31 @@ func (p *systemFlow) run(delta time.Duration) {
 						p.wg.Add(1)
 						wg := p.wg
 						Runtime.addJob(func() {
+							defer wg.Done()
 							fn(Event{Delta: delta})
-							wg.Done()
+						})
+					}
+				}
+				p.wg.Wait()
+			}
+		}
+	}
+
+	p.wg.Wait()
+
+	for _, period := range p.periodList {
+		sq = p.systemPeriod[period]
+		for _, sl := range sq {
+			sl.reset()
+			for ss := sl.next(); len(ss) > 0; ss = sl.next() {
+				if systemCount := len(ss); systemCount != 0 {
+					for i := 0; i < systemCount; i++ {
+						fn := ss[i].eventDispatch
+						p.wg.Add(1)
+						wg := p.wg
+						Runtime.addJob(func() {
+							defer wg.Done()
+							fn()
 						})
 					}
 				}
@@ -175,17 +207,28 @@ func (p *systemFlow) register(system ISystem) {
 	})
 
 	order := system.Order()
+	if order > OrderAppend {
+		Log.Errorf("system order must less then %d, reset order to %d", OrderAppend + 1, OrderAppend)
+		order = OrderAppend
+	}
+
 	for _, period := range p.periodList {
 		imp := false
 		switch period {
+		case PeriodPreStart:
+			_, imp = system.(IEventPreStart)
 		case PeriodStart:
 			_, imp = system.(IEventStart)
 		case PeriodPostStart:
 			_, imp = system.(IEventPostStart)
+		case PeriodPreUpdate:
+			_, imp = system.(IEventPreUpdate)
 		case PeriodUpdate:
 			_, imp = system.(IEventUpdate)
 		case PeriodPostUpdate:
 			_, imp = system.(IEventPostUpdate)
+		case PeriodPreDestroy:
+			_, imp = system.(IEventPreDestroy)
 		case PeriodDestroy:
 			_, imp = system.(IEventDestroy)
 		case PeriodPostDestroy:

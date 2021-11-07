@@ -12,7 +12,7 @@ type WorldStatus int
 type WorldConfig struct {
 	HashCount            int           //容器桶数量
 	DefaultFrameInterval time.Duration //帧间隔
-	StopCallback         func(world *World)
+	StopCallback         func(world *ecsWorld)
 }
 
 func NewDefaultWorldConfig() *WorldConfig {
@@ -22,7 +22,19 @@ func NewDefaultWorldConfig() *WorldConfig {
 	}
 }
 
-type World struct {
+type IWorld interface {
+	Run()
+	GetStatus() WorldStatus
+	GetID() int64
+	NewEntity() *EntityInfo
+
+	register(system ISystem)
+	getComponents(typ reflect.Type) interface{}
+	getNewComponents(typ reflect.Type) []OperateInfo
+	b14d94e462795b8bd42a0bf62ae90826()
+}
+
+type ecsWorld struct {
 	//mutex
 	mutex sync.Mutex
 	//id
@@ -43,11 +55,11 @@ type World struct {
 
 	wStop chan struct{}
 	//do some work for world cleaning
-	stopHandler func(world *World)
+	stopHandler func(world *ecsWorld)
 }
 
-func newWorld(runtime *ecsRuntime, config *WorldConfig) *World {
-	world := &World{
+func newWorld(runtime *ecsRuntime, config *WorldConfig) *ecsWorld {
+	world := &ecsWorld{
 		id:         UniqueID(),
 		systemFlow: nil,
 		config:     config,
@@ -71,16 +83,18 @@ func newWorld(runtime *ecsRuntime, config *WorldConfig) *World {
 	return world
 }
 
-func (w *World) GetID() int64 {
+func (w *ecsWorld) b14d94e462795b8bd42a0bf62ae90826(){}
+
+func (w *ecsWorld) GetID() int64 {
 	return w.id
 }
 
 // Run start ecs world
-func (w *World) Run() {
+func (w *ecsWorld) Run() {
 	go w.run()
 }
 
-func (w *World) run() {
+func (w *ecsWorld) run() {
 	if Runtime.status() != StatusRunning {
 		Log.Error("runtime is not running")
 		return
@@ -129,11 +143,11 @@ func (w *World) run() {
 	}
 }
 
-func (w *World) stop() {
+func (w *ecsWorld) stop() {
 	w.wStop <- struct{}{}
 }
 
-func (w *World) GetStatus() WorldStatus {
+func (w *ecsWorld) GetStatus() WorldStatus {
 	w.mutex.Lock()
 	defer w.mutex.Unlock()
 
@@ -141,7 +155,7 @@ func (w *World) GetStatus() WorldStatus {
 }
 
 // Register register system
-func (w *World) Register(system ISystem) {
+func (w *ecsWorld) register(system ISystem) {
 	w.mutex.Lock()
 	defer w.mutex.Unlock()
 
@@ -149,42 +163,46 @@ func (w *World) Register(system ISystem) {
 	w.systems.Store(reflect.TypeOf(system), system)
 }
 
-func (w *World) registerForT(system interface{}) {
-	w.Register(system.(ISystem))
+func (w *ecsWorld) registerForT(system interface{}, order ...Order) {
+	sys := system.(ISystem)
+	if len(order) > 0 {
+		sys.setOrder(order[0])
+	}
+	w.register(system.(ISystem))
 }
 
-func (w *World) GetSystem(sys reflect.Type) (ISystem, bool) {
+func (w *ecsWorld) GetSystem(sys reflect.Type) (ISystem, bool) {
 	s, ok := w.systems.Load(sys)
 	return s.(ISystem), ok
 }
 
 // AddEntity entity operate : add
-func (w *World) addEntity(entity *EntityInfo) {
+func (w *ecsWorld) addEntity(entity *EntityInfo) {
 	w.entities.add(entity)
 }
 
-func (w *World) getEntityInfo(id Entity) *EntityInfo {
+func (w *ecsWorld) getEntityInfo(id Entity) *EntityInfo {
 	return w.entities.getInfo(id)
 }
 
 // deleteEntity entity operate : delete
-func (w *World) deleteEntity(info *EntityInfo) {
+func (w *ecsWorld) deleteEntity(info *EntityInfo) {
 	w.entities.delete(info.entity)
 }
 
-func (w *World) getNewComponentsAll() map[reflect.Type][]OperateInfo {
+func (w *ecsWorld) getNewComponentsAll() map[reflect.Type][]OperateInfo {
 	return w.components.GetNewComponentsAll()
 }
 
-func (w *World) getNewComponents(typ reflect.Type) []OperateInfo {
+func (w *ecsWorld) getNewComponents(typ reflect.Type) []OperateInfo {
 	return w.components.GetNewComponents(typ)
 }
 
-func (w *World) getComponents(typ reflect.Type) interface{} {
+func (w *ecsWorld) getComponents(typ reflect.Type) interface{} {
 	return w.components.GetCollection(typ)
 }
 
-func (w *World) NewEntity() *EntityInfo {
+func (w *ecsWorld) NewEntity() *EntityInfo {
 	return newEntityInfo(w)
 }
 

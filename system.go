@@ -12,13 +12,18 @@ type SystemLifeCircleType int
 type ISystem interface {
 	Type() reflect.Type
 	Order() Order
-	World() *World
+	World() IWorld
 	Requirements() map[reflect.Type]struct{}
 	Emit(event string, args ...interface{})
 
 	IsRequire(component IComponent) bool
 
-	baseInit(world *World, ins ISystem)
+	isRequire(componentType reflect.Type) bool
+	setOrder(order Order)
+	setRequirements(rqs ...IComponent)
+	setRequirementsByType(rqs ...reflect.Type)
+	checkComponent(entity *EntityInfo, com IComponent) IComponent
+	baseInit(world *ecsWorld, ins ISystem)
 	eventDispatch()
 }
 
@@ -32,10 +37,24 @@ type System[T any] struct {
 	events       map[string]SysEventHandler
 	eventQueue   *list.List
 	order        Order
-	world        *World
+	world        *ecsWorld
 	realType     reflect.Type
 	isInited     bool
 }
+
+type ITest interface {
+	Test()
+}
+
+type TestA[T any] struct {
+	base testA[T]
+}
+
+type testA[T any] struct {
+
+}
+
+func (t *testA[T]) Test() {}
 
 func (s System[T]) d074634084a1556083fcd17c0254b557() {}
 
@@ -84,6 +103,10 @@ func (s *System[T]) eventDispatch() {
 }
 
 func (s *System[T]) SetRequirements(rqs ...IComponent) {
+	s.setRequirements(rqs...)
+}
+
+func (s *System[T]) setRequirements(rqs ...IComponent) {
 	if s.isInited {
 		return
 	}
@@ -92,6 +115,18 @@ func (s *System[T]) SetRequirements(rqs ...IComponent) {
 	}
 	for _, value := range rqs {
 		s.requirements[value.Type()] = struct{}{}
+	}
+}
+
+func (s *System[T]) setRequirementsByType(rqs ...reflect.Type) {
+	if s.isInited {
+		return
+	}
+	if s.requirements == nil {
+		s.requirements = map[reflect.Type]struct{}{}
+	}
+	for _, value := range rqs {
+		s.requirements[value] = struct{}{}
 	}
 }
 
@@ -108,10 +143,13 @@ func (s *System[T]) isRequire(typ reflect.Type) bool {
 	return ok
 }
 
-func (s *System[T]) baseInit(world *World, ins ISystem) {
+func (s *System[T]) baseInit(world *ecsWorld, ins ISystem) {
 	s.requirements = map[reflect.Type]struct{}{}
 	s.eventQueue = list.New()
-	s.SetOrder(OrderDefault)
+
+	if ins.Order() == OrderInvalid {
+		s.setOrder(OrderDefault)
+	}
 	s.world = world
 
 	if i, ok := ins.(IEventInit); ok {
@@ -128,7 +166,7 @@ func (s *System[T]) Type() reflect.Type {
 	return s.realType
 }
 
-func (s *System[T]) SetOrder(order Order) {
+func (s *System[T]) setOrder(order Order) {
 	if s.isInited {
 		return
 	}
@@ -140,7 +178,7 @@ func (s *System[T]) Order() Order {
 	return s.order
 }
 
-func (s *System[T]) World() *World {
+func (s *System[T]) World() IWorld {
 	return s.world
 }
 
@@ -162,11 +200,19 @@ func (s *System[T]) GetInterestedNew() map[reflect.Type][]OperateInfo {
 	return ls
 }
 
-func (s *System[T]) CheckComponent(entity *EntityInfo, com IComponent) IComponent {
+func (s *System[T]) CheckComponent(info *EntityInfo, com IComponent) IComponent {
+	return s.checkComponent(info, com)
+}
+
+func (s *System[T]) checkComponent(entity *EntityInfo, com IComponent) IComponent {
 	isRequire := s.IsRequire(com)
 	if !isRequire {
 		return nil
 	}
 
 	return entity.getComponent(com)
+}
+
+func (s *System[T]) GetEntityInfo(entity Entity) *EntityInfo {
+	return s.world.getEntityInfo(entity)
 }

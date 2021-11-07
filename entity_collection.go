@@ -1,13 +1,8 @@
 package ecs
 
-import (
-	"sync"
-)
-
 type EntityCollection struct {
-	collection []map[Entity]*EntityInfo
-	base       int64
-	locks      []sync.RWMutex
+	collection []Map[Entity,*EntityInfo]
+	bucket     int64
 }
 
 func NewEntityCollection(k int) *EntityCollection {
@@ -15,43 +10,36 @@ func NewEntityCollection(k int) *EntityCollection {
 
 	for i := 1; ; i++ {
 		if c := int64(1 << i); int64(k) < c {
-			ec.base = c - 1
+			ec.bucket = c - 1
 			break
 		}
 	}
 
-	ec.collection = make([]map[Entity]*EntityInfo, ec.base+1)
-	ec.locks = make([]sync.RWMutex, ec.base+1)
+	ec.collection = make([]Map[Entity,*EntityInfo], ec.bucket+1)
 	for index := range ec.collection {
-		ec.collection[index] = map[Entity]*EntityInfo{}
-		ec.locks[index] = sync.RWMutex{}
+		ec.collection[index] = Map[Entity, *EntityInfo]{}
 	}
 	return ec
 }
 
 func (p *EntityCollection) getInfo(entity Entity) *EntityInfo {
-	hash := int64(entity) & p.base
+	hash := int64(entity) & p.bucket
 
-	p.locks[hash].RLock()
-	defer p.locks[hash].RUnlock()
-
-	return p.collection[hash][entity]
+	info, ok := p.collection[hash].Load(entity)
+	if !ok {
+		return nil
+	}
+	return info
 }
 
-func (p *EntityCollection) add(entity *EntityInfo) {
-	hash := entity.hashKey() & p.base
+func (p *EntityCollection) add(info *EntityInfo) {
+	hash := info.hashKey() & p.bucket
 
-	p.locks[hash].Lock()
-	defer p.locks[hash].Unlock()
-
-	p.collection[hash][entity.entity] = entity
+	p.collection[hash].Store(info.entity, info)
 }
 
 func (p *EntityCollection) delete(entity Entity) {
-	hash := int64(entity) & p.base
+	hash := int64(entity) & p.bucket
 
-	p.locks[hash].Lock()
-	defer p.locks[hash].Unlock()
-
-	delete(p.collection[hash], entity)
+	p.collection[hash].Delete(entity)
 }

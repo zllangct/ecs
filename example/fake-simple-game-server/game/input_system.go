@@ -1,23 +1,32 @@
 package game
 
-import "github.com/zllangct/ecs"
+import (
+	"github.com/zllangct/ecs"
+)
 
 type InputSystem struct {
 	ecs.System[InputSystem]
 }
 
-func (m *InputSystem) Init() {
-	m.SetRequirements(&MoveChange{}, &Movement{})
-	m.EventRegister("Change", m.Change)
+func (is *InputSystem) Init() {
+	// is.SetRequirements(&Movement{},&MoveChange{})
+	ecs.AddRequireComponent2[Movement, MoveChange](is)
 }
 
-func (m *InputSystem) Change(in ...interface{}) {
-	dir := in[0].([]int)
-	v := in[1].(int)
-	_, _ = dir, v
-
+func (is *InputSystem) PreUpdate(event ecs.Event) {
+	iterMC := ecs.GetInterestedComponents[MoveChange](is)
+	var mov *Movement
+	for mc:=iterMC.Begin(); !iterMC.End(); iterMC.Next() {
+		mov = ecs.CheckComponent[Movement](is, mc.Owner())
+		mov.V = mc.V
+		mov.Dir = mc.Dir
+	}
 }
 
-func (m *InputSystem) Update(event ecs.Event) {
-
+func (is *InputSystem) PostUpdate(event ecs.Event) {
+	iterMC := ecs.GetInterestedComponents[MoveChange](is)
+	for mc:=iterMC.Begin(); !iterMC.End(); iterMC.Next() {
+		mc.Invalidate()
+	}
 }
+
