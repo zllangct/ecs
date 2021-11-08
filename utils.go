@@ -80,5 +80,6 @@ func StrHash(str string, groupCount int) int {
 }
 
 func TypeOf[T any]() reflect.Type {
-	return reflect.TypeOf((*T)(nil))
+	var ins *T
+	return reflect.TypeOf(ins)
 }

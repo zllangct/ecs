@@ -27,37 +27,37 @@ func (m *MoveSystem) UpdateTimeScale(timeScale []interface{}) {
 func (m *MoveSystem) Update(event ecs.Event) {
 	delta := event.Delta
 
-	csPosition := ecs.GetInterestedComponents[Position](m)
-	if csPosition == nil {
+	iterPos := ecs.GetInterestedComponents[Position](m)
+	if iterPos == nil {
 		return
 	}
-	csMovement := ecs.GetInterestedComponents[Movement](m)
-	if csMovement == nil {
+	iterMov := ecs.GetInterestedComponents[Movement](m)
+	if iterMov == nil {
 		return
 	}
 
-	d := map[int64]*MoveSystemData{}
+	d := map[ecs.Entity]*MoveSystemData{}
 
-	for iter := ecs.NewIterator(csPosition); !iter.End(); iter.Next() {
+	for iter := iterPos; !iter.End(); iter.Next() {
 		position := iter.Val()
 		owner := position.Owner()
-
 		movement := ecs.CheckComponent[Movement](m, owner)
 		if movement == nil {
 			continue
 		}
 
-		d[position.Owner().ID()] = &MoveSystemData{P: position, M: movement}
+		d[position.Owner().Entity()] = &MoveSystemData{P: position, M: movement}
 	}
 
 	for e, data := range d {
 		if data.M == nil || data.P == nil {
 			continue
 		}
-		data.P.X = data.P.X + int(float64(data.M.Dir[0]*data.M.V)*delta.Seconds()*m.timeScale)
-		data.P.Y = data.P.Y + int(float64(data.M.Dir[1]*data.M.V)*delta.Seconds()*m.timeScale)
-		data.P.Z = data.P.Z + int(float64(data.M.Dir[2]*data.M.V)*delta.Seconds()*m.timeScale)
+		data.P.X = data.P.X + int(float64(data.M.Dir[0]*data.M.V)*delta.Seconds())
+		data.P.Y = data.P.Y + int(float64(data.M.Dir[1]*data.M.V)*delta.Seconds())
+		data.P.Z = data.P.Z + int(float64(data.M.Dir[2]*data.M.V)*delta.Seconds())
 
 		ecs.Log.Info("target id:", e, "delta:", delta, " current position:", data.P.X, data.P.Y, data.P.Z)
 	}
+
 }

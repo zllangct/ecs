@@ -7,7 +7,7 @@ import (
 )
 
 type IComponent interface {
-	Owner() *EntityInfo //TODO 切换到 Entity
+	Owner() *EntityInfo
 	Type() reflect.Type
 	ID() int64
 	Template() IComponent
@@ -23,6 +23,10 @@ type IComponent interface {
 	newCollection() interface{}
 	addToCollection(collection interface{}) IComponent
 	deleteFromCollection(collection interface{})
+}
+
+type IComponentTemplate interface {
+	b26897f1d0938a734939da7d2f8aaedc()
 }
 
 const (
@@ -52,7 +56,7 @@ type FreeComponent[T any] struct {
 	Component[T]
 }
 
-func (f *FreeComponent[T]) getComponentType() ComponentType{
+func (f *FreeComponent[T]) getComponentType() ComponentType {
 	return ComponentTypeFree
 }
 
@@ -79,12 +83,14 @@ type Component[T any] struct {
 	st       uint8
 }
 
+func (c Component[T]) b26897f1d0938a734939da7d2f8aaedc() {}
+
 func (c *Component[T]) init() {
 	c.setType(c.getComponentType())
 	c.setState(ComponentStateInvalid)
 }
 
-func (c *Component[T]) getComponentType() ComponentType{
+func (c *Component[T]) getComponentType() ComponentType {
 	return ComponentTypeNormal
 }
 

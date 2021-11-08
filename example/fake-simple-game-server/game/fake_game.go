@@ -35,7 +35,6 @@ func (f *FakeGame) InitEcs() {
 	ecs.WorldRun(f.world)
 
 	//register your system
-	// ecs.RegisterSystem[System](world) or world.Register(system)
 	ecs.RegisterSystem[MoveSystem](f.world)
 	ecs.RegisterSystem[SyncSystem](f.world)
 	ecs.RegisterSystem[EmptySystem](f.world)

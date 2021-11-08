@@ -16,11 +16,9 @@ func (is *InputSystem) Init() {
 func (is *InputSystem) PreUpdate(event ecs.Event) {
 	iterMC := ecs.GetInterestedComponents[MoveChange](is)
 	var mov *Movement
-	for mc:=iterMC.Begin(); !iterMC.End(); iterMC.Next() {
+	for mc := iterMC.Begin(); !iterMC.End(); iterMC.Next() {
 		mov = ecs.CheckComponent[Movement](is, mc.Owner())
 		mov.V = mc.V
 		mov.Dir = mc.Dir
 	}
 }
-
-

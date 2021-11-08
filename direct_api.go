@@ -43,10 +43,10 @@ func GetWorldStatus(world IWorld) WorldStatus {
 }
 
 func RegisterSystem[T ISystemTemplate](world IWorld, order ...Order) {
-	world.(*ecsWorld).registerForT(new(T), order...)
+	world.registerForT(new(T), order...)
 }
 
-func GetSystem[T ISystem](w IWorld) (ISystem, bool) {
+func GetSystem[T ISystemTemplate](w IWorld) (ISystem, bool) {
 	return w.getSystem(TypeOf[T]())
 }
 
@@ -73,7 +73,7 @@ func EntityDestroy(world IWorld, entity Entity) {
 
 // system api
 
-func AddRequireComponent[T IComponent](sys ISystem) {
+func AddRequireComponent[T IComponentTemplate](sys ISystem) {
 	sys.setRequirementsByType(TypeOf[T]())
 }
 
@@ -102,5 +102,3 @@ func CheckComponent[T any](sys ISystem, entity *EntityInfo) *T {
 	c := entity.getComponentByType(typ)
 	return (*T)(unsafe.Pointer((*iface)(unsafe.Pointer(&c)).data))
 }
-
-

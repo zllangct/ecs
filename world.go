@@ -29,10 +29,12 @@ type IWorld interface {
 	NewEntity() *EntityInfo
 
 	register(system ISystem)
+	registerForT(system interface{}, order ...Order)
 	getComponents(typ reflect.Type) interface{}
 	getNewComponents(typ reflect.Type) []OperateInfo
 	getEntityInfo(id Entity) *EntityInfo
 	getSystem(sys reflect.Type) (ISystem, bool)
+
 	b14d94e462795b8bd42a0bf62ae90826()
 }
 
@@ -85,7 +87,7 @@ func newWorld(runtime *ecsRuntime, config *WorldConfig) *ecsWorld {
 	return world
 }
 
-func (w *ecsWorld) b14d94e462795b8bd42a0bf62ae90826(){}
+func (w *ecsWorld) b14d94e462795b8bd42a0bf62ae90826() {}
 
 func (w *ecsWorld) GetID() int64 {
 	return w.id
@@ -219,4 +221,3 @@ func (w *ecsWorld) deleteComponent(info *EntityInfo, component IComponent) {
 func (w *ecsWorld) AddFreeComponent(component IComponent) {
 	w.addComponent(nil, component)
 }
-
