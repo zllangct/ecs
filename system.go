@@ -8,6 +8,7 @@ import (
 )
 
 type SystemState uint8
+
 const (
 	SystemStateInvalid SystemState = iota
 	SystemStateInit
@@ -17,12 +18,18 @@ const (
 	SystemStateDestroy
 )
 
+const (
+	SystemCustomEventInvalid SystemCustomEventName = ""
+	SystemCustomEventPause                         = "__internal__Pause"
+	SystemCustomEventResume                        = "__internal__Resume"
+)
+
 type ISystem interface {
 	Type() reflect.Type
 	Order() Order
 	World() IWorld
 	Requirements() map[reflect.Type]struct{}
-	Emit(event string, args ...interface{})
+	Emit(event SystemCustomEventName, args ...interface{})
 
 	IsRequire(component IComponent) bool
 
@@ -44,12 +51,12 @@ type ISystemTemplate interface {
 type System[T any] struct {
 	lock         sync.Mutex
 	requirements map[reflect.Type]struct{}
-	events       map[string]SysEventHandler
+	events       map[SystemCustomEventName]SysEventHandler
 	eventQueue   *list.List
 	order        Order
 	world        *ecsWorld
 	realType     reflect.Type
-	state     	 SystemState
+	state        SystemState
 }
 
 func (s System[T]) d074634084a1556083fcd17c0254b557() {}
@@ -63,14 +70,14 @@ func (s *System[T]) RawIns() *T {
 	return (*T)(unsafe.Pointer(s))
 }
 
-func (s *System[T]) EventRegister(event string, fn SysEventHandler) {
+func (s *System[T]) EventRegister(event SystemCustomEventName, fn SysEventHandler) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
 	s.events[event] = fn
 }
 
-func (s *System[T]) Emit(event string, args ...interface{}) {
+func (s *System[T]) Emit(event SystemCustomEventName, args ...interface{}) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -88,7 +95,7 @@ func (s *System[T]) eventDispatch() {
 		e := i.Value.(SystemCustomEvent)
 		if fn, ok := s.events[e.Event]; ok {
 			err := TryAndReport(func() {
-				fn(e.Args...)
+				fn(e.Args)
 			})
 			if err != nil {
 				Log.Error(err)
@@ -121,14 +128,16 @@ func (s *System[T]) setRequirements(rqs ...IComponent) {
 	}
 }
 
-func (s *System[T]) Pause(e ...interface{}) {
+func (s *System[T]) Pause(e []interface{}) {
 	if s.getState() == SystemStateUpdate {
 		s.setState(SystemStatePause)
 	}
 }
 
-func (s *System[T]) Resume(e ...interface{}){
-	s.setState(SystemStateUpdate)
+func (s *System[T]) Resume(e []interface{}) {
+	if s.getState() == SystemStatePause {
+		s.setState(SystemStateUpdate)
+	}
 }
 
 func (s *System[T]) getState() SystemState {
@@ -166,6 +175,7 @@ func (s *System[T]) isRequire(typ reflect.Type) bool {
 
 func (s *System[T]) baseInit(world *ecsWorld, ins ISystem) {
 	s.requirements = map[reflect.Type]struct{}{}
+	s.events = make(map[SystemCustomEventName]SysEventHandler)
 	s.eventQueue = list.New()
 
 	if ins.Order() == OrderInvalid {
@@ -173,11 +183,16 @@ func (s *System[T]) baseInit(world *ecsWorld, ins ISystem) {
 	}
 	s.world = world
 
-	//TODO a bug of golang, internal compiler error: mismatched
-	//s.EventRegister("Pause", s.Pause)
+	s.EventRegister(SystemCustomEventPause, s.Pause)
+	s.EventRegister(SystemCustomEventResume, s.Resume)
 
 	if i, ok := ins.(IEventInit); ok {
-		i.Init()
+		err := TryAndReport(func() {
+			i.Init()
+		})
+		if err != nil {
+			Log.Error(err)
+		}
 	}
 
 	s.state = SystemStateInit

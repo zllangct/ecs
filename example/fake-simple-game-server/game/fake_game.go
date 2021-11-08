@@ -38,6 +38,7 @@ func (f *FakeGame) InitEcs() {
 	// ecs.RegisterSystem[System](world) or world.Register(system)
 	ecs.RegisterSystem[MoveSystem](f.world)
 	ecs.RegisterSystem[SyncSystem](f.world)
+	ecs.RegisterSystem[EmptySystem](f.world)
 }
 
 func (f *FakeGame) EnterGame(sess *Session) {
@@ -111,7 +112,7 @@ func (f *FakeGame) Dispatch(pkg interface{}, sess *Session) {
 
 		e := ecs.GetEntityInfo(f.world, sess.Entity)
 		e.Add(&MoveChange{
-			V: v,
+			V:   v,
 			Dir: dir,
 		})
 	}

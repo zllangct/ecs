@@ -43,7 +43,7 @@ type systemFlow struct {
 	world        *ecsWorld
 	systemPeriod map[Period]OrderSequence
 	periodList   []Period
-	wg            *sync.WaitGroup
+	wg           *sync.WaitGroup
 }
 
 func newSystemFlow(runtime *ecsWorld) *systemFlow {
@@ -192,13 +192,11 @@ func (p *systemFlow) run(delta time.Duration) {
 //register method only in world init or func init(){}
 func (p *systemFlow) register(system ISystem) {
 	//init function call
-	Try(func() {
-		system.baseInit(p.world, system)
-	})
+	system.baseInit(p.world, system)
 
 	order := system.Order()
 	if order > OrderAppend {
-		Log.Errorf("system order must less then %d, reset order to %d", OrderAppend + 1, OrderAppend)
+		Log.Errorf("system order must less then %d, reset order to %d", OrderAppend+1, OrderAppend)
 		order = OrderAppend
 	}
 

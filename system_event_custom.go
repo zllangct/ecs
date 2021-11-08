@@ -1,8 +1,9 @@
 package ecs
 
-type SysEventHandler func(...interface{})
+type SystemCustomEventName string
+type SysEventHandler func([]interface{})
 
 type SystemCustomEvent struct {
-	Event string
+	Event SystemCustomEventName
 	Args  []interface{}
 }
