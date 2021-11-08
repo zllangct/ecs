@@ -12,6 +12,7 @@ type EntityInfo struct {
 	mu  sync.RWMutex
 	components map[reflect.Type]IComponent
 	adding     map[reflect.Type]struct{}
+	once       map[reflect.Type]IComponent
 	entity     Entity
 }
 
@@ -20,6 +21,7 @@ func newEntityInfo(world *ecsWorld) *EntityInfo {
 		world:      world,
 		components: make(map[reflect.Type]IComponent),
 		adding	: make(map[reflect.Type]struct{}),
+		once: make(map[reflect.Type]IComponent),
 		entity:     newEntity(),
 	}
 	world.addEntity(entity)
@@ -61,8 +63,14 @@ func (e *EntityInfo) Has(components ...IComponent) bool {
 }
 
 func (e *EntityInfo) has(components ...IComponent) bool {
+	ok := false
 	for _, c := range components {
-		_, ok := e.components[c.Type()]
+		switch c.getComponentType() {
+		case ComponentTypeDisposable:
+			_, ok = e.once[c.Type()]
+		case ComponentTypeNormal:
+			_, ok = e.components[c.Type()]
+		}
 		if !ok {
 			_, ok = e.adding[c.Type()]
 			if !ok {
@@ -77,7 +85,13 @@ func (e *EntityInfo) hasByType(types ...reflect.Type) bool {
 	for _, typ := range types {
 		_, ok := e.components[typ]
 		if !ok {
-			return false
+			_, ok = e.once[typ]
+			if !ok {
+				_, ok = e.adding[typ]
+				if !ok {
+					return false
+				}
+			}
 		}
 	}
 	return true
@@ -109,7 +123,8 @@ func (e *EntityInfo) Remove(components ...IComponent) {
 }
 
 func (e *EntityInfo) addComponent(com IComponent) error {
-	switch com.getComponentType() {
+	ct := com.getComponentType()
+	switch ct {
 	case ComponentTypeFree, ComponentTypeFreeDisposable:
 		return errors.New("this type of component can not add to entity")
 	}
@@ -126,14 +141,25 @@ func (e *EntityInfo) componentAdded(typ reflect.Type, com IComponent) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	e.components[typ] = com
+	delete(e.adding, typ)
+
+	if com.getComponentType() == ComponentTypeDisposable {
+		e.once[typ] = com
+	} else {
+		e.components[typ] = com
+	}
 }
 
-func (e *EntityInfo) componentDeleted(typ reflect.Type, com IComponent) {
+func (e *EntityInfo) componentDeleted(typ reflect.Type, comType ComponentType) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	delete(e.components, typ)
+	switch comType {
+	case ComponentTypeNormal:
+		delete(e.components, typ)
+	case ComponentTypeDisposable:
+		delete(e.once, typ)
+	}
 }
 
 func (e *EntityInfo) getComponent(com IComponent) IComponent {
@@ -145,4 +171,13 @@ func (e *EntityInfo) getComponentByType(typ reflect.Type) IComponent {
 	defer e.mu.RUnlock()
 
 	return e.components[typ]
+}
+
+func (e *EntityInfo) clearDisposable() {
+	e.mu.Lock()
+	defer  e.mu.Unlock()
+
+	if len(e.once) > 0 {
+		e.once = make(map[reflect.Type]IComponent)
+	}
 }

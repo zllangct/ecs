@@ -181,7 +181,7 @@ func (c *ComponentCollection) GetTempTasks() []func() (reflect.Type, []OperateIn
 					operate.com.deleteFromCollection(collection)
 					switch operate.com.getComponentType() {
 					case ComponentTypeNormal, ComponentTypeDisposable:
-						operate.target.componentDeleted(t, operate.com)
+						operate.target.componentDeleted(t, operate.com.getComponentType())
 					}
 					n = append(n, operate)
 				}
