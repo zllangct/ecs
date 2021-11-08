@@ -137,7 +137,9 @@ func (w *ecsWorld) run() {
 		}
 
 		ts = time.Now()
+		Log.Info("-----RUN")
 		w.systemFlow.run(delta)
+		Log.Info("-----END")
 		delta = time.Since(ts)
 		//w.Info(delta, frameInterval - delta)
 		if frameInterval-delta > 0 {

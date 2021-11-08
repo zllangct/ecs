@@ -16,7 +16,7 @@ type Node struct {
 func (p *Node) isFriend(node *Node) bool {
 	for com, _ := range p.val.Requirements() {
 		for comTarget, _ := range node.val.Requirements() {
-			if comTarget.String() == com.String() {
+			if comTarget == com {
 				return true
 			}
 		}
@@ -42,7 +42,7 @@ func (p *Node) attach(node *Node) {
 type SystemGroup struct {
 	lock    sync.Mutex
 	systems []*Node
-	ref     map[string]int
+	ref     map[reflect.Type]int
 	top     []*Node
 	root    *Node
 	ordered bool
@@ -53,7 +53,7 @@ func NewSystemGroup() *SystemGroup {
 	return &SystemGroup{
 		lock:    sync.Mutex{},
 		systems: make([]*Node, 0),
-		ref:     map[string]int{},
+		ref:     map[reflect.Type]int{},
 		ordered: false,
 	}
 }
@@ -61,7 +61,7 @@ func NewSystemGroup() *SystemGroup {
 func (p *SystemGroup) refCount(rqs map[reflect.Type]struct{}) int {
 	ref := 0
 	for com, _ := range rqs {
-		ref += p.ref[com.String()] - 1
+		ref += p.ref[com] - 1
 	}
 	return ref
 }
@@ -123,14 +123,14 @@ func (p *SystemGroup) insert(sys ISystem) {
 	//get system's required components
 	rqs := sys.Requirements()
 	if len(rqs) == 0 {
-		panic("invalid system")
+		//panic("invalid system")
 	}
 	//reference count
 	for com, _ := range rqs {
-		if _, ok := p.ref[com.String()]; ok {
-			p.ref[com.String()] += 1
+		if _, ok := p.ref[com]; ok {
+			p.ref[com] += 1
 		} else {
-			p.ref[com.String()] = 1
+			p.ref[com] = 1
 		}
 	}
 	//add system

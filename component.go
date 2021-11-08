@@ -190,6 +190,6 @@ func (c *Component[T]) Type() reflect.Type {
 	return c.realType
 }
 
-func (c *Component[T]) String() string {
+func (c *Component[T]) ToString() string {
 	return fmt.Sprintf("%+v", c.rawInstance())
 }

@@ -20,7 +20,7 @@ func (m *MoveSystem) Init() {
 }
 
 func (m *MoveSystem) UpdateTimeScale(timeScale []interface{}) {
-	ecs.Log.Infof("time scale change to %+v", timeScale)
+	ecs.Log.Info("time scale change to ", timeScale[0])
 	m.timeScale = timeScale[0].(float64)
 }
 

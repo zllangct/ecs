@@ -21,7 +21,8 @@ func NewGame() *FakeGame {
 
 func (f *FakeGame) Run(ctx context.Context) {
 	f.InitEcs()
-	f.InitNetwork()
+	//f.InitChat()
+	//f.InitNetwork()
 }
 
 func (f *FakeGame) InitEcs() {
@@ -36,7 +37,7 @@ func (f *FakeGame) InitEcs() {
 
 	//register your system
 	ecs.RegisterSystem[MoveSystem](f.world)
-	ecs.RegisterSystem[SyncSystem](f.world)
+	//ecs.RegisterSystem[SyncSystem](f.world)
 	ecs.RegisterSystem[EmptySystem](f.world)
 }
 
@@ -118,6 +119,9 @@ func (f *FakeGame) Dispatch(pkg interface{}, sess *Session) {
 }
 
 func (f *FakeGame) ChangeMovementTimeScale(timeScale float64) {
+	if f.world == nil {
+		return
+	}
 	sys, ok := ecs.GetSystem[MoveSystem](f.world)
 	if !ok {
 		return

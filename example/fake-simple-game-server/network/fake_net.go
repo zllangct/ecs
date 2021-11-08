@@ -21,7 +21,7 @@ func (t *TcpConn) Write(in interface{}) {
 
 func (t *TcpConn) Read() interface{} {
 	read := <-t.r
-	ecs.Log.Info("Tcp Send message:", read)
+	ecs.Log.Info("Tcp Read message:", read)
 	return read
 }
 

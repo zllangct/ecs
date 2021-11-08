@@ -9,7 +9,9 @@ type ChatRoom struct {
 }
 
 func NewChatRoom(c *sync.Map) *ChatRoom {
-	return &ChatRoom{}
+	return &ChatRoom{
+		clients: &sync.Map{},
+	}
 }
 
 func (c *ChatRoom) Talk(content string) {
