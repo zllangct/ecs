@@ -91,7 +91,7 @@ func (p *systemFlow) run(delta time.Duration) {
 						if state == SystemStateInit {
 							switch period {
 							case PeriodStart:
-								system, ok := ss[i].(IEventStart)
+								system, ok := ss[i].(StartReceiver)
 								fn = system.Start
 								imp = ok
 							}
@@ -99,22 +99,22 @@ func (p *systemFlow) run(delta time.Duration) {
 						} else if state == SystemStateUpdate {
 							switch period {
 							case PeriodPreUpdate:
-								system, ok := sys.(IEventPreUpdate)
+								system, ok := sys.(PreUpdateReceiver)
 								fn = system.PreUpdate
 								imp = ok
 							case PeriodUpdate:
-								system, ok := ss[i].(IEventUpdate)
+								system, ok := ss[i].(UpdateReceiver)
 								fn = system.Update
 								imp = ok
 							case PeriodPostUpdate:
-								system, ok := ss[i].(IEventPostUpdate)
+								system, ok := ss[i].(PostUpdateReceiver)
 								fn = system.PostUpdate
 								imp = ok
 							}
 						} else if state == SystemStateDestroy {
 							switch period {
 							case PeriodDestroy:
-								system, ok := ss[i].(IEventDestroy)
+								system, ok := ss[i].(DestroyReceiver)
 								fn = system.Destroy
 								imp = ok
 								sys.setState(SystemStateInvalid)
@@ -204,15 +204,15 @@ func (p *systemFlow) register(system ISystem) {
 		imp := false
 		switch period {
 		case PeriodStart:
-			_, imp = system.(IEventStart)
+			_, imp = system.(StartReceiver)
 		case PeriodPreUpdate:
-			_, imp = system.(IEventPreUpdate)
+			_, imp = system.(PreUpdateReceiver)
 		case PeriodUpdate:
-			_, imp = system.(IEventUpdate)
+			_, imp = system.(UpdateReceiver)
 		case PeriodPostUpdate:
-			_, imp = system.(IEventPostUpdate)
+			_, imp = system.(PostUpdateReceiver)
 		case PeriodDestroy:
-			_, imp = system.(IEventDestroy)
+			_, imp = system.(DestroyReceiver)
 		}
 
 		if !imp {

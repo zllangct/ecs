@@ -6,42 +6,42 @@ type Event struct {
 	Delta time.Duration
 }
 
-type IEventInit interface {
+type InitReceiver interface {
 	Init()
 }
 
-type IEventPreStart interface {
+type PreStartReceiver interface {
 	PreStart(event Event)
 }
 
-type IEventStart interface {
+type StartReceiver interface {
 	Start(event Event)
 }
 
-type IEventPostStart interface {
+type PostStartReceiver interface {
 	PostStart(event Event)
 }
 
-type IEventPreUpdate interface {
+type PreUpdateReceiver interface {
 	PreUpdate(event Event)
 }
 
-type IEventUpdate interface {
+type UpdateReceiver interface {
 	Update(event Event)
 }
 
-type IEventPostUpdate interface {
+type PostUpdateReceiver interface {
 	PostUpdate(event Event)
 }
 
-type IEventPreDestroy interface {
+type PreDestroyReceiver interface {
 	PreDestroy(event Event)
 }
 
-type IEventDestroy interface {
+type DestroyReceiver interface {
 	Destroy(event Event)
 }
 
-type IEventPostDestroy interface {
+type PostDestroyReceiver interface {
 	PostDestroy(event Event)
 }

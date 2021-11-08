@@ -19,9 +19,9 @@ const (
 )
 
 const (
-	SystemCustomEventInvalid SystemCustomEventName = ""
-	SystemCustomEventPause                         = "__internal__Pause"
-	SystemCustomEventResume                        = "__internal__Resume"
+	SystemCustomEventInvalid CustomEventName = ""
+	SystemCustomEventPause                   = "__internal__Pause"
+	SystemCustomEventResume                  = "__internal__Resume"
 )
 
 type ISystem interface {
@@ -29,8 +29,7 @@ type ISystem interface {
 	Order() Order
 	World() IWorld
 	Requirements() map[reflect.Type]struct{}
-	Emit(event SystemCustomEventName, args ...interface{})
-
+	Emit(event CustomEventName, args ...interface{})
 	IsRequire(component IComponent) bool
 
 	isRequire(componentType reflect.Type) bool
@@ -51,7 +50,7 @@ type ISystemTemplate interface {
 type System[T any] struct {
 	lock         sync.Mutex
 	requirements map[reflect.Type]struct{}
-	events       map[SystemCustomEventName]SysEventHandler
+	events       map[CustomEventName]CustomEventHandler
 	eventQueue   *list.List
 	order        Order
 	world        *ecsWorld
@@ -70,18 +69,18 @@ func (s *System[T]) RawIns() *T {
 	return (*T)(unsafe.Pointer(s))
 }
 
-func (s *System[T]) EventRegister(event SystemCustomEventName, fn SysEventHandler) {
+func (s *System[T]) EventRegister(event CustomEventName, fn CustomEventHandler) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
 	s.events[event] = fn
 }
 
-func (s *System[T]) Emit(event SystemCustomEventName, args ...interface{}) {
+func (s *System[T]) Emit(event CustomEventName, args ...interface{}) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	s.eventQueue.PushBack(SystemCustomEvent{
+	s.eventQueue.PushBack(CustomEvent{
 		Event: event,
 		Args:  args,
 	})
@@ -92,7 +91,7 @@ func (s *System[T]) eventDispatch() {
 	defer s.lock.Unlock()
 
 	for i := s.eventQueue.Front(); i != nil; i = i.Next() {
-		e := i.Value.(SystemCustomEvent)
+		e := i.Value.(CustomEvent)
 		if fn, ok := s.events[e.Event]; ok {
 			err := TryAndReport(func() {
 				fn(e.Args)
@@ -175,7 +174,7 @@ func (s *System[T]) isRequire(typ reflect.Type) bool {
 
 func (s *System[T]) baseInit(world *ecsWorld, ins ISystem) {
 	s.requirements = map[reflect.Type]struct{}{}
-	s.events = make(map[SystemCustomEventName]SysEventHandler)
+	s.events = make(map[CustomEventName]CustomEventHandler)
 	s.eventQueue = list.New()
 
 	if ins.Order() == OrderInvalid {
@@ -186,7 +185,7 @@ func (s *System[T]) baseInit(world *ecsWorld, ins ISystem) {
 	s.EventRegister(SystemCustomEventPause, s.Pause)
 	s.EventRegister(SystemCustomEventResume, s.Resume)
 
-	if i, ok := ins.(IEventInit); ok {
+	if i, ok := ins.(InitReceiver); ok {
 		err := TryAndReport(func() {
 			i.Init()
 		})
