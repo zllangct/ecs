@@ -6,6 +6,8 @@ import (
 	"sync"
 )
 
+var emptyGroup []ISystem
+
 // system tree node
 type Node struct {
 	parent   *Node
@@ -34,6 +36,9 @@ func (p *Node) attach(node *Node) {
 		}
 	}
 	if !isAttached {
+		if p.val == node.val {
+			Log.Error("repeated system")
+		}
 		p.children = append(p.children, node)
 	}
 }
@@ -54,7 +59,7 @@ func NewSystemGroup() *SystemGroup {
 		lock:    sync.Mutex{},
 		systems: make([]*Node, 0),
 		ref:     map[reflect.Type]int{},
-		ordered: false,
+		ordered: true,
 	}
 }
 
@@ -86,24 +91,30 @@ func (p *SystemGroup) reset() {
 		}
 		p.ordered = true
 	}
-	// initialise the iterator
-	p.top = make([]*Node, 0)
-	if p.root != nil {
-		p.top = append(p.top, p.root)
+
+	if len(p.systems) == 0 {
+		return
 	}
+
+	// initialise the iterator
+	p.top = p.root.children
+	p.root.children = []*Node{}
 }
 
 //Pop a batch of independent system array
 func (p *SystemGroup) next() []ISystem {
-	temp := make([]*Node, 0)
+	if p.top == nil {
+		return emptyGroup
+	}
 	systems := make([]ISystem, 0)
-	for _, n := range p.top {
-		temp = append(temp, n.children...)
-		for _, sys := range n.children {
-			systems = append(systems, sys.val)
+	temp := p.top
+	p.top = make([]*Node, 0)
+	for _, s := range temp {
+		systems = append(systems, s.val)
+		for _, n := range s.children {
+			p.top = append(p.top, n)
 		}
 	}
-	p.top = temp
 	return systems
 }
 

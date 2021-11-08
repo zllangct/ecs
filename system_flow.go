@@ -76,7 +76,6 @@ func (p *systemFlow) init() {
 }
 
 func (p *systemFlow) run(delta time.Duration) {
-	Log.Info("=====================RUN START")
 	var sq OrderSequence
 	for _, period := range p.periodList {
 		sq = p.systemPeriod[period]
@@ -138,10 +137,8 @@ func (p *systemFlow) run(delta time.Duration) {
 			}
 		}
 	}
-	Log.Info("=====================RUN END 6")
 
 	p.wg.Wait()
-	Log.Info("=====================RUN END 5")
 
 	for _, period := range p.periodList {
 		sq = p.systemPeriod[period]
@@ -163,10 +160,8 @@ func (p *systemFlow) run(delta time.Duration) {
 			}
 		}
 	}
-	Log.Info("=====================RUN END 4")
 
 	p.wg.Wait()
-	Log.Info("=====================RUN END 3")
 
 	p.world.components.ClearDisposable()
 
@@ -188,14 +183,10 @@ func (p *systemFlow) run(delta time.Duration) {
 			wg.Done()
 		})
 	}
-	Log.Info("=====================RUN END 2")
 	p.wg.Wait()
-	Log.Info("=====================RUN END 1")
 
 	//Log.Info("new component this frame:", len(newList))
 	p.world.components.TempTasksDone(newList)
-
-	Log.Info("=====================RUN END")
 }
 
 //register method only in world init or func init(){}

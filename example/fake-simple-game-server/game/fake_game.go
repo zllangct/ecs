@@ -21,8 +21,8 @@ func NewGame() *FakeGame {
 
 func (f *FakeGame) Run(ctx context.Context) {
 	f.InitEcs()
-	//f.InitChat()
-	//f.InitNetwork()
+	f.InitChat()
+	f.InitNetwork()
 }
 
 func (f *FakeGame) InitEcs() {
@@ -37,7 +37,7 @@ func (f *FakeGame) InitEcs() {
 
 	//register your system
 	ecs.RegisterSystem[MoveSystem](f.world)
-	//ecs.RegisterSystem[SyncSystem](f.world)
+	ecs.RegisterSystem[SyncSystem](f.world)
 	ecs.RegisterSystem[EmptySystem](f.world)
 }
 
