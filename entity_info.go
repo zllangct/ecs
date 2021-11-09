@@ -9,7 +9,7 @@ import (
 
 type EntityInfo struct {
 	world      *ecsWorld
-	mu  sync.RWMutex
+	mu         sync.RWMutex
 	components map[reflect.Type]IComponent
 	adding     map[reflect.Type]struct{}
 	once       map[reflect.Type]IComponent
@@ -20,8 +20,8 @@ func newEntityInfo(world *ecsWorld) *EntityInfo {
 	entity := &EntityInfo{
 		world:      world,
 		components: make(map[reflect.Type]IComponent),
-		adding	: make(map[reflect.Type]struct{}),
-		once: make(map[reflect.Type]IComponent),
+		adding:     make(map[reflect.Type]struct{}),
+		once:       make(map[reflect.Type]IComponent),
 		entity:     newEntity(),
 	}
 	world.addEntity(entity)
@@ -118,7 +118,9 @@ func (e *EntityInfo) Remove(components ...IComponent) {
 			Log.Error(errors.New("repeat component:" + typ.Name()))
 			continue
 		}
-		e.world.deleteComponent(e, c)
+		if c.getComponentType() == ComponentTypeNormal {
+			e.world.deleteComponent(e, c)
+		}
 	}
 }
 
@@ -175,7 +177,7 @@ func (e *EntityInfo) getComponentByType(typ reflect.Type) IComponent {
 
 func (e *EntityInfo) clearDisposable() {
 	e.mu.Lock()
-	defer  e.mu.Unlock()
+	defer e.mu.Unlock()
 
 	if len(e.once) > 0 {
 		e.once = make(map[reflect.Type]IComponent)

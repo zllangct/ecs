@@ -138,7 +138,23 @@ func (p *systemFlow) run(delta time.Duration) {
 		}
 	}
 
+	buckets := p.world.entities.getBuckets()
+	for _, bucket := range buckets {
+		b := bucket
+		wg := p.wg
+		wg.Add(1)
+		Runtime.addJob(func() {
+			b.Range(func(key Entity, value *EntityInfo) bool {
+				value.clearDisposable()
+				return true
+			})
+			wg.Done()
+		})
+	}
+
 	p.wg.Wait()
+
+	p.world.components.ClearDisposable()
 
 	for _, period := range p.periodList {
 		sq = p.systemPeriod[period]
@@ -160,25 +176,6 @@ func (p *systemFlow) run(delta time.Duration) {
 			}
 		}
 	}
-
-
-	buckets := p.world.entities.getBuckets()
-	for _, bucket := range buckets {
-		b := bucket
-		wg := p.wg
-		wg.Add(1)
-		Runtime.addJob(func() {
-			b.Range(func(key Entity, value *EntityInfo) bool {
-				value.clearDisposable()
-				return true
-			})
-			wg.Done()
-		})
-	}
-
-	p.wg.Wait()
-
-	p.world.components.ClearDisposable()
 
 	tasks := p.world.components.GetTempTasks()
 	//Log.Info("temp task count:", len(tasks))

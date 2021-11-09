@@ -86,7 +86,10 @@ func (p *SystemGroup) reset() {
 				val:      nil,
 			}
 		}
+
+		p.root.children = []*Node{}
 		for _, node := range p.systems {
+			node.children = []*Node{}
 			p.root.attach(node)
 		}
 		p.ordered = true
@@ -98,7 +101,6 @@ func (p *SystemGroup) reset() {
 
 	// initialise the iterator
 	p.top = p.root.children
-	p.root.children = []*Node{}
 }
 
 //Pop a batch of independent system array
