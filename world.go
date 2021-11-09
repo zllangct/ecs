@@ -30,6 +30,7 @@ type IWorld interface {
 
 	register(system ISystem)
 	registerForT(system interface{}, order ...Order)
+	addFreeComponent(component IComponent)
 	getComponents(typ reflect.Type) interface{}
 	getNewComponents(typ reflect.Type) []OperateInfo
 	getEntityInfo(id Entity) *EntityInfo
@@ -218,6 +219,6 @@ func (w *ecsWorld) deleteComponent(info *EntityInfo, component IComponent) {
 	w.components.TempTemplateOperate(info, component, CollectionOperateDelete)
 }
 
-func (w *ecsWorld) AddFreeComponent(component IComponent) {
+func (w *ecsWorld) addFreeComponent(component IComponent) {
 	w.addComponent(nil, component)
 }

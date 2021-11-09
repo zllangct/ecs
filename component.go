@@ -29,6 +29,11 @@ type IComponentTemplate interface {
 	b26897f1d0938a734939da7d2f8aaedc()
 }
 
+type IFreeComponentTemplate interface {
+	sf8sg6s9s0s0df5g55dg8sd7f()
+	toIComponent(com interface{}) IComponent
+}
+
 const (
 	h4   = uint8(240)
 	l4   = uint8(15)
@@ -60,6 +65,12 @@ func (f *FreeComponent[T]) getComponentType() ComponentType {
 	return ComponentTypeFree
 }
 
+func (f FreeComponent[T]) sf8sg6s9s0s0df5g55dg8sd7f() {}
+
+func (f FreeComponent[T]) toIComponent(com interface{}) IComponent {
+	return com.(IComponent)
+}
+
 type DisposableComponent[T any] struct {
 	Component[T]
 }
@@ -75,6 +86,12 @@ type FreeDisposableComponent[T any] struct {
 func (f *FreeDisposableComponent[T]) getComponentType() ComponentType {
 	return ComponentTypeFreeDisposable
 }
+
+func (f FreeDisposableComponent[T]) toIComponent(com interface{}) IComponent {
+	return com.(IComponent)
+}
+
+func (f *FreeDisposableComponent[T]) sf8sg6s9s0s0df5g55dg8sd7f() {}
 
 type Component[T any] struct {
 	owner    *EntityInfo
@@ -101,13 +118,13 @@ func (c *Component[T]) addToCollection(collection interface{}) IComponent {
 		return nil
 	}
 	id, ins := cc.Add(c.rawInstance())
-	com := c.toIComponet(ins)
+	com := c.toIComponent(ins)
 	com.setID(id)
 	com.setState(ComponentStateActive)
 	return com
 }
 
-func (c *Component[T]) toIComponet(com interface{}) IComponent {
+func (c *Component[T]) toIComponent(com interface{}) IComponent {
 	return com.(IComponent)
 }
 

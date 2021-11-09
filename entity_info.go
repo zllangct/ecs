@@ -160,6 +160,7 @@ func (e *EntityInfo) componentDeleted(typ reflect.Type, comType ComponentType) {
 	case ComponentTypeNormal:
 		delete(e.components, typ)
 	case ComponentTypeDisposable:
+		Log.Info("delete disposable component")
 		delete(e.once, typ)
 	}
 }

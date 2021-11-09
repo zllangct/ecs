@@ -21,4 +21,6 @@ func (is *InputSystem) PreUpdate(event ecs.Event) {
 		mov.V = mc.V
 		mov.Dir = mc.Dir
 	}
+
+	//TODO 验证一次性组件的删除是否正常
 }

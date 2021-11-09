@@ -38,6 +38,7 @@ func (p *Node) attach(node *Node) {
 	if !isAttached {
 		if p.val == node.val {
 			Log.Error("repeated system")
+			return
 		}
 		p.children = append(p.children, node)
 	}

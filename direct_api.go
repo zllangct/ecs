@@ -54,6 +54,11 @@ func GetEntityInfo(world IWorld, entity Entity) *EntityInfo {
 	return world.getEntityInfo(entity)
 }
 
+func AddFreeComponent[T IFreeComponentTemplate](world IWorld, component *T) {
+	com := (*component).toIComponent(component)
+	world.addFreeComponent(com)
+}
+
 // entity api
 
 func NewEntity(world IWorld) *EntityInfo {
@@ -77,7 +82,21 @@ func AddRequireComponent[T IComponentTemplate](sys ISystem) {
 	sys.setRequirementsByType(TypeOf[T]())
 }
 
+func NewPeripheralSystem[T IPeripheralSystemTemplate]() *T {
+	var ins T
+	psys := ins.toPeripheralSystem(&ins)
+	psys.init()
+	if i, ok := psys.(InitReceiver); ok {
+		i.Init()
+	}
+	return &ins
+}
+
 func GetInterestedComponents[T any](sys ISystem) Iterator[T] {
+	if sys.getState() == SystemStateInvalid {
+		Log.Error("must init system first")
+		return nil
+	}
 	typ := GetType[T]()
 	if _, ok := sys.Requirements()[typ]; !ok {
 		Log.Error("not require, typ:", typ)
