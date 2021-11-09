@@ -61,7 +61,8 @@ func BenchmarkCollectionWrite(b *testing.B) {
 			Name:  "foo" + strconv.Itoa(n),
 		}
 
-		c.Add(item)
+		id, ret := c.Add(item)
+		_, _ = id, ret
 	}
 }
 

@@ -22,7 +22,9 @@ func (w *Worker) Start() {
 			case <-w.stop:
 				return
 			}
-			Try(job)
+			Try(job, func(err error) {
+				Log.Error(err)
+			})
 		}
 	}()
 }

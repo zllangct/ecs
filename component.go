@@ -101,11 +101,14 @@ func (c *Component[T]) addToCollection(collection interface{}) IComponent {
 		return nil
 	}
 	id, ins := cc.Add(c.rawInstance())
-	c.setID(id)
-	c.setState(ComponentStateActive)
-	var com IComponent
-	(*iface)(unsafe.Pointer(&com)).data = unsafe.Pointer(ins)
+	com := c.toIComponet(ins)
+	com.setID(id)
+	com.setState(ComponentStateActive)
 	return com
+}
+
+func (c *Component[T]) toIComponet(com interface{}) IComponent {
+	return com.(IComponent)
 }
 
 func (c *Component[T]) deleteFromCollection(collection interface{}) {
