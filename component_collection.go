@@ -51,16 +51,16 @@ func NewComponentCollection(k int) *ComponentCollection {
 		cc.locks[i] = sync.RWMutex{}
 	}
 	cc.optTemp = make([]map[reflect.Type][]OperateInfo, cc.bucket+1)
-	cc.resetOptTemp()
+	cc.initOptTemp()
 	cc.once = make([]map[reflect.Type]struct{}, cc.bucket+1)
-	cc.resetOnce()
+	cc.initOnce()
 
 	cc.componentsNew = make(map[reflect.Type][]OperateInfo)
 
 	return cc
 }
 
-func (c *ComponentCollection) resetOptTemp() {
+func (c *ComponentCollection) initOptTemp() {
 	for index := range c.optTemp {
 		c.locks[index].Lock()
 		c.optTemp[index] = make(map[reflect.Type][]OperateInfo)
@@ -68,7 +68,7 @@ func (c *ComponentCollection) resetOptTemp() {
 	}
 }
 
-func (c *ComponentCollection) resetOnce() {
+func (c *ComponentCollection) initOnce() {
 	for index := range c.once {
 		c.locks[index].Lock()
 		c.once[index] = make(map[reflect.Type]struct{})
@@ -78,35 +78,21 @@ func (c *ComponentCollection) resetOnce() {
 
 func (c *ComponentCollection) TempTemplateOperate(entity *EntityInfo, component IComponent, op CollectionOperate) {
 	var hash int64
-	var isOnce bool
 	switch component.getComponentType() {
-	case ComponentTypeFree:
+	case ComponentTypeFree,ComponentTypeFreeDisposable :
 		hash = int64((uintptr)(unsafe.Pointer(&hash))) & c.bucket
-		isOnce = false
-	case ComponentTypeFreeDisposable:
-		hash = int64((uintptr)(unsafe.Pointer(&hash))) & c.bucket
-		isOnce = true
-	case ComponentTypeNormal:
+	case ComponentTypeNormal, ComponentTypeDisposable:
 		if entity == nil {
 			Log.Errorf("invalid operate, entity is nil")
 			return
 		}
 		hash = entity.hashKey() & c.bucket
-		isOnce = false
-	case ComponentTypeDisposable:
-		if entity == nil {
-			Log.Errorf("invalid operate, entity is nil")
-			return
-		}
-		hash = entity.hashKey() & c.bucket
-		isOnce = true
 	}
 
 	typ := component.Type()
 	newOpt := NewTemplateOperateInfo(entity, component, op)
 
 	b := c.optTemp[hash]
-	o := c.once[hash]
 
 	c.locks[hash].Lock()
 	defer c.locks[hash].Unlock()
@@ -116,22 +102,29 @@ func (c *ComponentCollection) TempTemplateOperate(entity *EntityInfo, component 
 	} else {
 		b[typ] = []OperateInfo{newOpt}
 	}
-
-	if isOnce {
-		if _, ok := o[typ]; !ok {
-			o[typ] = Empty
-		}
-	}
 }
 
 func (c *ComponentCollection) ClearDisposable() {
-	for index := range c.once {
-		c.locks[index].Lock()
-		m :=c.once[index]
-		for typ, _ := range m {
-			c.RemoveAllByType(typ)
+	for i :=0; i < len(c.once); i++ {
+		c.locks[i].Lock()
+		m :=c.once[i]
+		if len(m) > 0 {
+			for typ, _ := range m {
+				c.RemoveAllByType(typ)
+				delete(m, typ)
+			}
 		}
-		c.locks[index].Unlock()
+		c.locks[i].Unlock()
+	}
+}
+
+func (c *ComponentCollection) DisposableTemp(com IComponent, typ reflect.Type){
+	hash := com.Owner().hashKey() & c.bucket
+	c.locks[hash].Lock()
+	defer c.locks[hash].Unlock()
+
+	if _, ok := c.once[hash][typ]; !ok {
+		c.once[hash][typ] = struct{}{}
 	}
 }
 
@@ -150,6 +143,7 @@ func (c *ComponentCollection) GetTempTasks() []func() (reflect.Type, []OperateIn
 				combination[typ] = op
 			}
 		}
+		c.optTemp[i] = make(map[reflect.Type][]OperateInfo)
 		c.locks[i].RUnlock()
 	}
 
@@ -172,8 +166,13 @@ func (c *ComponentCollection) GetTempTasks() []func() (reflect.Type, []OperateIn
 				case CollectionOperateAdd:
 					ret := operate.com.addToCollection(collection)
 					switch operate.com.getComponentType() {
-					case ComponentTypeNormal, ComponentTypeDisposable:
+					case ComponentTypeNormal:
 						operate.target.componentAdded(t, ret)
+					case ComponentTypeDisposable:
+						c.DisposableTemp(operate.com, t)
+						operate.target.componentAdded(t, ret)
+					case ComponentTypeFreeDisposable:
+						c.DisposableTemp(operate.com, t)
 					}
 					operate.com = ret
 					n = append(n, operate)
@@ -195,7 +194,6 @@ func (c *ComponentCollection) GetTempTasks() []func() (reflect.Type, []OperateIn
 
 func (c *ComponentCollection) TempTasksDone(newList map[reflect.Type][]OperateInfo) {
 	c.componentsNew = newList
-	c.resetOptTemp()
 }
 
 func (c *ComponentCollection) GetNewComponentsAll() map[reflect.Type][]OperateInfo {

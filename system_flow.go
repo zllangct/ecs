@@ -151,10 +151,8 @@ func (p *systemFlow) run(delta time.Duration) {
 			wg.Done()
 		})
 	}
-
-	p.wg.Wait()
-
 	p.world.components.ClearDisposable()
+	p.wg.Wait()
 
 	for _, period := range p.periodList {
 		sq = p.systemPeriod[period]

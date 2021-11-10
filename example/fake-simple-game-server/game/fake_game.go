@@ -39,6 +39,7 @@ func (f *FakeGame) InitEcs() {
 	ecs.RegisterSystem[MoveSystem](f.world)
 	ecs.RegisterSystem[SyncSystem](f.world)
 	ecs.RegisterSystem[EmptySystem](f.world)
+	ecs.RegisterSystem[InputSystem](f.world)
 }
 
 func (f *FakeGame) EnterGame(sess *Session) {
@@ -48,6 +49,10 @@ func (f *FakeGame) EnterGame(sess *Session) {
 		X: 100,
 		Y: 100,
 		Z: 100,
+	})
+	info.Add(&Movement{
+		V:   2000,
+		Dir: []int{1, 0, 0},
 	})
 
 	sess.Entity = info.Entity()

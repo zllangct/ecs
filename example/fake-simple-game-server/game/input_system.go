@@ -15,12 +15,16 @@ func (is *InputSystem) Init() {
 
 func (is *InputSystem) PreUpdate(event ecs.Event) {
 	iterMC := ecs.GetInterestedComponents[MoveChange](is)
+	if iterMC == nil {
+		return
+	}
 	var mov *Movement
 	for mc := iterMC.Begin(); !iterMC.End(); iterMC.Next() {
 		mov = ecs.CheckComponent[Movement](is, mc.Owner())
-		mov.V = mc.V
-		mov.Dir = mc.Dir
+		if mov != nil {
+			ecs.Log.Infof("move changed: old: %+v, new: %+v", mov, mc)
+			mov.V = mc.V
+			mov.Dir = mc.Dir
+		}
 	}
-
-	//TODO 验证一次性组件的删除是否正常
 }

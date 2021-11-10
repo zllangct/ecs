@@ -103,7 +103,7 @@ func (e *EntityInfo) Add(components ...IComponent) {
 
 	for _, c := range components {
 		if err := e.addComponent(c); err != nil {
-			Log.Error("repeat component:", err)
+			Log.Errorf("repeat component: %+v, %w", c, err)
 		}
 	}
 }
@@ -160,7 +160,6 @@ func (e *EntityInfo) componentDeleted(typ reflect.Type, comType ComponentType) {
 	case ComponentTypeNormal:
 		delete(e.components, typ)
 	case ComponentTypeDisposable:
-		Log.Info("delete disposable component")
 		delete(e.once, typ)
 	}
 }

@@ -2,6 +2,7 @@ package game
 
 import (
 	"github.com/zllangct/ecs"
+	"time"
 )
 
 type MoveSystemData struct {
@@ -12,6 +13,7 @@ type MoveSystemData struct {
 type MoveSystem struct {
 	ecs.System[MoveSystem]
 	timeScale float64
+	deltaTime time.Duration
 }
 
 func (m *MoveSystem) Init() {
@@ -26,6 +28,13 @@ func (m *MoveSystem) UpdateTimeScale(timeScale []interface{}) {
 
 func (m *MoveSystem) Update(event ecs.Event) {
 	delta := event.Delta
+
+	m.deltaTime += delta
+	isPrint := false
+	if m.deltaTime > time.Second * 3 {
+		isPrint = true
+		m.deltaTime = 0
+	}
 
 	iterPos := ecs.GetInterestedComponents[Position](m)
 	if iterPos == nil {
@@ -57,7 +66,9 @@ func (m *MoveSystem) Update(event ecs.Event) {
 		data.P.Y = data.P.Y + int(float64(data.M.Dir[1]*data.M.V)*delta.Seconds())
 		data.P.Z = data.P.Z + int(float64(data.M.Dir[2]*data.M.V)*delta.Seconds())
 
-		ecs.Log.Info("target id:", e, "delta:", delta, " current position:", data.P.X, data.P.Y, data.P.Z)
+		if isPrint {
+			ecs.Log.Info("target id:", e, "delta:", delta, " current position:", data.P.X, data.P.Y, data.P.Z)
+		}
 	}
 
 }

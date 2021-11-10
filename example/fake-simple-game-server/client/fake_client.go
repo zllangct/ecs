@@ -37,7 +37,8 @@ func (f *FakeClient) Run(ctx context.Context) {
 		for {
 			time.Sleep(time.Second * time.Duration(rand.Intn(5)))
 			idx := rand.Intn(len(c))
-			c[idx].Write(fmt.Sprintf("move:0,0,1:10"))
+			v := rand.Intn(1000)
+			c[idx].Write(fmt.Sprintf("move:0,0,1:%d", v))
 		}
 	}()
 
