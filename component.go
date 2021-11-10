@@ -91,7 +91,7 @@ func (f FreeDisposableComponent[T]) toIComponent(com interface{}) IComponent {
 	return com.(IComponent)
 }
 
-func (f *FreeDisposableComponent[T]) sf8sg6s9s0s0df5g55dg8sd7f() {}
+func (f FreeDisposableComponent[T]) sf8sg6s9s0s0df5g55dg8sd7f() {}
 
 type Component[T any] struct {
 	owner    *EntityInfo

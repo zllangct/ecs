@@ -3,7 +3,6 @@ package ecs
 import (
 	"reflect"
 	"sync"
-	"time"
 )
 
 const (
@@ -75,7 +74,7 @@ func (p *systemFlow) init() {
 	}
 }
 
-func (p *systemFlow) run(delta time.Duration) {
+func (p *systemFlow) run(event Event) {
 	var sq OrderSequence
 	for _, period := range p.periodList {
 		sq = p.systemPeriod[period]
@@ -129,7 +128,7 @@ func (p *systemFlow) run(delta time.Duration) {
 						wg := p.wg
 						Runtime.addJob(func() {
 							defer wg.Done()
-							fn(Event{Delta: delta})
+							fn(event)
 						})
 					}
 				}

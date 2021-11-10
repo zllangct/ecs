@@ -27,10 +27,10 @@ type IWorld interface {
 	GetStatus() WorldStatus
 	GetID() int64
 	NewEntity() *EntityInfo
+	AddFreeComponent(component IComponent)
 
 	register(system ISystem)
 	registerForT(system interface{}, order ...Order)
-	addFreeComponent(component IComponent)
 	getComponents(typ reflect.Type) interface{}
 	getNewComponents(typ reflect.Type) []OperateInfo
 	getEntityInfo(id Entity) *EntityInfo
@@ -124,6 +124,7 @@ func (w *ecsWorld) run() {
 
 	var ts time.Time
 	var delta time.Duration
+	var frame uint64
 	//main loop
 	for {
 		select {
@@ -138,7 +139,8 @@ func (w *ecsWorld) run() {
 		}
 
 		ts = time.Now()
-		w.systemFlow.run(delta)
+		w.systemFlow.run(Event{Delta: delta, Frame: frame})
+		frame++
 		delta = time.Since(ts)
 		//w.Info(delta, frameInterval - delta)
 		if frameInterval-delta > 0 {
@@ -219,6 +221,12 @@ func (w *ecsWorld) deleteComponent(info *EntityInfo, component IComponent) {
 	w.components.TempTemplateOperate(info, component, CollectionOperateDelete)
 }
 
-func (w *ecsWorld) addFreeComponent(component IComponent) {
+func (w *ecsWorld) AddFreeComponent(component IComponent) {
+	switch component.getComponentType() {
+	case ComponentTypeFree, ComponentTypeFreeDisposable:
+	default:
+		Log.Errorf("component not free type, %s", component.Type().String())
+		return
+	}
 	w.addComponent(nil, component)
 }

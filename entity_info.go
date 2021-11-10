@@ -103,7 +103,7 @@ func (e *EntityInfo) Add(components ...IComponent) {
 
 	for _, c := range components {
 		if err := e.addComponent(c); err != nil {
-			Log.Errorf("repeat component: %+v, %w", c, err)
+			Log.Errorf("component: %+v, %w", c, err)
 		}
 	}
 }
@@ -113,9 +113,8 @@ func (e *EntityInfo) Remove(components ...IComponent) {
 	defer e.mu.Unlock()
 
 	for _, c := range components {
-		typ := c.Type()
+		//typ := c.Type()
 		if !e.has(c) {
-			Log.Error(errors.New("repeat component:" + typ.Name()))
 			continue
 		}
 		if c.getComponentType() == ComponentTypeNormal {

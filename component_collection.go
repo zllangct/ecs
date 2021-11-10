@@ -119,7 +119,18 @@ func (c *ComponentCollection) ClearDisposable() {
 }
 
 func (c *ComponentCollection) DisposableTemp(com IComponent, typ reflect.Type){
-	hash := com.Owner().hashKey() & c.bucket
+	var hash int64
+	switch com.getComponentType() {
+	case ComponentTypeFree, ComponentTypeFreeDisposable :
+		hash = int64((uintptr)(unsafe.Pointer(&hash))) & c.bucket
+	case ComponentTypeNormal, ComponentTypeDisposable:
+		info := com.Owner()
+		if info == nil {
+			Log.Errorf("invalid operate, entity is nil")
+			return
+		}
+		hash = info.hashKey() & c.bucket
+	}
 	c.locks[hash].Lock()
 	defer c.locks[hash].Unlock()
 

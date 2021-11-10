@@ -3,6 +3,7 @@ package ecs
 import "time"
 
 type Event struct {
+	Frame uint64
 	Delta time.Duration
 }
 
