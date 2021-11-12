@@ -54,9 +54,8 @@ func GetEntityInfo(world IWorld, entity Entity) *EntityInfo {
 	return world.getEntityInfo(entity)
 }
 
-//TODO Bad fucntion
 func AddFreeComponent[T IFreeComponentTemplate](world IWorld, component *T) {
-	com := (*component).toIComponent(component)
+	com := (*component).toIComponent(interface{}(component))
 	world.AddFreeComponent(com)
 }
 
