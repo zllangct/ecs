@@ -4,7 +4,7 @@ import (
 	"unsafe"
 )
 
-type any interface {}
+type any interface{}
 
 type eface struct {
 	_type *_type

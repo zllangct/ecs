@@ -120,10 +120,10 @@ func (m *MoveSystem) Update(event ecs.Event) {
 		position := iter.Val()
 		owner := position.Owner()
 		/*
-		  无法通过Entity直接获取到所有组件，故意如此设计，保证在系统中错误修改非必须的组件，CheckComponent
+		  无法通过Entity直接获取到所有组件，故意如此设计，保证在系统中错误修改非必须的组件，GetRelatedComponent
 		  能够检查需要获取的组件是否是该系统所必须组件。
 		*/
-		movement := ecs.CheckComponent[Movement](m, owner)
+		movement := ecs.GetRelatedComponent[Movement](m, owner)
 		if movement == nil {
 			continue
 		}
@@ -218,11 +218,11 @@ func (d *DamageSystem) DataMatch() ([]Caster, []Target) {
 	var casters []Caster
 	for a := iterAction.Begin(); !iterAction.End(); iterAction.Next() {
 		caster := a.Owner()
-		p := ecs.CheckComponent[Position](d, caster)
+		p := ecs.GetRelatedComponent[Position](d, caster)
 		if p == nil {
 			continue
 		}
-		f := ecs.CheckComponent[Force](d, caster)
+		f := ecs.GetRelatedComponent[Force](d, caster)
 		if f == nil {
 			continue
 		}
@@ -246,7 +246,7 @@ func (d *DamageSystem) DataMatch() ([]Caster, []Target) {
 			continue
 		}
 
-		hp := ecs.CheckComponent[HealthPoint](d, target)
+		hp := ecs.GetRelatedComponent[HealthPoint](d, target)
 		if hp == nil {
 			continue
 		}

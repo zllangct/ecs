@@ -18,14 +18,14 @@ type IPeripheralSystem interface {
 }
 
 type PeripheralSystem[T any] struct {
-	lock       sync.RWMutex
-	events     map[CustomEventName]CustomEventHandler
-	eventQueue chan CustomEvent
-	cancel     context.CancelFunc
+	lock          sync.RWMutex
+	events        map[CustomEventName]CustomEventHandler
+	eventQueue    chan CustomEvent
+	cancel        context.CancelFunc
 	isInitialized bool
 }
 
-func (p PeripheralSystem[T]) sdf7xxh2l23h4h56g7g4g3lh43(){}
+func (p PeripheralSystem[T]) sdf7xxh2l23h4h56g7g4g3lh43() {}
 
 func (p PeripheralSystem[T]) toPeripheralSystem(psys interface{}) IPeripheralSystem {
 	return psys.(IPeripheralSystem)

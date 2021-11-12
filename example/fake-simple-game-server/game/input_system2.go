@@ -7,8 +7,8 @@ import (
 type MoveChange2 struct {
 	ecs.DisposableComponent[MoveChange2]
 	Entity ecs.Entity
-	V   int
-	Dir []int
+	V      int
+	Dir    []int
 }
 
 type InputSystem2 struct {
@@ -27,7 +27,7 @@ func (is *InputSystem2) PreUpdate(event ecs.Event) {
 	}
 	var mov *Movement
 	for mc := iterMC.Begin(); !iterMC.End(); iterMC.Next() {
-		mov = ecs.CheckComponent[Movement](is, mc.Owner())
+		mov = ecs.GetRelatedComponent[Movement](is, mc.Owner())
 		if mov != nil {
 			ecs.Log.Infof("move changed: old: %+v, new: %+v", mov, mc)
 			mov.V = mc.V

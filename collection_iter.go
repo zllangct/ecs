@@ -8,7 +8,7 @@ type Iterator[T any] interface {
 }
 
 type Iter[T any] struct {
-	c     *Collection[T]
+	c      *Collection[T]
 	len    int
 	offset int
 	cur    *T

@@ -31,7 +31,7 @@ func (m *MoveSystem) Update(event ecs.Event) {
 
 	m.deltaTime += delta
 	isPrint := false
-	if m.deltaTime > time.Second * 3 {
+	if m.deltaTime > time.Second*3 {
 		isPrint = true
 		m.deltaTime = 0
 	}
@@ -50,7 +50,7 @@ func (m *MoveSystem) Update(event ecs.Event) {
 	for iter := iterPos; !iter.End(); iter.Next() {
 		position := iter.Val()
 		owner := position.Owner()
-		movement := ecs.CheckComponent[Movement](m, owner)
+		movement := ecs.GetRelatedComponent[Movement](m, owner)
 		if movement == nil {
 			continue
 		}
@@ -70,5 +70,4 @@ func (m *MoveSystem) Update(event ecs.Event) {
 			ecs.Log.Info("target id:", e, "delta:", delta, " current position:", data.P.X, data.P.Y, data.P.Z)
 		}
 	}
-
 }

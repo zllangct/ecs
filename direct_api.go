@@ -112,7 +112,10 @@ func GetInterestedComponents[T any](sys ISystem) Iterator[T] {
 	return NewIterator(c.(*Collection[T]))
 }
 
-func CheckComponent[T any](sys ISystem, entity *EntityInfo) *T {
+func GetRelatedComponent[T any](sys ISystem, entity *EntityInfo) *T {
+	if entity == nil {
+		return nil
+	}
 	typ := TypeOf[T]()
 	isRequire := sys.isRequire(typ)
 	if !isRequire {

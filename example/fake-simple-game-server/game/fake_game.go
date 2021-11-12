@@ -9,6 +9,13 @@ import (
 	"test_ecs/network"
 )
 
+var send chan Msg2Client = make(chan Msg2Client, 10)
+
+type Msg2Client struct {
+	SessionID int
+	Content   interface{}
+}
+
 type FakeGame struct {
 	clients  sync.Map
 	world    ecs.IWorld
@@ -44,7 +51,9 @@ func (f *FakeGame) InitEcs() {
 
 func (f *FakeGame) EnterGame(sess *Session) {
 	info := f.world.NewEntity()
-	info.Add(&PlayerComponent{})
+	info.Add(&PlayerComponent{
+		SessionID: sess.SessionID,
+	})
 	info.Add(&Position{
 		X: 100,
 		Y: 100,
@@ -64,6 +73,19 @@ func (f *FakeGame) InitNetwork() {
 		return
 	}
 
+	go func() {
+		for {
+			select {
+			case m := <-send:
+				obj, ok := f.clients.Load(m.SessionID)
+				if ok {
+					sess := obj.(*Session)
+					sess.Conn.Write(m.Content)
+				}
+			}
+		}
+	}()
+
 	seq := 0
 	for {
 		conn := lis.Accept()
@@ -80,6 +102,13 @@ func (f *FakeGame) InitNetwork() {
 				f.Dispatch(pkg, sess)
 			}
 		}(conn, sess)
+	}
+}
+
+func SendToClient(sessionId int, content interface{}) {
+	send <- Msg2Client{
+		SessionID: sessionId,
+		Content:   content,
 	}
 }
 

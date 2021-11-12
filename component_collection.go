@@ -27,11 +27,11 @@ func NewTemplateOperateInfo(entity *EntityInfo, template IComponent, op Collecti
 type ComponentCollection struct {
 	collections map[reflect.Type]interface{}
 	//new component cache
-	bucket  int64
-	locks   []sync.RWMutex
-	optTemp []map[reflect.Type][]OperateInfo
+	bucket        int64
+	locks         []sync.RWMutex
+	optTemp       []map[reflect.Type][]OperateInfo
 	componentsNew map[reflect.Type][]OperateInfo
-	once    []map[reflect.Type]struct{}
+	once          []map[reflect.Type]struct{}
 }
 
 func NewComponentCollection(k int) *ComponentCollection {
@@ -79,7 +79,7 @@ func (c *ComponentCollection) initOnce() {
 func (c *ComponentCollection) TempTemplateOperate(entity *EntityInfo, component IComponent, op CollectionOperate) {
 	var hash int64
 	switch component.getComponentType() {
-	case ComponentTypeFree,ComponentTypeFreeDisposable :
+	case ComponentTypeFree, ComponentTypeFreeDisposable:
 		hash = int64((uintptr)(unsafe.Pointer(&hash))) & c.bucket
 	case ComponentTypeNormal, ComponentTypeDisposable:
 		if entity == nil {
@@ -105,9 +105,9 @@ func (c *ComponentCollection) TempTemplateOperate(entity *EntityInfo, component 
 }
 
 func (c *ComponentCollection) ClearDisposable() {
-	for i :=0; i < len(c.once); i++ {
+	for i := 0; i < len(c.once); i++ {
 		c.locks[i].Lock()
-		m :=c.once[i]
+		m := c.once[i]
 		if len(m) > 0 {
 			for typ, _ := range m {
 				c.RemoveAllByType(typ)
@@ -118,10 +118,10 @@ func (c *ComponentCollection) ClearDisposable() {
 	}
 }
 
-func (c *ComponentCollection) DisposableTemp(com IComponent, typ reflect.Type){
+func (c *ComponentCollection) DisposableTemp(com IComponent, typ reflect.Type) {
 	var hash int64
 	switch com.getComponentType() {
-	case ComponentTypeFree, ComponentTypeFreeDisposable :
+	case ComponentTypeFree, ComponentTypeFreeDisposable:
 		hash = int64((uintptr)(unsafe.Pointer(&hash))) & c.bucket
 	case ComponentTypeNormal, ComponentTypeDisposable:
 		info := com.Owner()
@@ -220,5 +220,5 @@ func (c *ComponentCollection) GetCollection(typ reflect.Type) interface{} {
 }
 
 func (c *ComponentCollection) RemoveAllByType(typ reflect.Type) {
-	delete(c.collections,typ)
+	delete(c.collections, typ)
 }

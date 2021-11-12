@@ -34,7 +34,7 @@ func (c *Collection[T]) Add(element *T) (int64, *T) {
 	Log.Info("collection Add:", ObjectToString(element))
 	if int64(len(c.data)) > c.len {
 		c.data[c.len] = *element
-	}else{
+	} else {
 		c.data = append(c.data, *element)
 	}
 	id := c.getID()
