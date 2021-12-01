@@ -38,18 +38,20 @@ func (f *FakeClient) Run(ctx context.Context) {
 			time.Sleep(time.Second * time.Duration(rand.Intn(5)))
 			idx := rand.Intn(len(c))
 			v := rand.Intn(1000)
-			c[idx].Write(fmt.Sprintf("move:0,0,1:%d", v))
+			dir := [3]int{0, 0, 0}
+			dir[rand.Intn(3)] = 1
+			c[idx].Write(fmt.Sprintf("move:%d,%d,%d:%d", dir[0], dir[1], dir[2], v))
 		}
 	}()
 
 	// simulation to accept pkg
 	for i, conn := range c {
-		go func(idx int) {
+		go func(idx int, conn *network.TcpConn) {
 			for {
 				pkg := conn.Read()
 				ecs.Log.Infof("client[%d] recv: %+v", idx, pkg)
 			}
-		}(i)
+		}(i, conn)
 	}
 
 	<-ctx.Done()

@@ -1,7 +1,5 @@
 package network
 
-import "github.com/zllangct/ecs"
-
 type TcpConn struct {
 	r chan interface{}
 	w chan interface{}
@@ -15,13 +13,13 @@ func NewTcpConn() *TcpConn {
 }
 
 func (t *TcpConn) Write(in interface{}) {
-	ecs.Log.Info("Tcp Send message:", in)
+	//ecs.Log.Info("Tcp Send message:", in)
 	t.w <- in
 }
 
 func (t *TcpConn) Read() interface{} {
 	read := <-t.r
-	ecs.Log.Info("Tcp Read message:", read)
+	//ecs.Log.Info("Tcp Read message:", read)
 	return read
 }
 

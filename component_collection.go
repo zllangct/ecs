@@ -112,6 +112,7 @@ func (c *ComponentCollection) ClearDisposable() {
 			for typ, _ := range m {
 				c.RemoveAllByType(typ)
 				delete(m, typ)
+				//Log.Info("collection Remove (Disposable):", typ.String())
 			}
 		}
 		c.locks[i].Unlock()

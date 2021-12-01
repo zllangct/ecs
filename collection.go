@@ -31,7 +31,7 @@ func (c *Collection[T]) getID() int64 {
 
 func (c *Collection[T]) Add(element *T) (int64, *T) {
 	idx := len(c.data)
-	Log.Info("collection Add:", ObjectToString(element))
+	//Log.Info("collection Add:", ObjectToString(element))
 	if int64(len(c.data)) > c.len {
 		c.data[c.len] = *element
 	} else {
@@ -53,6 +53,7 @@ func (c *Collection[T]) Remove(id int64) {
 	if !ok {
 		return
 	}
+	//Log.Info("collection Remove:", ObjectToString(c.data[idx]))
 	l := len(c.data)
 	c.ids[c.ids[int64(l)]] = idx
 	delete(c.ids, c.ids[-idx])
