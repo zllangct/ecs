@@ -26,7 +26,7 @@ func (is *InputSystem2) PreUpdate(event ecs.Event) {
 		return
 	}
 	var mov *Movement
-	for mc := iterMC.Begin(); !iterMC.End(); iterMC.Next() {
+	for mc := iterMC.Begin(); !iterMC.End(); mc = iterMC.Next() {
 		mov = ecs.GetRelatedComponent[Movement](is, mc.Owner())
 		if mov != nil {
 			ecs.Log.Infof("move changed: old: %+v, new: %+v", mov, mc)

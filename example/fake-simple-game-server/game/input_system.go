@@ -19,7 +19,7 @@ func (is *InputSystem) PreUpdate(event ecs.Event) {
 		return
 	}
 	var mov *Movement
-	for mc := iterMC.Begin(); !iterMC.End(); iterMC.Next() {
+	for mc := iterMC.Begin(); !iterMC.End(); mc = iterMC.Next() {
 		info := ecs.GetEntityInfo(is.World(), mc.Entity)
 		if info == nil {
 			continue
