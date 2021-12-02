@@ -56,7 +56,7 @@ func GetEntityInfo(world IWorld, entity Entity) *EntityInfo {
 
 func AddFreeComponent[T IFreeComponentTemplate](world IWorld, component *T) {
 	com := (*component).toIComponent(interface{}(component))
-	world.AddFreeComponent(com)
+	world.addFreeComponent(com)
 }
 
 // entity api

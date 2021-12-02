@@ -1,4 +1,4 @@
-module test_ecs
+module test_ecs_fake_server
 
 go 1.18
 

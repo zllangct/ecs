@@ -27,7 +27,6 @@ type IWorld interface {
 	GetStatus() WorldStatus
 	GetID() int64
 	NewEntity() *EntityInfo
-	AddFreeComponent(component IComponent)
 
 	register(system ISystem)
 	registerForT(system interface{}, order ...Order)
@@ -35,6 +34,7 @@ type IWorld interface {
 	getNewComponents(typ reflect.Type) []OperateInfo
 	getEntityInfo(id Entity) *EntityInfo
 	getSystem(sys reflect.Type) (ISystem, bool)
+	addFreeComponent(component IComponent)
 
 	b14d94e462795b8bd42a0bf62ae90826()
 }
@@ -221,7 +221,7 @@ func (w *ecsWorld) deleteComponent(info *EntityInfo, component IComponent) {
 	w.components.TempTemplateOperate(info, component, CollectionOperateDelete)
 }
 
-func (w *ecsWorld) AddFreeComponent(component IComponent) {
+func (w *ecsWorld) addFreeComponent(component IComponent) {
 	switch component.getComponentType() {
 	case ComponentTypeFree, ComponentTypeFreeDisposable:
 	default:

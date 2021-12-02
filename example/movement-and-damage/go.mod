@@ -1,4 +1,4 @@
-module test_ecs
+module test_ecs_m_d
 
 go 1.18
 

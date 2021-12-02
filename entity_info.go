@@ -36,7 +36,7 @@ func (e *EntityInfo) Destroy() {
 	for _, c := range e.components {
 		components = append(components, c)
 	}
-	e.Remove(components...)
+	e.remove(components...)
 	e.world.deleteEntity(e)
 }
 
@@ -108,10 +108,7 @@ func (e *EntityInfo) Add(components ...IComponent) {
 	}
 }
 
-func (e *EntityInfo) Remove(components ...IComponent) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-
+func (e *EntityInfo) remove(components ...IComponent) {
 	for _, c := range components {
 		//typ := c.Type()
 		if !e.has(c) {
@@ -121,6 +118,13 @@ func (e *EntityInfo) Remove(components ...IComponent) {
 			e.world.deleteComponent(e, c)
 		}
 	}
+}
+
+func (e *EntityInfo) Remove(components ...IComponent) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	e.remove(components...)
 }
 
 func (e *EntityInfo) addComponent(com IComponent) error {

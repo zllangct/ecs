@@ -150,7 +150,7 @@ func (f *FakeGame) Dispatch(pkg interface{}, sess *Session) {
 		//	Dir: dir,
 		//})
 
-		//f.world.AddFreeComponent(&MoveChange{
+		//f.world.addFreeComponent(&MoveChange{
 		//	Entity: sess.Entity,
 		//	V:      v,
 		//	Dir:    dir,

@@ -147,7 +147,7 @@ func (m *MoveSystem) Update(event ecs.Event) {
 		data.P.Y = data.P.Y + int(float64(data.M.Dir[1]*data.M.V)*delta.Seconds())
 		data.P.Z = data.P.Z + int(float64(data.M.Dir[2]*data.M.V)*delta.Seconds())
 
-		ecs.Log.Info("target id:", e, "delta:", delta, " current position:", data.P.X, data.P.Y, data.P.Z)
+		ecs.Log.Info("target id:", e, " delta:", delta, " current position:", data.P.X, data.P.Y, data.P.Z)
 	}
 }
 
@@ -336,7 +336,10 @@ func Runtime0() {
 		V:   2000,
 		Dir: []int{1, 0, 0},
 	}
-	world.NewEntity().Add(p1, m1)
+	e1 := world.NewEntity()
+	e1.Add(p1, m1)
+	ecs.Log.Info("e1:", e1.Entity())
+
 	p2 := &Position{
 		X: 100,
 		Y: 100,
@@ -346,7 +349,47 @@ func Runtime0() {
 		V:   2000,
 		Dir: []int{0, 1, 0},
 	}
-	world.NewEntity().Add(p2, m2)
+	e2 := world.NewEntity()
+	e2.Add(p2, m2)
+	ecs.Log.Info("e2:", e2.Entity())
+
+	p3 := &Position{
+		X: 100,
+		Y: 100,
+		Z: 100,
+	}
+	m3 := &Movement{
+		V:   2000,
+		Dir: []int{0, 1, 0},
+	}
+	e3 := world.NewEntity()
+	e3.Add(p3, m3)
+	ecs.Log.Info("e3:", e3.Entity())
+
+	time.Sleep(time.Second)
+	ecs.EntityDestroy(world, e3.Entity())
+
+	time.Sleep(time.Second)
+	info1 := ecs.GetEntityInfo(world, e1.Entity())
+	if info1 == nil {
+		ecs.Log.Info("info3 is empty")
+	} else {
+		ecs.Log.Info("info1:", info1)
+	}
+
+	info2 := ecs.GetEntityInfo(world, e2.Entity())
+	if info2 == nil {
+		ecs.Log.Info("info2 is empty")
+	} else {
+		ecs.Log.Info("info2:", info2)
+	}
+
+	info3 := ecs.GetEntityInfo(world, e3.Entity())
+	if info3 == nil {
+		ecs.Log.Info("info3 is empty")
+	} else {
+		ecs.Log.Info("info3:", info3)
+	}
 
 	//示例仅运行1秒
 	time.Sleep(time.Second * 1)
