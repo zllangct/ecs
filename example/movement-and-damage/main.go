@@ -393,6 +393,9 @@ func Runtime0() {
 
 	//示例仅运行1秒
 	time.Sleep(time.Second * 1)
+
+	ecs.DestroyWorld(world)
+	ecs.Log.Info("world stopped")
 }
 
 func main() {

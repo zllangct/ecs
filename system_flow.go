@@ -38,7 +38,7 @@ type OrderSequence []*SystemGroup
 
 //system execute flow
 type systemFlow struct {
-	sync.Mutex
+	lock         sync.Mutex
 	world        *ecsWorld
 	systemPeriod map[Period]OrderSequence
 	periodList   []Period
@@ -63,6 +63,10 @@ func (p *systemFlow) init() {
 		PeriodPostUpdate,
 		PeriodDestroy,
 	}
+	p.reset()
+}
+
+func (p *systemFlow) reset() {
 	p.systemPeriod = make(map[Period]OrderSequence)
 	for _, value := range p.periodList {
 		p.systemPeriod[value] = OrderSequence{}
@@ -75,6 +79,9 @@ func (p *systemFlow) init() {
 }
 
 func (p *systemFlow) run(event Event) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
 	var sq OrderSequence
 	for _, period := range p.periodList {
 		sq = p.systemPeriod[period]
@@ -200,6 +207,9 @@ func (p *systemFlow) run(event Event) {
 
 //register method only in world init or func init(){}
 func (p *systemFlow) register(system ISystem) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
 	//init function call
 	system.baseInit(p.world, system)
 
@@ -249,4 +259,11 @@ func (p *systemFlow) register(system ISystem) {
 			}
 		}
 	}
+}
+
+func (p *systemFlow) stop() {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	p.reset()
 }

@@ -71,6 +71,7 @@ func newWorld(runtime *ecsRuntime, config *WorldConfig) *ecsWorld {
 		components: NewComponentCollection(config.HashCount),
 		entities:   NewEntityCollection(config.HashCount),
 		status:     StatusInit,
+		wStop:      make(chan struct{}),
 	}
 
 	if world.config.DefaultFrameInterval <= 0 {
@@ -133,6 +134,7 @@ func (w *ecsWorld) run() {
 			if w.stopHandler != nil {
 				w.stopHandler(w)
 			}
+			w.systemFlow.stop()
 			w.mutex.Unlock()
 			return
 		default:
