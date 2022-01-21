@@ -35,8 +35,6 @@ type IWorld interface {
 	getEntityInfo(id Entity) *EntityInfo
 	getSystem(sys reflect.Type) (ISystem, bool)
 	addFreeComponent(component IComponent)
-
-	b14d94e462795b8bd42a0bf62ae90826()
 }
 
 type ecsWorld struct {
@@ -52,7 +50,6 @@ type ecsWorld struct {
 	runtime *ecsRuntime
 	//system flow,all systems
 	systemFlow *systemFlow
-	systems    sync.Map
 	//all components
 	components *ComponentCollection
 	//all entities
@@ -88,8 +85,6 @@ func newWorld(runtime *ecsRuntime, config *WorldConfig) *ecsWorld {
 	//generate world
 	return world
 }
-
-func (w *ecsWorld) b14d94e462795b8bd42a0bf62ae90826() {}
 
 func (w *ecsWorld) GetID() int64 {
 	return w.id
@@ -165,11 +160,7 @@ func (w *ecsWorld) GetStatus() WorldStatus {
 
 // Register register system
 func (w *ecsWorld) register(system ISystem) {
-	w.mutex.Lock()
-	defer w.mutex.Unlock()
-
 	w.systemFlow.register(system)
-	w.systems.Store(reflect.TypeOf(system), system)
 }
 
 func (w *ecsWorld) registerForT(system interface{}, order ...Order) {
@@ -181,8 +172,11 @@ func (w *ecsWorld) registerForT(system interface{}, order ...Order) {
 }
 
 func (w *ecsWorld) getSystem(sys reflect.Type) (ISystem, bool) {
-	s, ok := w.systems.Load(sys)
-	return s.(ISystem), ok
+	s, ok := w.systemFlow.systems.Load(sys)
+	if ok {
+		return s.(ISystem), ok
+	}
+	return nil, ok
 }
 
 // AddEntity entity operate : add

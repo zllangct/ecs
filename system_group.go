@@ -154,3 +154,45 @@ func (p *SystemGroup) insert(sys ISystem) {
 	}
 	p.systems = append(p.systems, node)
 }
+
+//has system
+func (p *SystemGroup) has(sys ISystem) bool {
+	for _, system := range p.systems {
+		if system.val.Type() == sys.Type() {
+			return true
+		}
+	}
+	return false
+}
+
+//remvoe system
+func (p *SystemGroup) remove(sys ISystem) {
+	//get system's required components
+	rqs := sys.Requirements()
+	if len(rqs) == 0 {
+		//panic("invalid system")
+	}
+	has := false
+	for i, system := range p.systems {
+		if system.val.ID() == sys.ID() {
+			p.systems = append(p.systems[:i], p.systems[i+1:]...)
+			has = true
+			break
+		}
+	}
+	if !has {
+		return
+	}
+	//set cluster no ordered
+	p.ordered = false
+	//reference count
+	for com, _ := range rqs {
+		if _, ok := p.ref[com]; ok {
+			p.ref[com] -= 1
+		} else {
+			println("component ref wrong")
+		}
+	}
+
+	p.reset()
+}

@@ -2,6 +2,7 @@ package ecs
 
 import (
 	"container/list"
+	"errors"
 	"reflect"
 	"sync"
 	"unsafe"
@@ -16,12 +17,14 @@ const (
 	SystemStatePause
 	SystemStateUpdate
 	SystemStateDestroy
+	SystemStateDestroyed
 )
 
 const (
 	SystemCustomEventInvalid CustomEventName = ""
 	SystemCustomEventPause                   = "__internal__Pause"
 	SystemCustomEventResume                  = "__internal__Resume"
+	SystemCustomEventStop                    = "__internal__Stop"
 )
 
 type ISystem interface {
@@ -31,6 +34,10 @@ type ISystem interface {
 	Requirements() map[reflect.Type]struct{}
 	Emit(event CustomEventName, args ...interface{})
 	IsRequire(component IComponent) bool
+	ID() int64
+	Pause()
+	Resume()
+	Stop()
 
 	isRequire(componentType reflect.Type) bool
 	setOrder(order Order)
@@ -56,6 +63,7 @@ type System[T any] struct {
 	world        *ecsWorld
 	realType     reflect.Type
 	state        SystemState
+	id           int64
 }
 
 func (s System[T]) d074634084a1556083fcd17c0254b557() {}
@@ -67,6 +75,13 @@ func (s *System[T]) Ins() (sys ISystem) {
 
 func (s *System[T]) RawIns() *T {
 	return (*T)(unsafe.Pointer(s))
+}
+
+func (s *System[T]) ID() int64 {
+	if s.id == 0 {
+		s.id = UniqueID()
+	}
+	return s.id
 }
 
 func (s *System[T]) EventRegister(event CustomEventName, fn CustomEventHandler) {
@@ -127,16 +142,43 @@ func (s *System[T]) setRequirements(rqs ...IComponent) {
 	}
 }
 
-func (s *System[T]) Pause(e []interface{}) {
-	if s.getState() == SystemStateUpdate {
-		s.setState(SystemStatePause)
-	}
+func (s *System[T]) Pause() {
+	s.Emit(SystemCustomEventPause, nil)
 }
 
-func (s *System[T]) Resume(e []interface{}) {
+func (s *System[T]) Resume() {
+	s.Emit(SystemCustomEventResume, nil)
+}
+
+func (s *System[T]) Stop() {
+	s.Emit(SystemCustomEventStop, nil)
+}
+
+func (s *System[T]) pause(e []interface{}) error {
+	if s.getState() == SystemStateUpdate {
+		s.setState(SystemStatePause)
+	} else {
+		return errors.New("system not running")
+	}
+	return nil
+}
+
+func (s *System[T]) resume(e []interface{}) error {
 	if s.getState() == SystemStatePause {
 		s.setState(SystemStateUpdate)
+	} else {
+		return errors.New("system not pausing")
 	}
+	return nil
+}
+
+func (s *System[T]) stop(e []interface{}) error {
+	if s.getState() == SystemStatePause {
+		s.setState(SystemStateUpdate)
+	} else {
+		return errors.New("system not pausing")
+	}
+	return nil
 }
 
 func (s *System[T]) getState() SystemState {
@@ -182,8 +224,24 @@ func (s *System[T]) baseInit(world *ecsWorld, ins ISystem) {
 	}
 	s.world = world
 
-	s.EventRegister(SystemCustomEventPause, s.Pause)
-	s.EventRegister(SystemCustomEventResume, s.Resume)
+	s.EventRegister(SystemCustomEventPause, func(i []interface{}) {
+		err := s.pause(i)
+		if err != nil {
+			Log.Error(err)
+		}
+	})
+	s.EventRegister(SystemCustomEventResume, func(i []interface{}) {
+		err := s.resume(i)
+		if err != nil {
+			Log.Error(err)
+		}
+	})
+	s.EventRegister(SystemCustomEventStop, func(i []interface{}) {
+		err := s.stop(i)
+		if err != nil {
+			Log.Error(err)
+		}
+	})
 
 	if i, ok := ins.(InitReceiver); ok {
 		err := TryAndReport(func() {

@@ -42,6 +42,7 @@ type systemFlow struct {
 	world        *ecsWorld
 	systemPeriod map[Period]OrderSequence
 	periodList   []Period
+	systems      sync.Map
 	wg           *sync.WaitGroup
 }
 
@@ -81,6 +82,8 @@ func (p *systemFlow) reset() {
 func (p *systemFlow) run(event Event) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
+
+	removeList := map[int64]ISystem{}
 
 	var sq OrderSequence
 	for _, period := range p.periodList {
@@ -123,7 +126,8 @@ func (p *systemFlow) run(event Event) {
 								system, ok := ss[i].(DestroyReceiver)
 								fn = system.Destroy
 								imp = ok
-								sys.setState(SystemStateInvalid)
+								sys.setState(SystemStateDestroyed)
+								removeList[sys.ID()] = sys
 							}
 						}
 
@@ -203,6 +207,11 @@ func (p *systemFlow) run(event Event) {
 
 	//Log.Info("new component this frame:", len(newList))
 	p.world.components.TempTasksDone(newList)
+
+	//do something clean
+	for _, system := range removeList {
+		p.unregister(system)
+	}
 }
 
 //register method only in world init or func init(){}
@@ -256,6 +265,44 @@ func (p *systemFlow) register(system ISystem) {
 					p.systemPeriod[period] = append(append(sl[:i-1], sg), temp...)
 					break
 				}
+			}
+		}
+	}
+}
+
+func (p *systemFlow) unregister(system ISystem) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	order := system.Order()
+	if order > OrderAppend {
+		Log.Errorf("system order must less then %d, reset order to %d", OrderAppend+1, OrderAppend)
+		order = OrderAppend
+	}
+
+	for _, period := range p.periodList {
+		imp := false
+		switch period {
+		case PeriodStart:
+			_, imp = system.(StartReceiver)
+		case PeriodPreUpdate:
+			_, imp = system.(PreUpdateReceiver)
+		case PeriodUpdate:
+			_, imp = system.(UpdateReceiver)
+		case PeriodPostUpdate:
+			_, imp = system.(PostUpdateReceiver)
+		case PeriodDestroy:
+			_, imp = system.(DestroyReceiver)
+		}
+
+		if !imp {
+			continue
+		}
+
+		sl := p.systemPeriod[period]
+		for _, group := range sl {
+			if group.has(system) {
+				group.remove(system)
 			}
 		}
 	}

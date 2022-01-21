@@ -17,7 +17,6 @@ type IComponent interface {
 	setState(state ComponentState)
 	getState() ComponentState
 	getComponentType() ComponentType
-	//init()
 
 	instance() IComponent
 	newCollection() interface{}
