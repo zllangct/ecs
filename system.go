@@ -51,7 +51,7 @@ type ISystem interface {
 }
 
 type ISystemTemplate interface {
-	d074634084a1556083fcd17c0254b557()
+	systemIdentification()
 }
 
 type System[T any] struct {
@@ -66,7 +66,7 @@ type System[T any] struct {
 	id           int64
 }
 
-func (s System[T]) d074634084a1556083fcd17c0254b557() {}
+func (s System[T]) systemIdentification() {}
 
 func (s *System[T]) Ins() (sys ISystem) {
 	(*iface)(unsafe.Pointer(&sys)).data = unsafe.Pointer(s)

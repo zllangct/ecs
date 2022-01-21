@@ -24,13 +24,22 @@ type IComponent interface {
 	deleteFromCollection(collection interface{})
 }
 
-type IComponentTemplate interface {
-	b26897f1d0938a734939da7d2f8aaedc()
+type ComponentObject interface {
+	componentIdentification()
 }
 
-type IFreeComponentTemplate interface {
-	sf8sg6s9s0s0df5g55dg8sd7f()
-	toIComponent(com interface{}) IComponent
+type FreeComponentObject interface {
+	freeComponentIdentification()
+}
+
+type ComponentPointer[T ComponentObject] interface {
+	IComponent
+	*T
+}
+
+type FreeComponentPointer[T FreeComponentObject] interface {
+	IComponent
+	*T
 }
 
 const (
@@ -64,11 +73,7 @@ func (f *FreeComponent[T]) getComponentType() ComponentType {
 	return ComponentTypeFree
 }
 
-func (f FreeComponent[T]) sf8sg6s9s0s0df5g55dg8sd7f() {}
-
-func (f FreeComponent[T]) toIComponent(com interface{}) IComponent {
-	return com.(IComponent)
-}
+func (f FreeComponent[T]) freeComponentIdentification() {}
 
 type DisposableComponent[T any] struct {
 	Component[T]
@@ -86,11 +91,7 @@ func (f *FreeDisposableComponent[T]) getComponentType() ComponentType {
 	return ComponentTypeFreeDisposable
 }
 
-func (f FreeDisposableComponent[T]) toIComponent(com interface{}) IComponent {
-	return com.(IComponent)
-}
-
-func (f FreeDisposableComponent[T]) sf8sg6s9s0s0df5g55dg8sd7f() {}
+func (f FreeDisposableComponent[T]) freeComponentIdentification() {}
 
 type Component[T any] struct {
 	owner    *EntityInfo
@@ -99,7 +100,7 @@ type Component[T any] struct {
 	st       uint8
 }
 
-func (c Component[T]) b26897f1d0938a734939da7d2f8aaedc() {}
+func (c Component[T]) componentIdentification() {}
 
 func (c *Component[T]) init() {
 	c.setType(c.getComponentType())

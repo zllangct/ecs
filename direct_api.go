@@ -54,9 +54,8 @@ func GetEntityInfo(world IWorld, entity Entity) *EntityInfo {
 	return world.getEntityInfo(entity)
 }
 
-func AddFreeComponent[T IFreeComponentTemplate](world IWorld, component *T) {
-	com := (*component).toIComponent(interface{}(component))
-	world.addFreeComponent(com)
+func AddFreeComponent[T FreeComponentObject, TP FreeComponentPointer[T]](world IWorld, component *T) {
+	world.addFreeComponent(TP(component))
 }
 
 // entity api
@@ -78,7 +77,7 @@ func EntityDestroy(world IWorld, entity Entity) {
 
 // system api
 
-func AddRequireComponent[T IComponentTemplate](sys ISystem) {
+func AddRequireComponent[T ComponentObject](sys ISystem) {
 	sys.setRequirementsByType(TypeOf[T]())
 }
 
