@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/zllangct/ecs"
 	"math/rand"
-	"test_ecs/network"
+	"test_ecs_fake_server/network"
 	"time"
 )
 

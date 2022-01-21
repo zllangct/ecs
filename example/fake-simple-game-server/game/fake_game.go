@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"test_ecs/network"
+	"test_ecs_fake_server/network"
 )
 
 var send chan Msg2Client = make(chan Msg2Client, 10)

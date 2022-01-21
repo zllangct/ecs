@@ -3,7 +3,7 @@ package gm
 import (
 	"context"
 	"math/rand"
-	"test_ecs/game"
+	"test_ecs_fake_server/game"
 	"time"
 )
 

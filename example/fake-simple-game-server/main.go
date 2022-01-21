@@ -5,9 +5,9 @@ import (
 	"github.com/zllangct/ecs"
 	"net/http"
 	_ "net/http/pprof"
-	"test_ecs/client"
-	"test_ecs/game"
-	"test_ecs/gm"
+	"test_ecs_fake_server/client"
+	"test_ecs_fake_server/game"
+	"test_ecs_fake_server/gm"
 )
 
 func main() {
