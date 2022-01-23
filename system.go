@@ -54,7 +54,12 @@ type SystemObject interface {
 	systemIdentification()
 }
 
-type System[T SystemObject] struct {
+type SystemPointer[T SystemObject] interface {
+	ISystem
+	*T
+}
+
+type System[T SystemObject, TP SystemPointer[T]] struct {
 	lock         sync.Mutex
 	requirements map[reflect.Type]struct{}
 	events       map[CustomEventName]CustomEventHandler
@@ -66,32 +71,32 @@ type System[T SystemObject] struct {
 	id           int64
 }
 
-func (s System[T]) systemIdentification() {}
+func (s System[T, TP]) systemIdentification() {}
 
-func (s *System[T]) Ins() (sys ISystem) {
+func (s *System[T, TP]) Ins() (sys ISystem) {
 	(*iface)(unsafe.Pointer(&sys)).data = unsafe.Pointer(s)
 	return
 }
 
-func (s *System[T]) rawInstance() *T {
+func (s *System[T, TP]) rawInstance() *T {
 	return (*T)(unsafe.Pointer(s))
 }
 
-func (s *System[T]) ID() int64 {
+func (s *System[T, TP]) ID() int64 {
 	if s.id == 0 {
 		s.id = UniqueID()
 	}
 	return s.id
 }
 
-func (s *System[T]) EventRegister(event CustomEventName, fn CustomEventHandler) {
+func (s *System[T, TP]) EventRegister(event CustomEventName, fn CustomEventHandler) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
 	s.events[event] = fn
 }
 
-func (s *System[T]) Emit(event CustomEventName, args ...interface{}) {
+func (s *System[T, TP]) Emit(event CustomEventName, args ...interface{}) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -101,7 +106,7 @@ func (s *System[T]) Emit(event CustomEventName, args ...interface{}) {
 	})
 }
 
-func (s *System[T]) eventDispatch() {
+func (s *System[T, TP]) eventDispatch() {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -122,15 +127,15 @@ func (s *System[T]) eventDispatch() {
 	s.eventQueue.Init()
 }
 
-func (s *System[T]) SetRequirements(rqs ...IComponent) {
+func (s *System[T, TP]) SetRequirements(rqs ...IComponent) {
 	s.setRequirements(rqs...)
 }
 
-func (s *System[T]) isInitialized() bool {
+func (s *System[T, TP]) isInitialized() bool {
 	return s.state >= SystemStateInit
 }
 
-func (s *System[T]) setRequirements(rqs ...IComponent) {
+func (s *System[T, TP]) setRequirements(rqs ...IComponent) {
 	if s.isInitialized() {
 		return
 	}
@@ -142,19 +147,19 @@ func (s *System[T]) setRequirements(rqs ...IComponent) {
 	}
 }
 
-func (s *System[T]) Pause() {
+func (s *System[T, TP]) Pause() {
 	s.Emit(SystemCustomEventPause, nil)
 }
 
-func (s *System[T]) Resume() {
+func (s *System[T, TP]) Resume() {
 	s.Emit(SystemCustomEventResume, nil)
 }
 
-func (s *System[T]) Stop() {
+func (s *System[T, TP]) Stop() {
 	s.Emit(SystemCustomEventStop, nil)
 }
 
-func (s *System[T]) pause(e []interface{}) error {
+func (s *System[T, TP]) pause(e []interface{}) error {
 	if s.getState() == SystemStateUpdate {
 		s.setState(SystemStatePause)
 	} else {
@@ -163,7 +168,7 @@ func (s *System[T]) pause(e []interface{}) error {
 	return nil
 }
 
-func (s *System[T]) resume(e []interface{}) error {
+func (s *System[T, TP]) resume(e []interface{}) error {
 	if s.getState() == SystemStatePause {
 		s.setState(SystemStateUpdate)
 	} else {
@@ -172,7 +177,7 @@ func (s *System[T]) resume(e []interface{}) error {
 	return nil
 }
 
-func (s *System[T]) stop(e []interface{}) error {
+func (s *System[T, TP]) stop(e []interface{}) error {
 	if s.getState() == SystemStatePause {
 		s.setState(SystemStateUpdate)
 	} else {
@@ -181,15 +186,15 @@ func (s *System[T]) stop(e []interface{}) error {
 	return nil
 }
 
-func (s *System[T]) getState() SystemState {
+func (s *System[T, TP]) getState() SystemState {
 	return s.state
 }
 
-func (s *System[T]) setState(state SystemState) {
+func (s *System[T, TP]) setState(state SystemState) {
 	s.state = state
 }
 
-func (s *System[T]) setRequirementsByType(rqs ...reflect.Type) {
+func (s *System[T, TP]) setRequirementsByType(rqs ...reflect.Type) {
 	if s.isInitialized() {
 		return
 	}
@@ -201,20 +206,20 @@ func (s *System[T]) setRequirementsByType(rqs ...reflect.Type) {
 	}
 }
 
-func (s *System[T]) Requirements() map[reflect.Type]struct{} {
+func (s *System[T, TP]) Requirements() map[reflect.Type]struct{} {
 	return s.requirements
 }
 
-func (s *System[T]) IsRequire(com IComponent) bool {
+func (s *System[T, TP]) IsRequire(com IComponent) bool {
 	return s.isRequire(com.Type())
 }
 
-func (s *System[T]) isRequire(typ reflect.Type) bool {
+func (s *System[T, TP]) isRequire(typ reflect.Type) bool {
 	_, ok := s.requirements[typ]
 	return ok
 }
 
-func (s *System[T]) baseInit(world *ecsWorld, ins ISystem) {
+func (s *System[T, TP]) baseInit(world *ecsWorld, ins ISystem) {
 	s.requirements = map[reflect.Type]struct{}{}
 	s.events = make(map[CustomEventName]CustomEventHandler)
 	s.eventQueue = list.New()
@@ -255,14 +260,14 @@ func (s *System[T]) baseInit(world *ecsWorld, ins ISystem) {
 	s.state = SystemStateInit
 }
 
-func (s *System[T]) Type() reflect.Type {
+func (s *System[T, TP]) Type() reflect.Type {
 	if s.realType == nil {
 		s.realType = TypeOf[T]()
 	}
 	return s.realType
 }
 
-func (s *System[T]) setOrder(order Order) {
+func (s *System[T, TP]) setOrder(order Order) {
 	if s.isInitialized() {
 		return
 	}
@@ -270,15 +275,15 @@ func (s *System[T]) setOrder(order Order) {
 	s.order = order
 }
 
-func (s *System[T]) Order() Order {
+func (s *System[T, TP]) Order() Order {
 	return s.order
 }
 
-func (s *System[T]) World() IWorld {
+func (s *System[T, TP]) World() IWorld {
 	return s.world
 }
 
-func (s *System[T]) GetInterested(typ reflect.Type) interface{} {
+func (s *System[T, TP]) GetInterested(typ reflect.Type) interface{} {
 	if _, ok := s.requirements[typ]; !ok {
 		return nil
 	}
@@ -286,7 +291,7 @@ func (s *System[T]) GetInterested(typ reflect.Type) interface{} {
 	return s.World().getComponents(typ)
 }
 
-func (s *System[T]) GetInterestedNew() map[reflect.Type][]OperateInfo {
+func (s *System[T, TP]) GetInterestedNew() map[reflect.Type][]OperateInfo {
 	ls := map[reflect.Type][]OperateInfo{}
 	for typ, _ := range s.Requirements() {
 		if n := s.World().getNewComponents(typ); n != nil {
@@ -296,11 +301,11 @@ func (s *System[T]) GetInterestedNew() map[reflect.Type][]OperateInfo {
 	return ls
 }
 
-func (s *System[T]) CheckComponent(info *EntityInfo, com IComponent) IComponent {
+func (s *System[T, TP]) CheckComponent(info *EntityInfo, com IComponent) IComponent {
 	return s.checkComponent(info, com)
 }
 
-func (s *System[T]) checkComponent(entity *EntityInfo, com IComponent) IComponent {
+func (s *System[T, TP]) checkComponent(entity *EntityInfo, com IComponent) IComponent {
 	isRequire := s.IsRequire(com)
 	if !isRequire {
 		return nil
@@ -309,6 +314,6 @@ func (s *System[T]) checkComponent(entity *EntityInfo, com IComponent) IComponen
 	return entity.getComponent(com)
 }
 
-func (s *System[T]) GetEntityInfo(entity Entity) *EntityInfo {
+func (s *System[T, TP]) GetEntityInfo(entity Entity) *EntityInfo {
 	return s.world.getEntityInfo(entity)
 }
