@@ -6,42 +6,6 @@ import (
 	"unsafe"
 )
 
-type IComponent interface {
-	Owner() *EntityInfo
-	Type() reflect.Type
-	ID() int64
-	Template() IComponent
-
-	setOwner(owner *EntityInfo)
-	setID(id int64)
-	setState(state ComponentState)
-	getState() ComponentState
-	getComponentType() ComponentType
-
-	instance() IComponent
-	newCollection() interface{}
-	addToCollection(collection interface{}) IComponent
-	deleteFromCollection(collection interface{})
-}
-
-type ComponentObject interface {
-	componentIdentification()
-}
-
-type FreeComponentObject interface {
-	freeComponentIdentification()
-}
-
-type ComponentPointer[T ComponentObject] interface {
-	IComponent
-	*T
-}
-
-type FreeComponentPointer[T FreeComponentObject] interface {
-	IComponent
-	*T
-}
-
 const (
 	h4   = uint8(240)
 	l4   = uint8(15)
@@ -65,7 +29,59 @@ const (
 	ComponentTypeFreeDisposable
 )
 
-type FreeComponent[T any] struct {
+type IComponent interface {
+	Owner() *EntityInfo
+	Type() reflect.Type
+	ID() int64
+
+	setOwner(owner *EntityInfo)
+	setID(id int64)
+	setState(state ComponentState)
+	getState() ComponentState
+	getComponentType() ComponentType
+
+	instance() IComponent
+	newCollection() interface{}
+	addToCollection(collection interface{}) IComponent
+	deleteFromCollection(collection interface{})
+}
+
+type ComponentObject interface {
+	componentIdentification()
+}
+
+type FreeComponentObject interface {
+	ComponentObject
+	freeComponentIdentification()
+}
+
+type DisposableComponentObject interface {
+	ComponentObject
+	disposableComponentIdentification()
+}
+
+type FreeDisposableComponentObject interface {
+	ComponentObject
+	freeComponentIdentification()
+	disposableComponentIdentification()
+}
+
+type ComponentPointer[T ComponentObject] interface {
+	IComponent
+	*T
+}
+
+type FreeComponentPointer[T FreeComponentObject] interface {
+	IComponent
+	*T
+}
+
+type DisposableComponentPointer[T FreeDisposableComponentObject] interface {
+	IComponent
+	*T
+}
+
+type FreeComponent[T FreeComponentObject] struct {
 	Component[T]
 }
 
@@ -75,7 +91,7 @@ func (f *FreeComponent[T]) getComponentType() ComponentType {
 
 func (f FreeComponent[T]) freeComponentIdentification() {}
 
-type DisposableComponent[T any] struct {
+type DisposableComponent[T DisposableComponentObject] struct {
 	Component[T]
 }
 
@@ -83,7 +99,9 @@ func (f *DisposableComponent[T]) getComponentType() ComponentType {
 	return ComponentTypeDisposable
 }
 
-type FreeDisposableComponent[T any] struct {
+func (f DisposableComponent[T]) disposableComponentIdentification() {}
+
+type FreeDisposableComponent[T FreeComponentObject] struct {
 	Component[T]
 }
 
@@ -93,7 +111,9 @@ func (f *FreeDisposableComponent[T]) getComponentType() ComponentType {
 
 func (f FreeDisposableComponent[T]) freeComponentIdentification() {}
 
-type Component[T any] struct {
+func (f FreeDisposableComponent[T]) disposableComponentIdentification() {}
+
+type Component[T ComponentObject] struct {
 	owner    *EntityInfo
 	id       int64
 	realType reflect.Type
@@ -193,10 +213,6 @@ func (c *Component[T]) Remove() {
 		return
 	}
 	c.owner.Remove(c)
-}
-
-func (c *Component[T]) Template() IComponent {
-	return c
 }
 
 func (c *Component[T]) Owner() *EntityInfo {

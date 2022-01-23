@@ -42,11 +42,11 @@ func GetWorldStatus(world IWorld) WorldStatus {
 	return world.GetStatus()
 }
 
-func RegisterSystem[T ISystemTemplate](world IWorld, order ...Order) {
+func RegisterSystem[T SystemObject](world IWorld, order ...Order) {
 	world.registerForT(new(T), order...)
 }
 
-func GetSystem[T ISystemTemplate](w IWorld) (ISystem, bool) {
+func GetSystem[T SystemObject](w IWorld) (ISystem, bool) {
 	return w.getSystem(TypeOf[T]())
 }
 

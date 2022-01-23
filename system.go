@@ -50,11 +50,11 @@ type ISystem interface {
 	eventDispatch()
 }
 
-type ISystemTemplate interface {
+type SystemObject interface {
 	systemIdentification()
 }
 
-type System[T any] struct {
+type System[T SystemObject] struct {
 	lock         sync.Mutex
 	requirements map[reflect.Type]struct{}
 	events       map[CustomEventName]CustomEventHandler
@@ -73,7 +73,7 @@ func (s *System[T]) Ins() (sys ISystem) {
 	return
 }
 
-func (s *System[T]) RawIns() *T {
+func (s *System[T]) rawInstance() *T {
 	return (*T)(unsafe.Pointer(s))
 }
 
