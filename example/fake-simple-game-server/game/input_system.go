@@ -15,9 +15,6 @@ func (is *InputSystem) Init() {
 
 func (is *InputSystem) PreUpdate(event ecs.Event) {
 	iterMC := ecs.GetInterestedComponents[MoveChange](is)
-	if iterMC == nil {
-		return
-	}
 	var mov *Movement
 	for mc := iterMC.Begin(); !iterMC.End(); mc = iterMC.Next() {
 		info := ecs.GetEntityInfo(is.World(), mc.Entity)

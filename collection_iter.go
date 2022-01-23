@@ -5,6 +5,7 @@ type Iterator[T ComponentObject, TP ComponentPointer[T]] interface {
 	Val() *T
 	Next() *T
 	End() bool
+	Empty() bool
 }
 
 type Iter[T ComponentObject, TP ComponentPointer[T]] struct {
@@ -12,6 +13,10 @@ type Iter[T ComponentObject, TP ComponentPointer[T]] struct {
 	len    int
 	offset int
 	cur    *T
+}
+
+func EmptyIter[T ComponentObject, TP ComponentPointer[T]]() Iterator[T, TP] {
+	return &Iter[T, TP]{}
 }
 
 func NewIterator[T ComponentObject, TP ComponentPointer[T]](collection *Collection[T, TP]) Iterator[T, TP] {
@@ -22,6 +27,13 @@ func NewIterator[T ComponentObject, TP ComponentPointer[T]](collection *Collecti
 		cur:    &(collection.data[0]),
 	}
 	return iter
+}
+
+func (i *Iter[T, TP]) Empty() bool {
+	if i.len == 0 {
+		return true
+	}
+	return false
 }
 
 func (i *Iter[T, TP]) End() bool {

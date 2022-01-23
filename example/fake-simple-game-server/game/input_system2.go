@@ -22,9 +22,6 @@ func (is *InputSystem2) Init() {
 
 func (is *InputSystem2) PreUpdate(event ecs.Event) {
 	iterMC := ecs.GetInterestedComponents[MoveChange2](is)
-	if iterMC == nil {
-		return
-	}
 	var mov *Movement
 	for mc := iterMC.Begin(); !iterMC.End(); mc = iterMC.Next() {
 		mov = ecs.GetRelatedComponent[Movement](is, mc.Owner())

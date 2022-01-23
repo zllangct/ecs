@@ -87,11 +87,9 @@ func (m *MoveSystem) Update(event ecs.Event) {
 	当两组件拥有相同的Owner时，完成匹配。
 	*/
 	iterPos := ecs.GetInterestedComponents[Position](m)
-	if iterPos == nil {
-		return
-	}
 	iterMov := ecs.GetInterestedComponents[Movement](m)
-	if iterMov == nil {
+
+	if iterPos.Empty() || iterMov.Empty() {
 		return
 	}
 
@@ -210,7 +208,7 @@ func (d *DamageSystem) Filter() []ecs.OperateInfo {
 
 func (d *DamageSystem) DataMatch() ([]Caster, []Target) {
 	iterAction := ecs.GetInterestedComponents[Action](d)
-	if iterAction == nil {
+	if iterAction.Empty() {
 		return nil, nil
 	}
 
@@ -236,7 +234,7 @@ func (d *DamageSystem) DataMatch() ([]Caster, []Target) {
 	}
 
 	iterPos := ecs.GetInterestedComponents[Position](d)
-	if iterPos == nil {
+	if iterPos.Empty() {
 		return nil, nil
 	}
 	var targets []Target

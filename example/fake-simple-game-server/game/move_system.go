@@ -37,11 +37,9 @@ func (m *MoveSystem) Update(event ecs.Event) {
 	}
 
 	iterPos := ecs.GetInterestedComponents[Position](m)
-	if iterPos == nil {
-		return
-	}
 	iterMov := ecs.GetInterestedComponents[Movement](m)
-	if iterMov == nil {
+
+	if iterPos.Empty() || iterMov.Empty() {
 		return
 	}
 

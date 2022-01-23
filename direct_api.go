@@ -1,6 +1,10 @@
 package ecs
 
-import "unsafe"
+import (
+	"errors"
+	"fmt"
+	"unsafe"
+)
 
 // runtime api
 
@@ -91,22 +95,26 @@ func NewPeripheralSystem[T PeripheralSystemObject, TP PeripheralSystemPointer[T]
 	return &ins
 }
 
-func GetInterestedComponents[T ComponentObject, TP ComponentPointer[T]](sys ISystem) Iterator[T, TP] {
+func GetInterestedComponents[T ComponentObject, TP ComponentPointer[T]](sys ISystem, outError ...*error) Iterator[T, TP] {
+	setError := func(format string, args ...interface{}) Iterator[T, TP] {
+		if len(outError) > 0 {
+			*(outError[0]) = errors.New(fmt.Sprintf(format, args...))
+		}
+		return EmptyIter[T, TP]()
+	}
 	if sys.getState() == SystemStateInvalid {
-		Log.Error("must init system first")
-		return nil
+		return setError("must init system first")
 	}
 	typ := GetType[T]()
 	if _, ok := sys.Requirements()[typ]; !ok {
-		Log.Error("not require, typ:", typ)
-		return nil
+		return setError("not require, typ:", typ)
 	}
 	if sys.World() == nil {
-		Log.Error("world is nil")
+		return setError("world is nil")
 	}
 	c := sys.World().getComponents(typ)
 	if c == nil {
-		return nil
+		return EmptyIter[T, TP]()
 	}
 	return NewIterator(c.(*Collection[T, TP]))
 }
