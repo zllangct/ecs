@@ -2,7 +2,7 @@ package ecs
 
 import "reflect"
 
-type Collection[T any] struct {
+type Collection[T ComponentObject, TP ComponentPointer[T]] struct {
 	data []T
 	ids  map[int64]int64
 	seq  int64
@@ -10,15 +10,15 @@ type Collection[T any] struct {
 	len  int64
 }
 
-func NewCollection[T any]() *Collection[T] {
-	c := &Collection[T]{
+func NewCollection[T ComponentObject, TP ComponentPointer[T]]() *Collection[T, TP] {
+	c := &Collection[T, TP]{
 		ids: map[int64]int64{},
 		typ: TypeOf[T](),
 	}
 	return c
 }
 
-func (c *Collection[T]) getID() int64 {
+func (c *Collection[T, TP]) getID() int64 {
 	ok := false
 	for !ok {
 		c.seq++
@@ -29,7 +29,7 @@ func (c *Collection[T]) getID() int64 {
 	return c.seq
 }
 
-func (c *Collection[T]) Add(element *T) (int64, *T) {
+func (c *Collection[T, TP]) Add(element *T) (int64, *T) {
 	idx := len(c.data)
 	//Log.Info("collection Add:", ObjectToString(element))
 	if int64(len(c.data)) > c.len {
@@ -40,12 +40,14 @@ func (c *Collection[T]) Add(element *T) (int64, *T) {
 	id := c.getID()
 	c.ids[id] = int64(idx)
 	c.ids[int64(-idx)] = -id
-	ret := &(c.data[idx])
+	ret := TP(&(c.data[idx]))
 	c.len++
-	return id, ret
+	ret.setID(id)
+	ret.setState(ComponentStateActive)
+	return id, (*T)(ret)
 }
 
-func (c *Collection[T]) Remove(id int64) {
+func (c *Collection[T, TP]) Remove(id int64) {
 	if id < 0 {
 		return
 	}
@@ -59,14 +61,13 @@ func (c *Collection[T]) Remove(id int64) {
 	delete(c.ids, c.ids[-idx])
 	c.ids[-idx] = c.ids[int64(l)]
 	delete(c.ids, int64(l))
-
 	c.data[idx], c.data[l-1] = c.data[l-1], c.data[idx]
-	//c.data = c.data[:l-1]
+	TP(&(c.data[l-1])).setState(ComponentStateDisable)
 	c.shrink()
 	c.len--
 }
 
-func (c *Collection[T]) shrink() {
+func (c *Collection[T, TP]) shrink() {
 	var threshold int64
 	if len(c.data) < 1024 {
 		threshold = c.len * 2
@@ -78,7 +79,7 @@ func (c *Collection[T]) shrink() {
 	}
 }
 
-func (c *Collection[T]) Get(id int64) *T {
+func (c *Collection[T, TP]) Get(id int64) *T {
 	if id < 0 {
 		return nil
 	}
@@ -89,10 +90,10 @@ func (c *Collection[T]) Get(id int64) *T {
 	return &(c.data[idx])
 }
 
-func (c *Collection[T]) Len() int {
+func (c *Collection[T, TP]) Len() int {
 	return int(c.len)
 }
 
-func (c *Collection[T]) EleType() reflect.Type {
+func (c *Collection[T, TP]) EleType() reflect.Type {
 	return c.typ
 }

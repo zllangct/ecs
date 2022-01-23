@@ -5,7 +5,7 @@ import (
 	"reflect"
 )
 
-func GetType[T any]() reflect.Type {
+func GetType[T ComponentObject]() reflect.Type {
 	return TypeOf[T]()
 }
 

@@ -137,31 +137,28 @@ func (c *Component[T, TP]) getComponentType() ComponentType {
 }
 
 func (c *Component[T, TP]) addToCollection(collection interface{}) IComponent {
-	cc, ok := collection.(*Collection[T])
+	cc, ok := collection.(*Collection[T, TP])
 	if !ok {
 		Log.Info("add to collection, collecion is nil")
 		return nil
 	}
-	id, ins := cc.Add(c.rawInstance())
+	_, ins := cc.Add(c.rawInstance())
 	com := IComponent(TP(ins))
-	com.setID(id)
-	com.setState(ComponentStateActive)
 	return com
 }
 
 func (c *Component[T, TP]) deleteFromCollection(collection interface{}) {
-	cc, ok := collection.(*Collection[T])
+	cc, ok := collection.(*Collection[T, TP])
 	if !ok {
 		Log.Info("add to collection, collecion is nil")
 		return
 	}
 	cc.Remove(c.ID())
-	c.setState(ComponentStateDisable)
 	return
 }
 
 func (c *Component[T, TP]) newCollection() interface{} {
-	return NewCollection[T]()
+	return NewCollection[T, TP]()
 }
 
 func (c *Component[T, TP]) setOwner(entity *EntityInfo) {
@@ -201,15 +198,15 @@ func (c *Component[T, TP]) getType() ComponentType {
 	return ComponentType(c.st & l4)
 }
 
-func (c *Component[T, TP]) Invalidate() {
-	c.setState(ComponentStateDisable)
+func (c *Component[T, TP]) invalidate() {
+	c.setState(ComponentStateInvalid)
 }
 
-func (c *Component[T, TP]) Active() {
+func (c *Component[T, TP]) active() {
 	c.setState(ComponentStateActive)
 }
 
-func (c *Component[T, TP]) Remove() {
+func (c *Component[T, TP]) remove() {
 	if c.owner == nil {
 		return
 	}

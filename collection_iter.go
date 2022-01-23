@@ -1,21 +1,21 @@
 package ecs
 
-type Iterator[T any] interface {
+type Iterator[T ComponentObject, TP ComponentPointer[T]] interface {
 	Begin() *T
 	Val() *T
 	Next() *T
 	End() bool
 }
 
-type Iter[T any] struct {
-	c      *Collection[T]
+type Iter[T ComponentObject, TP ComponentPointer[T]] struct {
+	c      *Collection[T, TP]
 	len    int
 	offset int
 	cur    *T
 }
 
-func NewIterator[T any](collection *Collection[T]) Iterator[T] {
-	iter := &Iter[T]{
+func NewIterator[T ComponentObject, TP ComponentPointer[T]](collection *Collection[T, TP]) Iterator[T, TP] {
+	iter := &Iter[T, TP]{
 		c:      collection,
 		len:    collection.Len(),
 		offset: 0,
@@ -24,22 +24,22 @@ func NewIterator[T any](collection *Collection[T]) Iterator[T] {
 	return iter
 }
 
-func (i *Iter[T]) End() bool {
+func (i *Iter[T, TP]) End() bool {
 	if i.offset > i.len-1 || i.len == 0 {
 		return true
 	}
 	return false
 }
 
-func (i *Iter[T]) Begin() *T {
+func (i *Iter[T, TP]) Begin() *T {
 	return i.cur
 }
 
-func (i *Iter[T]) Val() *T {
+func (i *Iter[T, TP]) Val() *T {
 	return i.cur
 }
 
-func (i *Iter[T]) Next() *T {
+func (i *Iter[T, TP]) Next() *T {
 	i.offset++
 	if !i.End() {
 		i.cur = &(i.c.data[i.offset])

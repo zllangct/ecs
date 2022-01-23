@@ -91,7 +91,7 @@ func NewPeripheralSystem[T PeripheralSystemObject, TP PeripheralSystemPointer[T]
 	return &ins
 }
 
-func GetInterestedComponents[T any](sys ISystem) Iterator[T] {
+func GetInterestedComponents[T ComponentObject, TP ComponentPointer[T]](sys ISystem) Iterator[T, TP] {
 	if sys.getState() == SystemStateInvalid {
 		Log.Error("must init system first")
 		return nil
@@ -108,10 +108,10 @@ func GetInterestedComponents[T any](sys ISystem) Iterator[T] {
 	if c == nil {
 		return nil
 	}
-	return NewIterator(c.(*Collection[T]))
+	return NewIterator(c.(*Collection[T, TP]))
 }
 
-func GetRelatedComponent[T any](sys ISystem, entity *EntityInfo) *T {
+func GetRelatedComponent[T ComponentObject](sys ISystem, entity *EntityInfo) *T {
 	if entity == nil {
 		return nil
 	}
