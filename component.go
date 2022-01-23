@@ -143,14 +143,10 @@ func (c *Component[T, TP]) addToCollection(collection interface{}) IComponent {
 		return nil
 	}
 	id, ins := cc.Add(c.rawInstance())
-	com := c.toIComponent(ins)
+	com := IComponent(TP(ins))
 	com.setID(id)
 	com.setState(ComponentStateActive)
 	return com
-}
-
-func (c *Component[T, TP]) toIComponent(com interface{}) IComponent {
-	return com.(IComponent)
 }
 
 func (c *Component[T, TP]) deleteFromCollection(collection interface{}) {

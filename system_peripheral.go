@@ -5,9 +5,13 @@ import (
 	"sync"
 )
 
-type IPeripheralSystemTemplate interface {
-	sdf7xxh2l23h4h56g7g4g3lh43()
-	toPeripheralSystem(psys interface{}) IPeripheralSystem
+type PeripheralSystemObject interface {
+	peripheralSystemIdentification()
+}
+
+type PeripheralSystemPointer[T PeripheralSystemObject] interface {
+	IPeripheralSystem
+	*T
 }
 
 type IPeripheralSystem interface {
@@ -17,7 +21,7 @@ type IPeripheralSystem interface {
 	Emit(event CustomEventName, args ...interface{})
 }
 
-type PeripheralSystem[T any] struct {
+type PeripheralSystem[T PeripheralSystemObject, TP PeripheralSystemPointer[T]] struct {
 	lock          sync.RWMutex
 	events        map[CustomEventName]CustomEventHandler
 	eventQueue    chan CustomEvent
@@ -25,13 +29,9 @@ type PeripheralSystem[T any] struct {
 	isInitialized bool
 }
 
-func (p PeripheralSystem[T]) sdf7xxh2l23h4h56g7g4g3lh43() {}
+func (p PeripheralSystem[T, TP]) peripheralSystemIdentification() {}
 
-func (p PeripheralSystem[T]) toPeripheralSystem(psys interface{}) IPeripheralSystem {
-	return psys.(IPeripheralSystem)
-}
-
-func (p *PeripheralSystem[T]) init() {
+func (p *PeripheralSystem[T, TP]) init() {
 	p.events = make(map[CustomEventName]CustomEventHandler)
 	p.eventQueue = make(chan CustomEvent, 10)
 	var ctx context.Context
@@ -40,7 +40,7 @@ func (p *PeripheralSystem[T]) init() {
 	p.isInitialized = true
 }
 
-func (p *PeripheralSystem[T]) Stop() {
+func (p *PeripheralSystem[T, TP]) Stop() {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
@@ -53,7 +53,7 @@ func (p *PeripheralSystem[T]) Stop() {
 	}
 }
 
-func (p *PeripheralSystem[T]) EventRegister(event CustomEventName, fn CustomEventHandler) {
+func (p *PeripheralSystem[T, TP]) EventRegister(event CustomEventName, fn CustomEventHandler) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -65,7 +65,7 @@ func (p *PeripheralSystem[T]) EventRegister(event CustomEventName, fn CustomEven
 	p.events[event] = fn
 }
 
-func (p *PeripheralSystem[T]) Emit(event CustomEventName, args ...interface{}) {
+func (p *PeripheralSystem[T, TP]) Emit(event CustomEventName, args ...interface{}) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
@@ -79,7 +79,7 @@ func (p *PeripheralSystem[T]) Emit(event CustomEventName, args ...interface{}) {
 	}
 }
 
-func (p *PeripheralSystem[T]) eventDispatch(ctx context.Context) {
+func (p *PeripheralSystem[T, TP]) eventDispatch(ctx context.Context) {
 	var e CustomEvent
 	for {
 		select {

@@ -81,9 +81,9 @@ func AddRequireComponent[T ComponentObject](sys ISystem) {
 	sys.setRequirementsByType(TypeOf[T]())
 }
 
-func NewPeripheralSystem[T IPeripheralSystemTemplate]() *T {
+func NewPeripheralSystem[T PeripheralSystemObject, TP PeripheralSystemPointer[T]]() *T {
 	var ins T
-	psys := ins.toPeripheralSystem(&ins)
+	psys := IPeripheralSystem(TP(&ins))
 	psys.init()
 	if i, ok := psys.(InitReceiver); ok {
 		i.Init()
