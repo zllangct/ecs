@@ -161,7 +161,7 @@ func (p *systemFlow) run(event Event) {
 			wg.Done()
 		})
 	}
-	p.world.components.ClearDisposable()
+	p.world.components.clearDisposable()
 	p.wg.Wait()
 
 	for _, period := range p.periodList {
@@ -185,7 +185,7 @@ func (p *systemFlow) run(event Event) {
 		}
 	}
 
-	tasks := p.world.components.GetTempTasks()
+	tasks := p.world.components.getTempTasks()
 	//Log.Info("temp task count:", len(tasks))
 	newList := map[reflect.Type][]OperateInfo{}
 	lock := sync.Mutex{}
@@ -206,7 +206,7 @@ func (p *systemFlow) run(event Event) {
 	p.wg.Wait()
 
 	//Log.Info("new component this frame:", len(newList))
-	p.world.components.TempTasksDone(newList)
+	p.world.components.tempTasksDone(newList)
 
 	//do something clean
 	for _, system := range removeList {

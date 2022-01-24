@@ -45,7 +45,7 @@ type ISystem interface {
 	setRequirementsByType(rqs ...reflect.Type)
 	getState() SystemState
 	setState(state SystemState)
-	checkComponent(entity *EntityInfo, com IComponent) IComponent
+	checkoutComponent(entity *EntityInfo, com IComponent) IComponent
 	baseInit(world *ecsWorld, ins ISystem)
 	eventDispatch()
 }
@@ -283,14 +283,6 @@ func (s *System[T, TP]) World() IWorld {
 	return s.world
 }
 
-func (s *System[T, TP]) GetInterested(typ reflect.Type) interface{} {
-	if _, ok := s.requirements[typ]; !ok {
-		return nil
-	}
-
-	return s.World().getComponents(typ)
-}
-
 func (s *System[T, TP]) GetInterestedNew() map[reflect.Type][]OperateInfo {
 	ls := map[reflect.Type][]OperateInfo{}
 	for typ, _ := range s.Requirements() {
@@ -301,11 +293,11 @@ func (s *System[T, TP]) GetInterestedNew() map[reflect.Type][]OperateInfo {
 	return ls
 }
 
-func (s *System[T, TP]) CheckComponent(info *EntityInfo, com IComponent) IComponent {
-	return s.checkComponent(info, com)
+func (s *System[T, TP]) CheckoutComponent(info *EntityInfo, com IComponent) IComponent {
+	return s.checkoutComponent(info, com)
 }
 
-func (s *System[T, TP]) checkComponent(entity *EntityInfo, com IComponent) IComponent {
+func (s *System[T, TP]) checkoutComponent(entity *EntityInfo, com IComponent) IComponent {
 	isRequire := s.IsRequire(com)
 	if !isRequire {
 		return nil
@@ -315,5 +307,5 @@ func (s *System[T, TP]) checkComponent(entity *EntityInfo, com IComponent) IComp
 }
 
 func (s *System[T, TP]) GetEntityInfo(entity Entity) *EntityInfo {
-	return s.world.getEntityInfo(entity)
+	return s.world.GetEntityInfo(entity)
 }

@@ -76,7 +76,7 @@ func (c *ComponentCollection) initOnce() {
 	}
 }
 
-func (c *ComponentCollection) TempTemplateOperate(entity *EntityInfo, component IComponent, op CollectionOperate) {
+func (c *ComponentCollection) tempTemplateOperate(entity *EntityInfo, component IComponent, op CollectionOperate) {
 	var hash int64
 	switch component.getComponentType() {
 	case ComponentTypeFree, ComponentTypeFreeDisposable:
@@ -104,13 +104,13 @@ func (c *ComponentCollection) TempTemplateOperate(entity *EntityInfo, component 
 	}
 }
 
-func (c *ComponentCollection) ClearDisposable() {
+func (c *ComponentCollection) clearDisposable() {
 	for i := 0; i < len(c.once); i++ {
 		c.locks[i].Lock()
 		m := c.once[i]
 		if len(m) > 0 {
 			for typ, _ := range m {
-				c.RemoveAllByType(typ)
+				c.removeAllByType(typ)
 				delete(m, typ)
 				//Log.Info("collection Remove (Disposable):", typ.String())
 			}
@@ -119,7 +119,7 @@ func (c *ComponentCollection) ClearDisposable() {
 	}
 }
 
-func (c *ComponentCollection) DisposableTemp(com IComponent, typ reflect.Type) {
+func (c *ComponentCollection) disposableTemp(com IComponent, typ reflect.Type) {
 	var hash int64
 	switch com.getComponentType() {
 	case ComponentTypeFree, ComponentTypeFreeDisposable:
@@ -140,7 +140,7 @@ func (c *ComponentCollection) DisposableTemp(com IComponent, typ reflect.Type) {
 	}
 }
 
-func (c *ComponentCollection) GetTempTasks() []func() (reflect.Type, []OperateInfo) {
+func (c *ComponentCollection) getTempTasks() []func() (reflect.Type, []OperateInfo) {
 	combination := make(map[reflect.Type][]OperateInfo)
 
 	for i := 0; i < len(c.optTemp); i++ {
@@ -181,10 +181,10 @@ func (c *ComponentCollection) GetTempTasks() []func() (reflect.Type, []OperateIn
 					case ComponentTypeNormal:
 						operate.target.componentAdded(t, ret)
 					case ComponentTypeDisposable:
-						c.DisposableTemp(operate.com, t)
+						c.disposableTemp(operate.com, t)
 						operate.target.componentAdded(t, ret)
 					case ComponentTypeFreeDisposable:
-						c.DisposableTemp(operate.com, t)
+						c.disposableTemp(operate.com, t)
 					}
 					operate.com = ret
 					n = append(n, operate)
@@ -204,22 +204,22 @@ func (c *ComponentCollection) GetTempTasks() []func() (reflect.Type, []OperateIn
 	return tasks
 }
 
-func (c *ComponentCollection) TempTasksDone(newList map[reflect.Type][]OperateInfo) {
+func (c *ComponentCollection) tempTasksDone(newList map[reflect.Type][]OperateInfo) {
 	c.componentsNew = newList
 }
 
-func (c *ComponentCollection) GetNewComponentsAll() map[reflect.Type][]OperateInfo {
+func (c *ComponentCollection) getNewComponentsAll() map[reflect.Type][]OperateInfo {
 	return c.componentsNew
 }
 
-func (c *ComponentCollection) GetNewComponents(typ reflect.Type) []OperateInfo {
+func (c *ComponentCollection) getNewComponents(typ reflect.Type) []OperateInfo {
 	return c.componentsNew[typ]
 }
 
-func (c *ComponentCollection) GetCollection(typ reflect.Type) interface{} {
+func (c *ComponentCollection) getCollection(typ reflect.Type) interface{} {
 	return c.collections[typ]
 }
 
-func (c *ComponentCollection) RemoveAllByType(typ reflect.Type) {
+func (c *ComponentCollection) removeAllByType(typ reflect.Type) {
 	delete(c.collections, typ)
 }

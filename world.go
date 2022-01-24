@@ -27,14 +27,14 @@ type IWorld interface {
 	GetStatus() WorldStatus
 	GetID() int64
 	NewEntity() *EntityInfo
+	GetEntityInfo(id Entity) *EntityInfo
+	AddFreeComponent(component IComponent)
+	Register(system ISystem)
+	GetSystem(sys reflect.Type) (ISystem, bool)
 
-	register(system ISystem)
-	registerForT(system interface{}, order ...Order)
 	getComponents(typ reflect.Type) interface{}
 	getNewComponents(typ reflect.Type) []OperateInfo
-	getEntityInfo(id Entity) *EntityInfo
-	getSystem(sys reflect.Type) (ISystem, bool)
-	addFreeComponent(component IComponent)
+	registerForT(system interface{}, order ...Order)
 }
 
 type ecsWorld struct {
@@ -159,7 +159,7 @@ func (w *ecsWorld) GetStatus() WorldStatus {
 }
 
 // Register register system
-func (w *ecsWorld) register(system ISystem) {
+func (w *ecsWorld) Register(system ISystem) {
 	w.systemFlow.register(system)
 }
 
@@ -168,10 +168,10 @@ func (w *ecsWorld) registerForT(system interface{}, order ...Order) {
 	if len(order) > 0 {
 		sys.setOrder(order[0])
 	}
-	w.register(system.(ISystem))
+	w.Register(system.(ISystem))
 }
 
-func (w *ecsWorld) getSystem(sys reflect.Type) (ISystem, bool) {
+func (w *ecsWorld) GetSystem(sys reflect.Type) (ISystem, bool) {
 	s, ok := w.systemFlow.systems.Load(sys)
 	if ok {
 		return s.(ISystem), ok
@@ -184,7 +184,7 @@ func (w *ecsWorld) addEntity(entity *EntityInfo) {
 	w.entities.add(entity)
 }
 
-func (w *ecsWorld) getEntityInfo(id Entity) *EntityInfo {
+func (w *ecsWorld) GetEntityInfo(id Entity) *EntityInfo {
 	return w.entities.getInfo(id)
 }
 
@@ -194,15 +194,15 @@ func (w *ecsWorld) deleteEntity(info *EntityInfo) {
 }
 
 func (w *ecsWorld) getNewComponentsAll() map[reflect.Type][]OperateInfo {
-	return w.components.GetNewComponentsAll()
+	return w.components.getNewComponentsAll()
 }
 
 func (w *ecsWorld) getNewComponents(typ reflect.Type) []OperateInfo {
-	return w.components.GetNewComponents(typ)
+	return w.components.getNewComponents(typ)
 }
 
 func (w *ecsWorld) getComponents(typ reflect.Type) interface{} {
-	return w.components.GetCollection(typ)
+	return w.components.getCollection(typ)
 }
 
 func (w *ecsWorld) NewEntity() *EntityInfo {
@@ -210,14 +210,14 @@ func (w *ecsWorld) NewEntity() *EntityInfo {
 }
 
 func (w *ecsWorld) addComponent(info *EntityInfo, component IComponent) {
-	w.components.TempTemplateOperate(info, component, CollectionOperateAdd)
+	w.components.tempTemplateOperate(info, component, CollectionOperateAdd)
 }
 
 func (w *ecsWorld) deleteComponent(info *EntityInfo, component IComponent) {
-	w.components.TempTemplateOperate(info, component, CollectionOperateDelete)
+	w.components.tempTemplateOperate(info, component, CollectionOperateDelete)
 }
 
-func (w *ecsWorld) addFreeComponent(component IComponent) {
+func (w *ecsWorld) AddFreeComponent(component IComponent) {
 	switch component.getComponentType() {
 	case ComponentTypeFree, ComponentTypeFreeDisposable:
 	default:

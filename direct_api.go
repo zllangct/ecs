@@ -51,15 +51,15 @@ func RegisterSystem[T SystemObject](world IWorld, order ...Order) {
 }
 
 func GetSystem[T SystemObject](w IWorld) (ISystem, bool) {
-	return w.getSystem(TypeOf[T]())
+	return w.GetSystem(TypeOf[T]())
 }
 
 func GetEntityInfo(world IWorld, entity Entity) *EntityInfo {
-	return world.getEntityInfo(entity)
+	return world.GetEntityInfo(entity)
 }
 
 func AddFreeComponent[T FreeComponentObject, TP FreeComponentPointer[T]](world IWorld, component *T) {
-	world.addFreeComponent(TP(component))
+	world.AddFreeComponent(TP(component))
 }
 
 // entity api
@@ -73,7 +73,7 @@ func EntityDestroyByInfo(info *EntityInfo) {
 }
 
 func EntityDestroy(world IWorld, entity Entity) {
-	info := world.getEntityInfo(entity)
+	info := world.GetEntityInfo(entity)
 	if info != nil {
 		info.Destroy()
 	}
