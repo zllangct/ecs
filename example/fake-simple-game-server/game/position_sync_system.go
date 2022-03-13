@@ -8,7 +8,7 @@ type PlayerPosition struct {
 }
 
 type SyncSystem struct {
-	ecs.System[SyncSystem]
+	ecs.System[SyncSystem, *SyncSystem]
 }
 
 func (m *SyncSystem) Init() {

@@ -3,7 +3,7 @@ package game
 import "github.com/zllangct/ecs"
 
 type EmptySystem struct {
-	ecs.System[EmptySystem]
+	ecs.System[EmptySystem, *EmptySystem]
 	isPreStart  bool
 	isStart     bool
 	isPostStart bool

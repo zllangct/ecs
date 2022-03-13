@@ -7,13 +7,13 @@ import (
 )
 
 const (
-	runTimes  = 1000000
-	poolSize  = 50000
-	queueSize = 5000
+	runTimes  = 1000
+	poolSize  = 50
+	queueSize = 50
 )
 
 func demoTask() {
-	time.Sleep(time.Millisecond * 10)
+	time.Sleep(time.Nanosecond * 10)
 }
 
 //BenchmarkGoroutine benchmark the goroutine doing tasks.
@@ -41,13 +41,17 @@ func BenchmarkGpool(b *testing.B) {
 	defer pool.Release()
 	var wg sync.WaitGroup
 
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		wg.Add(runTimes)
+
 		for j := 0; j < runTimes; j++ {
 			pool.Add(func() {
 				defer wg.Done()
 				demoTask()
 			})
 		}
+
+		wg.Wait()
 	}
 }

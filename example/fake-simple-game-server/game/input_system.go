@@ -5,7 +5,7 @@ import (
 )
 
 type InputSystem struct {
-	ecs.System[InputSystem]
+	ecs.System[InputSystem, *InputSystem]
 }
 
 func (is *InputSystem) Init() {

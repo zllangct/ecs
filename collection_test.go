@@ -9,6 +9,7 @@ import (
 func TestCollectionIterator(t *testing.T) {
 	//待存储的数据定义
 	type Item struct {
+		Component[Item, *Item]
 		Count int
 		Name  string
 		Arr   []int
@@ -50,6 +51,7 @@ func TestCollectionIterator(t *testing.T) {
 
 func BenchmarkCollectionWrite(b *testing.B) {
 	type Item struct {
+		Component[Item, *Item]
 		Count int
 		Name  string
 	}
@@ -68,6 +70,7 @@ func BenchmarkCollectionWrite(b *testing.B) {
 
 func BenchmarkCollectionRead(b *testing.B) {
 	type Item struct {
+		Component[Item, *Item]
 		Count int
 		Name  string
 	}

@@ -11,7 +11,7 @@ type MoveSystemData struct {
 }
 
 type MoveSystem struct {
-	ecs.System[MoveSystem]
+	ecs.System[MoveSystem, *MoveSystem]
 	timeScale float64
 	deltaTime time.Duration
 }

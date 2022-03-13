@@ -6,43 +6,43 @@ import (
 )
 
 type Com1 struct {
-	Component[Com1]
+	Component[Com1, *Com1]
 }
 type Com2 struct {
-	Component[Com2]
+	Component[Com2, *Com2]
 }
 type Com3 struct {
-	Component[Com3]
+	Component[Com3, *Com3]
 }
 type Com4 struct {
-	Component[Com4]
+	Component[Com4, *Com4]
 }
 type Com5 struct {
-	Component[Com5]
+	Component[Com5, *Com5]
 }
 type Com6 struct {
-	Component[Com6]
+	Component[Com6, *Com6]
 }
 type Com7 struct {
-	Component[Com7]
+	Component[Com7, *Com7]
 }
 type Com8 struct {
-	Component[Com8]
+	Component[Com8, *Com8]
 }
 type Com9 struct {
-	Component[Com9]
+	Component[Com9, *Com9]
 }
 type Com10 struct {
-	Component[Com10]
+	Component[Com10, *Com10]
 }
 
 type TestSystem struct {
-	System[TestSystem]
-	ID int
+	System[TestSystem, *TestSystem]
+	Name int
 }
 
 func NewTestSystem(ID int, rqs ...IComponent) *TestSystem {
-	s := &TestSystem{ID: ID}
+	s := &TestSystem{Name: ID}
 	s.SetRequirements(rqs...)
 	return s
 }
@@ -50,7 +50,7 @@ func NewTestSystem(ID int, rqs ...IComponent) *TestSystem {
 func (p *TestSystem) Call(label int) interface{} {
 	switch label {
 	case 1:
-		println(p.ID)
+		println(p.Name)
 	}
 	return nil
 }

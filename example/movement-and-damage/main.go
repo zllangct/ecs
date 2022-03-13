@@ -37,14 +37,14 @@ import (
 
 //position component
 type Position struct {
-	ecs.Component[Position]
+	ecs.Component[Position, *Position]
 	X int
 	Y int
 	Z int
 }
 
 type Movement struct {
-	ecs.Component[Movement]
+	ecs.Component[Movement, *Movement]
 	V   int
 	Dir []int
 }
@@ -55,7 +55,7 @@ type MoveSystemData struct {
 }
 
 type MoveSystem struct {
-	ecs.System[MoveSystem]
+	ecs.System[MoveSystem, *MoveSystem]
 }
 
 func (m *MoveSystem) Init() {
@@ -151,12 +151,12 @@ func (m *MoveSystem) Update(event ecs.Event) {
 
 //hp component
 type HealthPoint struct {
-	ecs.Component[HealthPoint]
+	ecs.Component[HealthPoint, *HealthPoint]
 	HP int
 }
 
 type Force struct {
-	ecs.Component[Force]
+	ecs.Component[Force, *Force]
 	AttackRange        int
 	PhysicalBaseAttack int
 	Strength           int
@@ -165,7 +165,7 @@ type Force struct {
 }
 
 type Action struct {
-	ecs.Component[Action]
+	ecs.Component[Action, *Action]
 	ActionType int
 }
 
