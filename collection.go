@@ -6,14 +6,12 @@ type Collection[T ComponentObject, TP ComponentPointer[T]] struct {
 	data []T
 	ids  map[int64]int64
 	seq  int64
-	typ  reflect.Type
 	len  int64
 }
 
 func NewCollection[T ComponentObject, TP ComponentPointer[T]]() *Collection[T, TP] {
 	c := &Collection[T, TP]{
 		ids: map[int64]int64{},
-		typ: TypeOf[T](),
 	}
 	return c
 }
@@ -30,41 +28,43 @@ func (c *Collection[T, TP]) getID() int64 {
 }
 
 func (c *Collection[T, TP]) Add(element *T) (int64, *T) {
-	idx := len(c.data)
 	//Log.Info("collection Add:", ObjectToString(element))
 	if int64(len(c.data)) > c.len {
 		c.data[c.len] = *element
 	} else {
 		c.data = append(c.data, *element)
 	}
+	idx := c.len
 	id := c.getID()
-	c.ids[id] = int64(idx)
-	c.ids[int64(-idx)] = -id
+	c.ids[id] = idx
+	c.ids[-idx] = -id
 	ret := TP(&(c.data[idx]))
 	c.len++
 	ret.setID(id)
-	ret.setState(ComponentStateActive)
 	return id, (*T)(ret)
 }
 
-func (c *Collection[T, TP]) Remove(id int64) {
+func (c *Collection[T, TP]) Remove(id int64) *T {
 	if id < 0 {
-		return
+		return nil
 	}
 	idx, ok := c.ids[id]
 	if !ok {
-		return
+		return nil
 	}
 	//Log.Info("collection Remove:", ObjectToString(c.data[idx]))
-	l := len(c.data)
-	c.ids[c.ids[int64(l)]] = idx
-	delete(c.ids, c.ids[-idx])
-	c.ids[-idx] = c.ids[int64(l)]
-	delete(c.ids, int64(l))
-	c.data[idx], c.data[l-1] = c.data[l-1], c.data[idx]
-	TP(&(c.data[l-1])).setState(ComponentStateDisable)
+	lastIdx := c.len - 1
+	lastId := -c.ids[-lastIdx]
+
+	c.ids[lastId] = idx
+	c.ids[-idx] = -lastId
+	delete(c.ids, -lastIdx)
+	delete(c.ids, id)
+
+	c.data[idx], c.data[lastIdx] = c.data[lastIdx], c.data[idx]
 	c.shrink()
 	c.len--
+	return &(c.data[lastIdx])
 }
 
 func (c *Collection[T, TP]) shrink() {
@@ -75,7 +75,7 @@ func (c *Collection[T, TP]) shrink() {
 		threshold = int64(float64(c.len) * 1.25)
 	}
 	if int64(len(c.data)) > threshold {
-		c.data = c.data[:c.len]
+		c.data = c.data[:threshold]
 	}
 }
 
@@ -94,6 +94,10 @@ func (c *Collection[T, TP]) Len() int {
 	return int(c.len)
 }
 
-func (c *Collection[T, TP]) EleType() reflect.Type {
-	return c.typ
+func (c *Collection[T, TP]) ElementType() reflect.Type {
+	if c.len > 0 {
+		return reflect.TypeOf(c.data[0])
+	}
+	var e T
+	return reflect.TypeOf(e)
 }

@@ -32,7 +32,7 @@ func (e *EntityInfo) Destroy() {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	var components []IComponent
+	var components []IComponent = make([]IComponent, 0, len(e.components))
 	for _, c := range e.components {
 		components = append(components, c)
 	}

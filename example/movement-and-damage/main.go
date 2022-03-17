@@ -182,7 +182,7 @@ type Target struct {
 }
 
 type DamageSystem struct {
-	ecs.System[DamageSystem]
+	ecs.System[DamageSystem, *DamageSystem]
 }
 
 func (d *DamageSystem) Init() {
@@ -388,6 +388,8 @@ func Runtime0() {
 	} else {
 		ecs.Log.Info("info3:", info3)
 	}
+
+	world.NewEntity().Add(p3, m3)
 
 	//示例仅运行1秒
 	time.Sleep(time.Second * 1)
