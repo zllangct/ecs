@@ -97,15 +97,19 @@ func (e *EntityInfo) hasByType(types ...reflect.Type) bool {
 	return true
 }
 
-func (e *EntityInfo) Add(components ...IComponent) {
+func (e *EntityInfo) Add(components ...IComponent) []error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-
+	var errors []error
 	for _, c := range components {
 		if err := e.addComponent(c); err != nil {
-			Log.Errorf("component: %+v, %w", c, err)
+			errors = append(errors, err)
 		}
 	}
+	if len(errors) > 0 {
+		return errors
+	}
+	return nil
 }
 
 func (e *EntityInfo) remove(components ...IComponent) {

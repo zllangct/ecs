@@ -95,6 +95,11 @@ func (w *ecsWorld) Run() {
 	go w.run()
 }
 
+func doFrameForBenchmark(w IWorld, frame uint64, lastDelta time.Duration) {
+	world := w.(*ecsWorld)
+	world.systemFlow.run(Event{Delta: lastDelta, Frame: frame})
+}
+
 func (w *ecsWorld) run() {
 	if Runtime.status() != StatusRunning {
 		Log.Error("runtime is not running")
