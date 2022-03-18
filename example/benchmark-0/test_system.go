@@ -6,7 +6,7 @@ type Test1System struct {
 	ecs.System[Test1System, *Test1System]
 }
 
-func (t *Test1System) OnInit() {
+func (t *Test1System) Init() {
 	t.SetRequirements(&Test1{})
 }
 
@@ -23,7 +23,7 @@ type Test2System struct {
 	ecs.System[Test2System, *Test2System]
 }
 
-func (t *Test2System) OnInit() {
+func (t *Test2System) Init() {
 	t.SetRequirements(&Test2{})
 }
 
@@ -40,7 +40,7 @@ type Test3System struct {
 	ecs.System[Test3System, *Test3System]
 }
 
-func (t *Test3System) OnInit() {
+func (t *Test3System) Init() {
 	t.SetRequirements(&Test1{})
 }
 
@@ -57,7 +57,7 @@ type Test4System struct {
 	ecs.System[Test4System, *Test4System]
 }
 
-func (t *Test4System) OnInit() {
+func (t *Test4System) Init() {
 	t.SetRequirements(&Test4{})
 }
 
@@ -74,7 +74,7 @@ type Test5System struct {
 	ecs.System[Test5System, *Test5System]
 }
 
-func (t *Test5System) OnInit() {
+func (t *Test5System) Init() {
 	t.SetRequirements(&Test5{})
 }
 
