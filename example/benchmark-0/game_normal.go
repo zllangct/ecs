@@ -111,7 +111,7 @@ func (g *GameNormal) doFrame(parallel bool, frame uint64, delta time.Duration) {
 func (g *GameNormal) SimuLoad1() {
 	for _, p := range g.players {
 		for i := 0; i < 1000; i++ {
-			p.Test2 += 1
+			p.Test1 += 1
 		}
 	}
 }
@@ -125,21 +125,21 @@ func (g *GameNormal) SimuLoad2() {
 func (g *GameNormal) SimuLoad3() {
 	for _, p := range g.players {
 		for i := 0; i < 1000; i++ {
-			p.Test2 += 1
+			p.Test3 += 1
 		}
 	}
 }
 func (g *GameNormal) SimuLoad4() {
 	for _, p := range g.players {
 		for i := 0; i < 1000; i++ {
-			p.Test2 += 1
+			p.Test4 += 1
 		}
 	}
 }
 func (g *GameNormal) SimuLoad5() {
 	for _, p := range g.players {
 		for i := 0; i < 1000; i++ {
-			p.Test2 += 1
+			p.Test5 += 1
 		}
 	}
 }
@@ -148,7 +148,7 @@ func (g *GameNormal) SimuLoadParallel1() {
 	for _, p := range g.players {
 		p.rw.Lock()
 		for i := 0; i < 1000; i++ {
-			p.Test2 += 1
+			p.Test1 += 1
 		}
 		p.rw.Unlock()
 	}
@@ -166,7 +166,7 @@ func (g *GameNormal) SimuLoadParallel3() {
 	for _, p := range g.players {
 		p.rw.Lock()
 		for i := 0; i < 1000; i++ {
-			p.Test2 += 1
+			p.Test3 += 1
 		}
 		p.rw.Unlock()
 	}
@@ -175,7 +175,7 @@ func (g *GameNormal) SimuLoadParallel4() {
 	for _, p := range g.players {
 		p.rw.Lock()
 		for i := 0; i < 1000; i++ {
-			p.Test2 += 1
+			p.Test4 += 1
 		}
 		p.rw.Unlock()
 	}
@@ -184,7 +184,7 @@ func (g *GameNormal) SimuLoadParallel5() {
 	for _, p := range g.players {
 		p.rw.Lock()
 		for i := 0; i < 1000; i++ {
-			p.Test2 += 1
+			p.Test5 += 1
 		}
 		p.rw.Unlock()
 	}
