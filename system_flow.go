@@ -85,7 +85,47 @@ func (p *systemFlow) run(event Event) {
 
 	removeList := map[int64]ISystem{}
 
+	//Log.Info("system flow # Clear Disposable #")
+	p.world.components.clearDisposable()
+
+	//Log.Info("system flow # Temp Task Execute #")
+	tasks := p.world.components.getTempTasks()
+	p.wg.Add(len(tasks))
+	for _, task := range tasks {
+		wg := p.wg
+		fn := task
+		Runtime.addJob(func() {
+			fn()
+			wg.Done()
+		})
+	}
+	p.wg.Wait()
+
 	var sq OrderSequence
+
+	//Log.Info("system flow # Event Dispatch #")
+	for _, period := range p.periodList {
+		sq = p.systemPeriod[period]
+		for _, sl := range sq {
+			sl.reset()
+			for ss := sl.next(); len(ss) > 0; ss = sl.next() {
+				if systemCount := len(ss); systemCount != 0 {
+					for i := 0; i < systemCount; i++ {
+						fn := ss[i].eventDispatch
+						p.wg.Add(1)
+						wg := p.wg
+						Runtime.addJob(func() {
+							defer wg.Done()
+							fn()
+						})
+					}
+				}
+				p.wg.Wait()
+			}
+		}
+	}
+
+	//Log.Info("system flow # Logic #")
 	for _, period := range p.periodList {
 		sq = p.systemPeriod[period]
 		for _, sl := range sq {
@@ -147,66 +187,6 @@ func (p *systemFlow) run(event Event) {
 			}
 		}
 	}
-
-	buckets := p.world.entities.getBuckets()
-	for _, bucket := range buckets {
-		b := bucket
-		wg := p.wg
-		wg.Add(1)
-		Runtime.addJob(func() {
-			b.Range(func(key Entity, value *EntityInfo) bool {
-				value.clearDisposable()
-				return true
-			})
-			wg.Done()
-		})
-	}
-	p.world.components.clearDisposable()
-	p.wg.Wait()
-
-	for _, period := range p.periodList {
-		sq = p.systemPeriod[period]
-		for _, sl := range sq {
-			sl.reset()
-			for ss := sl.next(); len(ss) > 0; ss = sl.next() {
-				if systemCount := len(ss); systemCount != 0 {
-					for i := 0; i < systemCount; i++ {
-						fn := ss[i].eventDispatch
-						p.wg.Add(1)
-						wg := p.wg
-						Runtime.addJob(func() {
-							defer wg.Done()
-							fn()
-						})
-					}
-				}
-				p.wg.Wait()
-			}
-		}
-	}
-
-	tasks := p.world.components.getTempTasks()
-	//Log.Info("temp task count:", len(tasks))
-	newList := map[reflect.Type][]OperateInfo{}
-	lock := sync.Mutex{}
-	p.wg.Add(len(tasks))
-	for _, task := range tasks {
-		wg := p.wg
-		fn := task
-		Runtime.addJob(func() {
-			typ, rn := fn()
-
-			lock.Lock()
-			newList[typ] = rn
-			lock.Unlock()
-
-			wg.Done()
-		})
-	}
-	p.wg.Wait()
-
-	//Log.Info("new component this frame:", len(newList))
-	p.world.components.tempTasksDone(newList)
 
 	//do something clean
 	for _, system := range removeList {

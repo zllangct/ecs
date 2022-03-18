@@ -283,16 +283,6 @@ func (s *System[T, TP]) World() IWorld {
 	return s.world
 }
 
-func (s *System[T, TP]) GetInterestedNew() map[reflect.Type][]OperateInfo {
-	ls := map[reflect.Type][]OperateInfo{}
-	for typ, _ := range s.Requirements() {
-		if n := s.World().getNewComponents(typ); n != nil {
-			ls[typ] = n
-		}
-	}
-	return ls
-}
-
 func (s *System[T, TP]) CheckoutComponent(info *EntityInfo, com IComponent) IComponent {
 	return s.checkoutComponent(info, com)
 }

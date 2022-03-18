@@ -32,7 +32,7 @@ type Force struct {
 }
 
 type Action struct {
-	ecs.Component[Action, *Action]
+	ecs.DisposableComponent[Action, *Action]
 	ActionType int
 }
 

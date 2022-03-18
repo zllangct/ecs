@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/zllangct/ecs"
-	"reflect"
 )
 
 type MoveSystemData struct {
@@ -18,19 +17,8 @@ func (m *MoveSystem) Init() {
 	m.SetRequirements(&Position{}, &Movement{})
 }
 
-func (m *MoveSystem) Filter(ls map[reflect.Type][]ecs.OperateInfo) {
-	if len(ls) > 0 {
-		//ecs.Log.Info("new component:", len(ls))
-	}
-}
-
 func (m *MoveSystem) Update(event ecs.Event) {
 	delta := event.Delta
-
-	//当前帧新所有创建、删除的组件
-	nc := m.GetInterestedNew()
-	m.Filter(nc)
-
 	//获取系统所需的组件
 	//方式 1:
 	//iterPos := m.GetInterested(ecs.GetType[Position]()).(*ecs.Collection[Position])

@@ -7,12 +7,48 @@ import (
 	"sync"
 )
 
+type TypeList []reflect.Type
+
+func newTypeList(cap int) TypeList {
+	return make(TypeList, 0, cap)
+}
+
+func (tl TypeList) Contains(t reflect.Type) bool {
+	for _, t2 := range tl {
+		if t2 == t {
+			return true
+		}
+	}
+	return false
+}
+
+func (tl TypeList) Find(t reflect.Type) (int, bool) {
+	for i, t2 := range tl {
+		if t2 == t {
+			return i, true
+		}
+	}
+	return 0, false
+}
+
+func (tl *TypeList) Remove(t reflect.Type) {
+	i, ok := tl.Find(t)
+	if !ok {
+		return
+	}
+	*tl = append((*tl)[:i], (*tl)[i+1:]...)
+}
+
+func (tl *TypeList) Append(t ...reflect.Type) {
+	*tl = append(*tl, t...)
+}
+
 type EntityInfo struct {
 	world      *ecsWorld
 	mu         sync.RWMutex
 	components map[reflect.Type]IComponent
-	adding     map[reflect.Type]struct{}
-	once       map[reflect.Type]IComponent
+	adding     TypeList
+	removing   TypeList
 	entity     Entity
 }
 
@@ -20,8 +56,8 @@ func newEntityInfo(world *ecsWorld) *EntityInfo {
 	entity := &EntityInfo{
 		world:      world,
 		components: make(map[reflect.Type]IComponent),
-		adding:     make(map[reflect.Type]struct{}),
-		once:       make(map[reflect.Type]IComponent),
+		adding:     newTypeList(3),
+		removing:   newTypeList(3),
 		entity:     newEntity(),
 	}
 	world.addEntity(entity)
@@ -36,7 +72,9 @@ func (e *EntityInfo) Destroy() {
 	for _, c := range e.components {
 		components = append(components, c)
 	}
-	e.remove(components...)
+	for _, c := range components {
+		e.deleteComponent(c)
+	}
 	e.world.deleteEntity(e)
 }
 
@@ -63,72 +101,53 @@ func (e *EntityInfo) Has(components ...IComponent) bool {
 }
 
 func (e *EntityInfo) has(components ...IComponent) bool {
-	ok := false
+	has := true
 	for _, c := range components {
-		switch c.getComponentType() {
-		case ComponentTypeDisposable:
-			_, ok = e.once[c.Type()]
-		case ComponentTypeNormal:
-			_, ok = e.components[c.Type()]
-		}
-		if !ok {
-			_, ok = e.adding[c.Type()]
-			if !ok {
-				return false
-			}
+		_, has = e.components[c.Type()]
+		if !has {
+			return false
 		}
 	}
-	return true
+	return has
 }
 
 func (e *EntityInfo) hasByType(types ...reflect.Type) bool {
+	has := true
 	for _, typ := range types {
-		_, ok := e.components[typ]
-		if !ok {
-			_, ok = e.once[typ]
-			if !ok {
-				_, ok = e.adding[typ]
-				if !ok {
-					return false
-				}
-			}
+		_, has := e.components[typ]
+		if !has {
+			return false
 		}
 	}
-	return true
+	return has
 }
 
 func (e *EntityInfo) Add(components ...IComponent) []error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	var errors []error
+
+	var errs []error
 	for _, c := range components {
 		if err := e.addComponent(c); err != nil {
-			errors = append(errors, err)
+			errs = append(errs, err)
 		}
 	}
-	if len(errors) > 0 {
-		return errors
+	if len(errs) > 0 {
+		return errs
 	}
 	return nil
-}
-
-func (e *EntityInfo) remove(components ...IComponent) {
-	for _, c := range components {
-		//typ := c.Type()
-		if !e.has(c) {
-			continue
-		}
-		if c.getComponentType() == ComponentTypeNormal {
-			e.world.deleteComponent(e, c)
-		}
-	}
 }
 
 func (e *EntityInfo) Remove(components ...IComponent) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	e.remove(components...)
+	for _, c := range components {
+		if !e.has(c) {
+			continue
+		}
+		e.deleteComponent(c)
+	}
 }
 
 func (e *EntityInfo) addComponent(com IComponent) error {
@@ -137,38 +156,62 @@ func (e *EntityInfo) addComponent(com IComponent) error {
 	case ComponentTypeFree, ComponentTypeFreeDisposable:
 		return errors.New("this type of component can not add to entity")
 	}
-	com.setOwner(e)
+	canAdd := true
+	typ := com.Type()
 	if e.has(com) {
-		return fmt.Errorf("repeated component: %s", com.Type().Name())
+		if _, ok := e.removing.Find(typ); !ok {
+			canAdd = false
+		}
 	}
-	e.adding[com.Type()] = Empty
+	if !canAdd {
+		return errors.New(fmt.Sprintf("repeated component: %s", typ.Name()))
+	}
+	_, ok := e.adding.Find(typ)
+	if ok {
+		return errors.New(fmt.Sprintf("repeated component: %s", typ.Name()))
+	}
+
+	//Log.Info("add component: ", com.Type().Name())
+
+	e.adding.Append(typ)
+	com.setOwner(e)
+
+	if ct == ComponentTypeDisposable {
+		e.deleteComponent(com)
+	}
 	e.world.addComponent(e, com)
+
 	return nil
+}
+
+func (e *EntityInfo) deleteComponent(com IComponent) {
+	//Log.Info("delete component: ", com.Type().Name())
+	e.removing.Append(com.Type())
+	e.world.deleteComponent(e, com)
 }
 
 func (e *EntityInfo) componentAdded(typ reflect.Type, com IComponent) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	delete(e.adding, typ)
+	e.adding.Remove(typ)
 
+	e.components[typ] = com
 	if com.getComponentType() == ComponentTypeDisposable {
-		e.once[typ] = com
-	} else {
-		e.components[typ] = com
+		e.removing.Append(typ)
 	}
+
+	//Log.Info("component added: ", typ.Name())
 }
 
 func (e *EntityInfo) componentDeleted(typ reflect.Type, comType ComponentType) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	switch comType {
-	case ComponentTypeNormal:
-		delete(e.components, typ)
-	case ComponentTypeDisposable:
-		delete(e.once, typ)
-	}
+	e.removing.Remove(typ)
+
+	delete(e.components, typ)
+	//Log.Info("component removed: ", typ.Name())
 }
 
 func (e *EntityInfo) getComponent(com IComponent) IComponent {
@@ -180,13 +223,4 @@ func (e *EntityInfo) getComponentByType(typ reflect.Type) IComponent {
 	defer e.mu.RUnlock()
 
 	return e.components[typ]
-}
-
-func (e *EntityInfo) clearDisposable() {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-
-	if len(e.once) > 0 {
-		e.once = make(map[reflect.Type]IComponent)
-	}
 }

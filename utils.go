@@ -80,6 +80,23 @@ func StrHash(str string, groupCount int) int {
 }
 
 func TypeOf[T any]() reflect.Type {
-	var ins *T
+	var ins T
 	return reflect.TypeOf(ins)
+}
+
+func SliceFind[T comparable](c []T, v T) (int, bool) {
+	for i, vv := range c {
+		if vv == v {
+			return i, true
+		}
+	}
+	return 0, false
+}
+
+func SliceRemove[T comparable](c []T, v T) []T {
+	i, ok := SliceFind(c, v)
+	if ok {
+		return append(c[:i], c[i+1:]...)
+	}
+	return c
 }

@@ -25,28 +25,13 @@ func (d *DamageSystem) Init() {
 	d.SetRequirements(&Position{}, &HealthPoint{}, &Force{}, &Action{})
 }
 
-func (d *DamageSystem) Filter() []ecs.OperateInfo {
-	/*
-	  获取当前帧新所有创建、删除的组件
-	*/
-	nc := d.GetInterestedNew()
-	if len(nc) == 0 {
-		return nil
-	}
-
-	as, ok := nc[ecs.GetType[Action]()]
-	if !ok {
-		return nil
-	}
-
-	return as
-}
-
 func (d *DamageSystem) DataMatch() ([]Caster, []Target) {
 	iterAction := ecs.GetInterestedComponents[Action](d)
 	if iterAction.Empty() {
 		return nil, nil
 	}
+
+	//ecs.Log.Infof("iterAction: %v", iterAction.Empty())
 
 	idTemp := map[ecs.Entity]struct{}{}
 	var casters []Caster
@@ -111,6 +96,7 @@ func (d *DamageSystem) Update(event ecs.Event) {
 	聚合数据时，需要匹配攻击者的位置、攻击基础信息，需要匹配被攻击者的位置和血量组件。此外提醒，Entity本身是聚合
 	了'个体'的相关组件，天然聚合了相关组件，可以通过Entity得到攻击者或被攻击者的需要聚合的组件。
 	*/
+	//ecs.Log.Info("DamageSystem Update")
 	casters, targets := d.DataMatch()
 
 	// 伤害主逻辑
@@ -126,17 +112,17 @@ func (d *DamageSystem) Update(event ecs.Event) {
 			}
 
 			//伤害公式：伤害=（基础攻击+力量）+ 暴击伤害， 暴击伤害=基础攻击 * 2
-			damage := caster.F.PhysicalBaseAttack * caster.F.Strength
+			damage := caster.F.PhysicalBaseAttack + caster.F.Strength
 			critical := 0
 			if rand.Intn(100) < caster.F.CriticalChange {
 				critical = caster.F.PhysicalBaseAttack * caster.F.CriticalMultiple
 			}
 			damage = damage + critical
+			//ecs.Log.Infof("Damage:%v", damage)
 			target.HP.HP -= damage
 			if target.HP.HP < 0 {
 				target.HP.HP = 0
 			}
 		}
-		caster.E.Remove(caster.A)
 	}
 }

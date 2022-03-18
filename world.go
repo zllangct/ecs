@@ -33,7 +33,6 @@ type IWorld interface {
 	GetSystem(sys reflect.Type) (ISystem, bool)
 
 	getComponents(typ reflect.Type) interface{}
-	getNewComponents(typ reflect.Type) []OperateInfo
 	registerForT(system interface{}, order ...Order)
 }
 
@@ -198,14 +197,6 @@ func (w *ecsWorld) deleteEntity(info *EntityInfo) {
 	w.entities.delete(info.entity)
 }
 
-func (w *ecsWorld) getNewComponentsAll() map[reflect.Type][]OperateInfo {
-	return w.components.getNewComponentsAll()
-}
-
-func (w *ecsWorld) getNewComponents(typ reflect.Type) []OperateInfo {
-	return w.components.getNewComponents(typ)
-}
-
 func (w *ecsWorld) getComponents(typ reflect.Type) interface{} {
 	return w.components.getCollection(typ)
 }
@@ -215,11 +206,11 @@ func (w *ecsWorld) NewEntity() *EntityInfo {
 }
 
 func (w *ecsWorld) addComponent(info *EntityInfo, component IComponent) {
-	w.components.tempTemplateOperate(info, component, CollectionOperateAdd)
+	w.components.operate(info, component, CollectionOperateAdd)
 }
 
 func (w *ecsWorld) deleteComponent(info *EntityInfo, component IComponent) {
-	w.components.tempTemplateOperate(info, component, CollectionOperateDelete)
+	w.components.operate(info, component, CollectionOperateDelete)
 }
 
 func (w *ecsWorld) AddFreeComponent(component IComponent) {
