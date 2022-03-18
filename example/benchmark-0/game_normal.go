@@ -222,7 +222,7 @@ func (g *GameNormal) DoDamage() {
 			}
 
 			//伤害公式：伤害=（基础攻击+力量）+ 暴击伤害， 暴击伤害=基础攻击 * 2
-			damage := caster.PhysicalBaseAttack * caster.Strength
+			damage := caster.PhysicalBaseAttack + caster.Strength
 			critical := 0
 			if rand.Intn(100) < caster.CriticalChange {
 				critical = caster.PhysicalBaseAttack * caster.CriticalMultiple
