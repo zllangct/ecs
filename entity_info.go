@@ -36,10 +36,13 @@ func (tl *TypeList) Remove(t reflect.Type) {
 	if !ok {
 		return
 	}
-	*tl = append((*tl)[:i], (*tl)[i+1:]...)
+	//*tl = append((*tl)[:i], (*tl)[i+1:]...)
+	(*tl)[i], (*tl)[len(*tl)-1] = (*tl)[len(*tl)-1], (*tl)[i]
+	*tl = (*tl)[:len(*tl)-1]
 }
 
 func (tl *TypeList) Append(t ...reflect.Type) {
+	// todo 大量分配对象, TypeList 频繁修改, 考虑链表
 	*tl = append(*tl, t...)
 }
 
