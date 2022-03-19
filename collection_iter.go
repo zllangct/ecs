@@ -46,6 +46,10 @@ func (i *Iter[T, TP]) End() bool {
 }
 
 func (i *Iter[T, TP]) Begin() *T {
+	if i.len != 0 {
+		i.offset = 0
+		i.cur = &(i.c.data[0])
+	}
 	return i.cur
 }
 
