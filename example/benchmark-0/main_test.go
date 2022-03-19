@@ -2,6 +2,8 @@ package main
 
 import (
 	"github.com/zllangct/ecs"
+	"net/http"
+	_ "net/http/pprof"
 	"testing"
 	"time"
 	_ "unsafe"
@@ -48,6 +50,10 @@ func BenchmarkNormalParallel(b *testing.B) {
 }
 
 func BenchmarkEcsCollectionV1(b *testing.B) {
+	go func() {
+		http.ListenAndServe(":6060", nil)
+	}()
+
 	game := &GameECS{}
 	config := ecs.NewDefaultWorldConfig()
 	config.CollectionVersion = 1

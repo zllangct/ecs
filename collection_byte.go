@@ -115,6 +115,5 @@ func (c *CollectionByte[T, TP]) Len() int {
 }
 
 func (c *CollectionByte[T, TP]) ElementType() reflect.Type {
-	var e T
-	return reflect.TypeOf(e)
+	return TypeOf[T]()
 }

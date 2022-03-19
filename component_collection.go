@@ -22,21 +22,11 @@ type IComponentCollection interface {
 	getCollection(typ reflect.Type) interface{}
 }
 
-type OperateInfo struct {
-	target *EntityInfo
-	com    IComponent
-	op     CollectionOperate
-}
-
-func NewTemplateOperateInfo(entity *EntityInfo, template IComponent, op CollectionOperate) OperateInfo {
-	return OperateInfo{target: entity, com: template, op: op}
-}
-
 type ComponentCollection struct {
 	collections map[reflect.Type]interface{}
 	bucket      int64
 	locks       []sync.RWMutex
-	opLog       []map[reflect.Type][]OperateInfo
+	opLog       []map[reflect.Type]*opTaskList
 	once        []map[reflect.Type]struct{}
 }
 
@@ -56,7 +46,7 @@ func NewComponentCollection(k int) *ComponentCollection {
 	for i := int64(0); i < cc.bucket+1; i++ {
 		cc.locks[i] = sync.RWMutex{}
 	}
-	cc.opLog = make([]map[reflect.Type][]OperateInfo, cc.bucket+1)
+	cc.opLog = make([]map[reflect.Type]*opTaskList, cc.bucket+1)
 	cc.initOptTemp()
 	cc.once = make([]map[reflect.Type]struct{}, cc.bucket+1)
 	cc.initOnce()
@@ -67,7 +57,7 @@ func NewComponentCollection(k int) *ComponentCollection {
 func (c *ComponentCollection) initOptTemp() {
 	for index := range c.opLog {
 		c.locks[index].Lock()
-		c.opLog[index] = make(map[reflect.Type][]OperateInfo)
+		c.opLog[index] = make(map[reflect.Type]*opTaskList)
 		c.locks[index].Unlock()
 	}
 }
@@ -94,18 +84,23 @@ func (c *ComponentCollection) operate(op CollectionOperate, entity *EntityInfo, 
 	}
 
 	typ := component.Type()
-	newOpt := NewTemplateOperateInfo(entity, component, op)
+	newOpt := opTaskPool.Get()
+	newOpt.target = entity
+	newOpt.com = component
+	newOpt.op = op
 
 	b := c.opLog[hash]
 
 	c.locks[hash].Lock()
 	defer c.locks[hash].Unlock()
 
-	if _, ok := b[typ]; ok {
-		b[typ] = append(b[typ], newOpt)
-	} else {
-		b[typ] = []OperateInfo{newOpt}
+	tl, ok := b[typ]
+	if !ok {
+		tl = &opTaskList{}
+		b[typ] = tl
 	}
+
+	tl.Append(newOpt)
 }
 
 func (c *ComponentCollection) clearDisposable() {
@@ -145,63 +140,74 @@ func (c *ComponentCollection) disposableTemp(com IComponent, typ reflect.Type) {
 }
 
 func (c *ComponentCollection) getTempTasks() []func() {
-	combination := make(map[reflect.Type][]OperateInfo)
+	combination := make(map[reflect.Type]*opTaskList)
 
 	for i := 0; i < len(c.opLog); i++ {
 		c.locks[i].RLock()
-		for typ, op := range c.opLog[i] {
-			if len(op) == 0 {
+		for typ, list := range c.opLog[i] {
+			if list.Len() == 0 {
 				continue
 			}
 			if _, ok := combination[typ]; ok {
-				combination[typ] = append(combination[typ], op...)
+				combination[typ].Combine(list)
 			} else {
-				combination[typ] = op
+				combination[typ] = list
 			}
 		}
-		c.opLog[i] = make(map[reflect.Type][]OperateInfo)
+		c.opLog[i] = make(map[reflect.Type]*opTaskList)
 		c.locks[i].RUnlock()
 	}
 
 	var tasks []func()
-	for typ, opList := range combination {
+	for typ, list := range combination {
 		typTemp := typ
-		oopList := opList
+		taskList := list
 		collection, ok := c.collections[typTemp]
 		if !ok {
-			c.collections[typTemp] = oopList[0].com.newCollection()
+			c.collections[typTemp] = taskList.head.com.newCollection()
 			collection = c.collections[typTemp]
 		}
 
 		fn := func() {
-			var t reflect.Type
-			for _, operate := range oopList {
-				t = operate.com.Type()
-				switch operate.op {
-				case CollectionOperateAdd:
-					ret := operate.com.addToCollection(collection)
-					switch operate.com.getComponentType() {
-					case ComponentTypeNormal:
-						operate.target.componentAdded(t, ret)
-					case ComponentTypeDisposable:
-						c.disposableTemp(operate.com, t)
-						operate.target.componentAdded(t, ret)
-					case ComponentTypeFreeDisposable:
-						c.disposableTemp(operate.com, t)
-					}
-					operate.com = ret
-				case CollectionOperateDelete:
-					operate.com.deleteFromCollection(collection)
-					switch operate.com.getComponentType() {
-					case ComponentTypeNormal, ComponentTypeDisposable:
-						operate.target.componentDeleted(t, operate.com.getComponentType())
-					}
-				}
-			}
+			c.opExecute(taskList, collection)
 		}
 		tasks = append(tasks, fn)
 	}
 	return tasks
+}
+
+func (c *ComponentCollection) opExecute(taskList *opTaskList, collection any) {
+	var t reflect.Type
+	for task := taskList.head; task != nil; task = task.next {
+		t = task.com.Type()
+		switch task.op {
+		case CollectionOperateAdd:
+			ret := task.com.addToCollection(collection)
+			switch task.com.getComponentType() {
+			case ComponentTypeNormal:
+				task.target.componentAdded(t, ret)
+			case ComponentTypeDisposable:
+				c.disposableTemp(task.com, t)
+				task.target.componentAdded(t, ret)
+			case ComponentTypeFreeDisposable:
+				c.disposableTemp(task.com, t)
+			}
+			task.com = ret
+		case CollectionOperateDelete:
+			task.com.deleteFromCollection(collection)
+			switch task.com.getComponentType() {
+			case ComponentTypeNormal, ComponentTypeDisposable:
+				task.target.componentDeleted(t, task.com.getComponentType())
+			}
+		}
+	}
+	next := taskList.head
+	for next != nil {
+		task := next
+		next = next.next
+		opTaskPool.Put(task)
+	}
+	taskList.Reset()
 }
 
 func (c *ComponentCollection) getCollection(typ reflect.Type) interface{} {

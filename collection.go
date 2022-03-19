@@ -96,9 +96,5 @@ func (c *Collection[T, TP]) Len() int {
 }
 
 func (c *Collection[T, TP]) ElementType() reflect.Type {
-	if c.len > 0 {
-		return reflect.TypeOf(c.data[0])
-	}
-	var e T
-	return reflect.TypeOf(e)
+	return TypeOf[T]()
 }

@@ -1,7 +1,6 @@
 package ecs
 
 import (
-	"reflect"
 	"sync"
 )
 
@@ -25,13 +24,6 @@ const (
 	OrderAppend  Order = 99999999
 	OrderDefault Order = OrderAppend
 )
-
-type TempTask struct {
-	lock *sync.Mutex
-	m    map[reflect.Type][]OperateInfo
-	wg   *sync.WaitGroup
-	fn   func() (reflect.Type, []OperateInfo)
-}
 
 // OrderSequence extension of system group slice
 type OrderSequence []*SystemGroup

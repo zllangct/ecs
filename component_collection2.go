@@ -26,6 +26,21 @@ type opTaskList struct {
 	tail    *opTask
 }
 
+func (o *opTaskList) Len() int {
+	return o.len
+}
+
+func (o *opTaskList) Combine(list *opTaskList) {
+	if o.head == nil {
+		o.head = list.head
+		o.tail = list.tail
+	} else {
+		o.tail.next = list.head
+		o.tail = list.tail
+	}
+	o.len += list.len
+}
+
 func (o *opTaskList) Append(task *opTask) {
 	if o.head == nil {
 		o.head = task
