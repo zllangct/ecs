@@ -8,7 +8,7 @@ import (
 
 // runtime api
 
-func RuntimeConfigure(config *RuntimeConfig) {
+func Configure(config *RuntimeConfig) {
 	Runtime.Configure(config)
 }
 

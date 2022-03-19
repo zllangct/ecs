@@ -34,7 +34,7 @@ func (f *FakeGame) Run(ctx context.Context) {
 
 func (f *FakeGame) InitEcs() {
 	//run your ecs runtime
-	ecs.RuntimeConfigure(ecs.NewDefaultRuntimeConfig())
+	ecs.Configure(ecs.NewDefaultRuntimeConfig())
 	ecs.Run()
 
 	//create a world

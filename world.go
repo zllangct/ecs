@@ -10,7 +10,8 @@ import (
 type WorldStatus int
 
 type WorldConfig struct {
-	HashCount            int           //容器桶数量
+	HashCount            int //容器桶数量
+	CollectionVersion    int
 	DefaultFrameInterval time.Duration //帧间隔
 	StopCallback         func(world *ecsWorld)
 }
@@ -50,7 +51,8 @@ type ecsWorld struct {
 	//system flow,all systems
 	systemFlow *systemFlow
 	//all components
-	components *ComponentCollection
+	//components *ComponentCollection
+	components IComponentCollection
 	//all entities
 	entities *EntityCollection
 
@@ -64,10 +66,18 @@ func newWorld(runtime *ecsRuntime, config *WorldConfig) *ecsWorld {
 		id:         UniqueID(),
 		systemFlow: nil,
 		config:     config,
-		components: NewComponentCollection(config.HashCount),
+		//components: NewComponentCollection(config.HashCount),
+		components: newComponentCollection2(),
 		entities:   NewEntityCollection(config.HashCount),
 		status:     StatusInit,
 		wStop:      make(chan struct{}),
+	}
+
+	switch config.CollectionVersion {
+	case 2:
+		world.components = newComponentCollection2()
+	default:
+		world.components = NewComponentCollection(config.HashCount)
 	}
 
 	if world.config.DefaultFrameInterval <= 0 {
@@ -206,11 +216,11 @@ func (w *ecsWorld) NewEntity() *EntityInfo {
 }
 
 func (w *ecsWorld) addComponent(info *EntityInfo, component IComponent) {
-	w.components.operate(info, component, CollectionOperateAdd)
+	w.components.operate(CollectionOperateAdd, info, component)
 }
 
 func (w *ecsWorld) deleteComponent(info *EntityInfo, component IComponent) {
-	w.components.operate(info, component, CollectionOperateDelete)
+	w.components.operate(CollectionOperateDelete, info, component)
 }
 
 func (w *ecsWorld) AddFreeComponent(component IComponent) {

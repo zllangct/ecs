@@ -24,7 +24,9 @@ func NewIterator[T ComponentObject, TP ComponentPointer[T]](collection *Collecti
 		c:      collection,
 		len:    collection.Len(),
 		offset: 0,
-		cur:    &(collection.data[0]),
+	}
+	if iter.len != 0 {
+		iter.cur = &(collection.data[0])
 	}
 	return iter
 }

@@ -14,6 +14,14 @@ const (
 	CollectionOperateDelete                   //delete component operation
 )
 
+type IComponentCollection interface {
+	operate(op CollectionOperate, entity *EntityInfo, component IComponent)
+	getTempTasks() []func()
+	collectorRun()
+	clearDisposable()
+	getCollection(typ reflect.Type) interface{}
+}
+
 type OperateInfo struct {
 	target *EntityInfo
 	com    IComponent
@@ -72,7 +80,7 @@ func (c *ComponentCollection) initOnce() {
 	}
 }
 
-func (c *ComponentCollection) operate(entity *EntityInfo, component IComponent, op CollectionOperate) {
+func (c *ComponentCollection) operate(op CollectionOperate, entity *EntityInfo, component IComponent) {
 	var hash int64
 	switch component.getComponentType() {
 	case ComponentTypeFree, ComponentTypeFreeDisposable:
@@ -202,4 +210,7 @@ func (c *ComponentCollection) getCollection(typ reflect.Type) interface{} {
 
 func (c *ComponentCollection) removeAllByType(typ reflect.Type) {
 	delete(c.collections, typ)
+}
+
+func (c *ComponentCollection) collectorRun() {
 }

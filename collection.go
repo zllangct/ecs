@@ -11,7 +11,8 @@ type Collection[T ComponentObject, TP ComponentPointer[T]] struct {
 
 func NewCollection[T ComponentObject, TP ComponentPointer[T]]() *Collection[T, TP] {
 	c := &Collection[T, TP]{
-		ids: map[int64]int64{},
+		ids:  map[int64]int64{},
+		data: make([]T, 0, 1),
 	}
 	return c
 }

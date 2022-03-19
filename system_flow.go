@@ -101,6 +101,8 @@ func (p *systemFlow) run(event Event) {
 	}
 	p.wg.Wait()
 
+	p.world.components.collectorRun()
+
 	var sq OrderSequence
 
 	//Log.Info("system flow # Event Dispatch #")

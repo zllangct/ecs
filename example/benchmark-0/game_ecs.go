@@ -14,11 +14,11 @@ type GameECS struct {
 //go:linkname doFrame github.com/zllangct/ecs.doFrameForBenchmark
 func doFrame(w ecs.IWorld, frame uint64, lastDelta time.Duration)
 
-func (g *GameECS) init() {
-	ecs.RuntimeConfigure(ecs.NewDefaultRuntimeConfig())
+func (g *GameECS) init(config *ecs.WorldConfig) {
+	ecs.Configure(ecs.NewDefaultRuntimeConfig())
 	ecs.Run()
 
-	g.world = ecs.CreateWorld(ecs.NewDefaultWorldConfig())
+	g.world = ecs.CreateWorld(config)
 
 	ecs.RegisterSystem[MoveSystem](g.world)
 	ecs.RegisterSystem[DamageSystem](g.world)

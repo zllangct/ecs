@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/zllangct/ecs"
 	"testing"
 	"time"
 	_ "unsafe"
@@ -46,42 +47,55 @@ func BenchmarkNormalParallel(b *testing.B) {
 	}
 }
 
-func BenchmarkEcs(b *testing.B) {
+func BenchmarkEcsCollectionV1(b *testing.B) {
 	game := &GameECS{}
-	game.init()
+	config := ecs.NewDefaultWorldConfig()
+	config.CollectionVersion = 1
+	game.init(config)
 
 	b.ResetTimer()
 
 	var delta time.Duration
 	var ts time.Time
-	var frameInterval time.Duration = time.Millisecond * 33
+	for i := 0; i < b.N; i++ {
+		ts = time.Now()
+		game.attack()
+		doFrame(game.world, uint64(i), delta)
+		delta = time.Since(ts)
+	}
+}
+
+func BenchmarkEcsCollectionV2(b *testing.B) {
+	game := &GameECS{}
+	config := ecs.NewDefaultWorldConfig()
+	config.CollectionVersion = 2
+	game.init(config)
+
+	b.ResetTimer()
+
+	var delta time.Duration
+	var ts time.Time
 	for i := 0; i < b.N; i++ {
 		//ecs.Log.Info("===== Frame:", i)
 		ts = time.Now()
 		game.attack()
-		doFrame(game.world, uint64(i), frameInterval)
+		doFrame(game.world, uint64(i), delta)
 		delta = time.Since(ts)
-		if frameInterval-delta > 0 {
-			delta = frameInterval
-		}
 	}
 }
 
 func TestEcs(t *testing.T) {
 	game := &GameECS{}
-	game.init()
+	config := ecs.NewDefaultWorldConfig()
+	game.init(config)
 
 	var delta time.Duration
 	var ts time.Time
-	var frameInterval time.Duration = time.Millisecond * 33
 	for i := 0; i < 10; i++ {
 		//ecs.Log.Info("===== Frame:", i)
 		ts = time.Now()
-		doFrame(game.world, uint64(i), frameInterval)
+		doFrame(game.world, uint64(i), delta)
 		game.attack()
 		delta = time.Since(ts)
-		if frameInterval-delta > 0 {
-			delta = frameInterval
-		}
 	}
 }
