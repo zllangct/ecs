@@ -42,7 +42,9 @@ func (tl *TypeList) Remove(t reflect.Type) {
 }
 
 func (tl *TypeList) Append(t ...reflect.Type) {
-	// todo 大量分配对象, TypeList 频繁修改, 考虑链表
+	/* todo
+	大量分配对象, TypeList 频繁修改, 考虑链表, map的插入效率,find、delete效率高
+	*/
 	*tl = append(*tl, t...)
 }
 

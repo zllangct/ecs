@@ -32,6 +32,7 @@ type IWorld interface {
 	AddFreeComponent(component IComponent)
 	Register(system ISystem)
 	GetSystem(sys reflect.Type) (ISystem, bool)
+	Optimize(t time.Duration)
 
 	getComponents(typ reflect.Type) interface{}
 	registerForT(system interface{}, order ...Order)
@@ -55,6 +56,8 @@ type ecsWorld struct {
 	components IComponentCollection
 	//all entities
 	entities *EntityCollection
+	//optimizer
+	optimizer *optimizer
 
 	wStop chan struct{}
 	//do some work for world cleaning
@@ -72,6 +75,7 @@ func newWorld(runtime *ecsRuntime, config *WorldConfig) *ecsWorld {
 		status:     StatusInit,
 		wStop:      make(chan struct{}),
 	}
+	world.optimizer = newOptimizer(world)
 
 	switch config.CollectionVersion {
 	case 2:
@@ -106,7 +110,15 @@ func (w *ecsWorld) Run() {
 
 func doFrameForBenchmark(w IWorld, frame uint64, lastDelta time.Duration) {
 	world := w.(*ecsWorld)
-	world.systemFlow.run(Event{Delta: lastDelta, Frame: frame})
+	world.update(Event{Delta: lastDelta, Frame: frame})
+}
+
+func (w *ecsWorld) update(event Event) {
+	w.systemFlow.run(event)
+}
+
+func (w *ecsWorld) Optimize(t time.Duration) {
+	w.optimizer.optimize(t)
 }
 
 func (w *ecsWorld) run() {
@@ -150,7 +162,7 @@ func (w *ecsWorld) run() {
 		}
 
 		ts = time.Now()
-		w.systemFlow.run(Event{Delta: delta, Frame: frame})
+		w.update(Event{Delta: delta, Frame: frame})
 		frame++
 		delta = time.Since(ts)
 		//w.Info(delta, frameInterval - delta)

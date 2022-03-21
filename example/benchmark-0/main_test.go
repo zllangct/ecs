@@ -18,14 +18,10 @@ func BenchmarkNormal(b *testing.B) {
 
 	var delta time.Duration
 	var ts time.Time
-	var frameInterval time.Duration = time.Millisecond * 33
 	for i := 0; i < b.N; i++ {
 		ts = time.Now()
-		game.doFrame(false, uint64(i), frameInterval)
+		game.doFrame(false, uint64(i), delta)
 		delta = time.Since(ts)
-		if frameInterval-delta > 0 {
-			delta = frameInterval
-		}
 	}
 }
 
@@ -103,5 +99,27 @@ func TestEcs(t *testing.T) {
 		doFrame(game.world, uint64(i), delta)
 		game.attack()
 		delta = time.Since(ts)
+	}
+}
+
+func TestEcsOptimizer(t *testing.T) {
+	game := &GameECS{}
+	config := ecs.NewDefaultWorldConfig()
+	game.init(config)
+
+	var frameInterval = time.Millisecond * 33
+	var delta time.Duration
+	var ts time.Time
+	for i := 0; i < 10; i++ {
+		//ecs.Log.Info("===== Frame:", i)
+		ts = time.Now()
+		doFrame(game.world, uint64(i), delta)
+		game.attack()
+		delta = time.Since(ts)
+		if frameInterval-delta > 0 {
+			game.world.Optimize(frameInterval - delta)
+			time.Sleep(frameInterval - delta)
+			delta = frameInterval
+		}
 	}
 }

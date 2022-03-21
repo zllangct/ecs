@@ -232,6 +232,10 @@ func (c *ComponentCollection2) getCollection(typ reflect.Type) interface{} {
 	return c.collections[typ]
 }
 
+func (c *ComponentCollection2) getCollections() map[reflect.Type]interface{} {
+	return c.collections
+}
+
 func (c *ComponentCollection2) removeAllByType(typ reflect.Type) {
 	delete(c.collections, typ)
 }

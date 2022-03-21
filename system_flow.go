@@ -5,15 +5,15 @@ import (
 )
 
 const (
-	PeriodStart Period = iota
-	PeriodPreUpdate
-	PeriodUpdate
-	PeriodPostUpdate
-	PeriodDestroy
+	StageStart Stage = iota
+	StagePreUpdate
+	StageUpdate
+	StagePostUpdate
+	StageDestroy
 )
 
-// Period system execute period:start->pre_update->update->pre_destroy->destroy
-type Period uint32
+// Stage system execute period:start->pre_update->update->pre_destroy->destroy
+type Stage uint32
 
 // Order default suborder of system
 type Order int32
@@ -25,17 +25,17 @@ const (
 	OrderDefault Order = OrderAppend
 )
 
-// OrderSequence extension of system group slice
-type OrderSequence []*SystemGroup
+// SystemGroupList extension of system group slice
+type SystemGroupList []*SystemGroup
 
 //system execute flow
 type systemFlow struct {
-	lock         sync.Mutex
-	world        *ecsWorld
-	systemPeriod map[Period]OrderSequence
-	periodList   []Period
-	systems      sync.Map
-	wg           *sync.WaitGroup
+	lock      sync.Mutex
+	world     *ecsWorld
+	stages    map[Stage]SystemGroupList
+	stageList []Stage
+	systems   sync.Map
+	wg        *sync.WaitGroup
 }
 
 func newSystemFlow(runtime *ecsWorld) *systemFlow {
@@ -49,25 +49,25 @@ func newSystemFlow(runtime *ecsWorld) *systemFlow {
 
 //initialize the system flow
 func (p *systemFlow) init() {
-	p.periodList = []Period{
-		PeriodStart,
-		PeriodPreUpdate,
-		PeriodUpdate,
-		PeriodPostUpdate,
-		PeriodDestroy,
+	p.stageList = []Stage{
+		StageStart,
+		StagePreUpdate,
+		StageUpdate,
+		StagePostUpdate,
+		StageDestroy,
 	}
 	p.reset()
 }
 
 func (p *systemFlow) reset() {
-	p.systemPeriod = make(map[Period]OrderSequence)
-	for _, value := range p.periodList {
-		p.systemPeriod[value] = OrderSequence{}
+	p.stages = make(map[Stage]SystemGroupList)
+	for _, value := range p.stageList {
+		p.stages[value] = SystemGroupList{}
 		sgFront := NewSystemGroup()
 		sgFront.order = OrderFront
 		sgAppend := NewSystemGroup()
 		sgAppend.order = OrderAppend
-		p.systemPeriod[value] = append(p.systemPeriod[value], sgFront, sgAppend)
+		p.stages[value] = append(p.stages[value], sgFront, sgAppend)
 	}
 }
 
@@ -95,11 +95,11 @@ func (p *systemFlow) run(event Event) {
 
 	p.world.components.collectorRun()
 
-	var sq OrderSequence
+	var sq SystemGroupList
 
 	//Log.Info("system flow # Event Dispatch #")
-	for _, period := range p.periodList {
-		sq = p.systemPeriod[period]
+	for _, period := range p.stageList {
+		sq = p.stages[period]
 		for _, sl := range sq {
 			sl.reset()
 			for ss := sl.next(); len(ss) > 0; ss = sl.next() {
@@ -120,8 +120,8 @@ func (p *systemFlow) run(event Event) {
 	}
 
 	//Log.Info("system flow # Logic #")
-	for _, period := range p.periodList {
-		sq = p.systemPeriod[period]
+	for _, period := range p.stageList {
+		sq = p.stages[period]
 		for _, sl := range sq {
 			sl.reset()
 			for ss := sl.next(); len(ss) > 0; ss = sl.next() {
@@ -133,7 +133,7 @@ func (p *systemFlow) run(event Event) {
 						state := ss[i].getState()
 						if state == SystemStateInit {
 							switch period {
-							case PeriodStart:
+							case StageStart:
 								system, ok := ss[i].(StartReceiver)
 								fn = system.Start
 								imp = ok
@@ -141,22 +141,22 @@ func (p *systemFlow) run(event Event) {
 							sys.setState(SystemStateUpdate)
 						} else if state == SystemStateUpdate {
 							switch period {
-							case PeriodPreUpdate:
+							case StagePreUpdate:
 								system, ok := sys.(PreUpdateReceiver)
 								fn = system.PreUpdate
 								imp = ok
-							case PeriodUpdate:
+							case StageUpdate:
 								system, ok := ss[i].(UpdateReceiver)
 								fn = system.Update
 								imp = ok
-							case PeriodPostUpdate:
+							case StagePostUpdate:
 								system, ok := ss[i].(PostUpdateReceiver)
 								fn = system.PostUpdate
 								imp = ok
 							}
 						} else if state == SystemStateDestroy {
 							switch period {
-							case PeriodDestroy:
+							case StageDestroy:
 								system, ok := ss[i].(DestroyReceiver)
 								fn = system.Destroy
 								imp = ok
@@ -202,18 +202,18 @@ func (p *systemFlow) register(system ISystem) {
 		order = OrderAppend
 	}
 
-	for _, period := range p.periodList {
+	for _, period := range p.stageList {
 		imp := false
 		switch period {
-		case PeriodStart:
+		case StageStart:
 			_, imp = system.(StartReceiver)
-		case PeriodPreUpdate:
+		case StagePreUpdate:
 			_, imp = system.(PreUpdateReceiver)
-		case PeriodUpdate:
+		case StageUpdate:
 			_, imp = system.(UpdateReceiver)
-		case PeriodPostUpdate:
+		case StagePostUpdate:
 			_, imp = system.(PostUpdateReceiver)
-		case PeriodDestroy:
+		case StageDestroy:
 			_, imp = system.(DestroyReceiver)
 		}
 
@@ -221,11 +221,11 @@ func (p *systemFlow) register(system ISystem) {
 			continue
 		}
 
-		sl := p.systemPeriod[period]
+		sl := p.stages[period]
 		if order == OrderFront {
-			p.systemPeriod[period][0].insert(system)
+			p.stages[period][0].insert(system)
 		} else if order == OrderAppend {
-			p.systemPeriod[period][len(sl)-1].insert(system)
+			p.stages[period][len(sl)-1].insert(system)
 		} else {
 			for i, v := range sl {
 				if order == v.order {
@@ -235,13 +235,15 @@ func (p *systemFlow) register(system ISystem) {
 					sg := NewSystemGroup()
 					sg.order = order
 					sg.insert(system)
-					temp := append(OrderSequence{}, sl[i-1:]...)
-					p.systemPeriod[period] = append(append(sl[:i-1], sg), temp...)
+					temp := append(SystemGroupList{}, sl[i-1:]...)
+					p.stages[period] = append(append(sl[:i-1], sg), temp...)
 					break
 				}
 			}
 		}
 	}
+
+	p.systems.Store(system.Type(), system)
 }
 
 func (p *systemFlow) unregister(system ISystem) {
@@ -254,18 +256,18 @@ func (p *systemFlow) unregister(system ISystem) {
 		order = OrderAppend
 	}
 
-	for _, period := range p.periodList {
+	for _, period := range p.stageList {
 		imp := false
 		switch period {
-		case PeriodStart:
+		case StageStart:
 			_, imp = system.(StartReceiver)
-		case PeriodPreUpdate:
+		case StagePreUpdate:
 			_, imp = system.(PreUpdateReceiver)
-		case PeriodUpdate:
+		case StageUpdate:
 			_, imp = system.(UpdateReceiver)
-		case PeriodPostUpdate:
+		case StagePostUpdate:
 			_, imp = system.(PostUpdateReceiver)
-		case PeriodDestroy:
+		case StageDestroy:
 			_, imp = system.(DestroyReceiver)
 		}
 
@@ -273,13 +275,15 @@ func (p *systemFlow) unregister(system ISystem) {
 			continue
 		}
 
-		sl := p.systemPeriod[period]
+		sl := p.stages[period]
 		for _, group := range sl {
 			if group.has(system) {
 				group.remove(system)
 			}
 		}
 	}
+
+	p.systems.Delete(system.Type())
 }
 
 func (p *systemFlow) stop() {

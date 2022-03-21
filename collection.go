@@ -2,6 +2,15 @@ package ecs
 
 import "reflect"
 
+const (
+	TrunkSize = 1024 * 16
+)
+
+type trunk[T ComponentObject, TP ComponentPointer[T]] struct {
+	data [TrunkSize]T
+	len  int64
+}
+
 type Collection[T ComponentObject, TP ComponentPointer[T]] struct {
 	data []T
 	ids  map[int64]int64

@@ -20,6 +20,7 @@ type IComponentCollection interface {
 	collectorRun()
 	clearDisposable()
 	getCollection(typ reflect.Type) interface{}
+	getCollections() map[reflect.Type]interface{}
 }
 
 type ComponentCollection struct {
@@ -212,6 +213,10 @@ func (c *ComponentCollection) opExecute(taskList *opTaskList, collection any) {
 
 func (c *ComponentCollection) getCollection(typ reflect.Type) interface{} {
 	return c.collections[typ]
+}
+
+func (c *ComponentCollection) getCollections() map[reflect.Type]interface{} {
+	return c.collections
 }
 
 func (c *ComponentCollection) removeAllByType(typ reflect.Type) {

@@ -119,10 +119,10 @@ func (f FreeDisposableComponent[T, TP]) freeComponentIdentification() {}
 func (f FreeDisposableComponent[T, TP]) disposableComponentIdentification() {}
 
 type Component[T ComponentObject, TP ComponentPointer[T]] struct {
-	owner    *EntityInfo
 	id       int64
-	realType reflect.Type
 	st       uint8
+	owner    *EntityInfo
+	realType reflect.Type
 }
 
 func (c Component[T, TP]) componentIdentification() {}

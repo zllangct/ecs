@@ -48,6 +48,7 @@ type ISystem interface {
 	checkoutComponent(entity *EntityInfo, com IComponent) IComponent
 	baseInit(world *ecsWorld, ins ISystem)
 	eventDispatch()
+	getOptimizer() *OptimizerReporter
 }
 
 type SystemObject interface {
@@ -60,20 +61,21 @@ type SystemPointer[T SystemObject] interface {
 }
 
 type System[T SystemObject, TP SystemPointer[T]] struct {
-	lock         sync.Mutex
-	requirements map[reflect.Type]struct{}
-	events       map[CustomEventName]CustomEventHandler
-	eventQueue   *list.List
-	order        Order
-	world        *ecsWorld
-	realType     reflect.Type
-	state        SystemState
-	id           int64
+	lock              sync.Mutex
+	requirements      map[reflect.Type]struct{}
+	events            map[CustomEventName]CustomEventHandler
+	eventQueue        *list.List
+	order             Order
+	optimizerReporter *OptimizerReporter
+	world             *ecsWorld
+	realType          reflect.Type
+	state             SystemState
+	id                int64
 }
 
 func (s System[T, TP]) systemIdentification() {}
 
-func (s *System[T, TP]) Ins() (sys ISystem) {
+func (s *System[T, TP]) instance() (sys ISystem) {
 	(*iface)(unsafe.Pointer(&sys)).data = unsafe.Pointer(s)
 	return
 }
@@ -298,4 +300,13 @@ func (s *System[T, TP]) checkoutComponent(entity *EntityInfo, com IComponent) IC
 
 func (s *System[T, TP]) GetEntityInfo(entity Entity) *EntityInfo {
 	return s.world.GetEntityInfo(entity)
+}
+
+// get optimizer
+func (s *System[T, TP]) getOptimizer() *OptimizerReporter {
+	if s.optimizerReporter == nil {
+		s.optimizerReporter = &OptimizerReporter{}
+		s.optimizerReporter.init()
+	}
+	return s.optimizerReporter
 }
