@@ -11,6 +11,7 @@ type IShapeGetter interface {
 }
 
 type IShape interface {
+	GetEntity() Entity
 	setEntity(e Entity)
 	parse(head unsafe.Pointer, eleSize []uintptr)
 	getElements() []unsafe.Pointer
@@ -45,6 +46,10 @@ type ShapeBase struct {
 	entity Entity
 }
 
+func (s *ShapeBase) GetEntity() Entity {
+	return s.entity
+}
+
 // set entity
 func (s *ShapeBase) setEntity(e Entity) {
 	s.entity = e
@@ -63,9 +68,8 @@ func (s Shape2[T1, T2]) getElements() []unsafe.Pointer {
 func (s *Shape2[T1, T2]) parse(head unsafe.Pointer, eleSize []uintptr) {
 	s.head = head
 	offset := uintptr(0)
-	b := unsafe.Slice((*byte)(head), eleSize[0])
+	s.setEntity(getComponentOwnerEntity(unsafe.Pointer(uintptr(head))))
 	s.C1 = (*T1)(unsafe.Pointer(uintptr(head) + offset))
-	_ = b
 	offset += eleSize[0]
 	s.C2 = (*T2)(unsafe.Pointer(uintptr(head) + offset))
 }

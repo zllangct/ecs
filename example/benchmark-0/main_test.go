@@ -45,7 +45,7 @@ func BenchmarkNormalParallel(b *testing.B) {
 	}
 }
 
-func BenchmarkEcsCollectionV1(b *testing.B) {
+func BenchmarkEcs(b *testing.B) {
 	go func() {
 		http.ListenAndServe(":6060", nil)
 	}()
@@ -60,25 +60,6 @@ func BenchmarkEcsCollectionV1(b *testing.B) {
 	var delta time.Duration
 	var ts time.Time
 	for i := 0; i < b.N; i++ {
-		ts = time.Now()
-		game.attack()
-		doFrame(game.world, uint64(i), delta)
-		delta = time.Since(ts)
-	}
-}
-
-func BenchmarkEcsCollectionV2(b *testing.B) {
-	game := &GameECS{}
-	config := ecs.NewDefaultWorldConfig()
-	config.CollectionVersion = 2
-	game.init(config)
-
-	b.ResetTimer()
-
-	var delta time.Duration
-	var ts time.Time
-	for i := 0; i < b.N; i++ {
-		//ecs.Log.Info("===== Frame:", i)
 		ts = time.Now()
 		game.attack()
 		doFrame(game.world, uint64(i), delta)

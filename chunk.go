@@ -5,7 +5,8 @@ import (
 )
 
 const (
-	ChunkSize int64 = 1024 * 16
+	//ChunkSize int64 = 1024 * 16
+	ChunkSize int64 = 512
 )
 
 const (
@@ -17,7 +18,6 @@ const (
 type Chunk struct {
 	data    [ChunkSize]byte
 	ids     map[int64]int64
-	seq     int64
 	len     int64
 	eleSize uintptr
 	pend    uintptr
@@ -109,6 +109,7 @@ func (c *Chunk) RemoveAndReturn(entity Entity) unsafe.Pointer {
 	copy(r, c.data[offset:offset+c.eleSize])
 	copy(c.data[offset:offset+c.eleSize], c.data[lastOffset:lastOffset+c.eleSize])
 	c.len--
+	c.pend -= c.eleSize
 	return unsafe.Pointer(&r[0])
 }
 
@@ -140,6 +141,13 @@ func (c *Chunk) MoveTo(target *Chunk) []Entity {
 func (c *Chunk) Get(entity Entity) unsafe.Pointer {
 	idx, ok := c.ids[int64(entity)]
 	if !ok {
+		return nil
+	}
+	return unsafe.Pointer(&(c.data[idx*int64(c.eleSize)]))
+}
+
+func (c *Chunk) GetByIndex(idx int64) unsafe.Pointer {
+	if idx < 0 || idx >= c.len {
 		return nil
 	}
 	return unsafe.Pointer(&(c.data[idx*int64(c.eleSize)]))

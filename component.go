@@ -35,7 +35,6 @@ type IComponent interface {
 	ID() int64
 
 	setOwner(owner *EntityInfo)
-	setID(id int64)
 	setState(state ComponentState)
 	getState() ComponentState
 	getComponentType() ComponentType
@@ -48,6 +47,7 @@ type IComponent interface {
 
 type ComponentObject interface {
 	componentIdentification()
+	getEntity() Entity
 }
 
 type FreeComponentObject interface {
@@ -127,6 +127,10 @@ type Component[T ComponentObject, TP ComponentPointer[T]] struct {
 
 func (c Component[T, TP]) componentIdentification() {}
 
+func (c Component[T, TP]) getEntity() Entity {
+	return Entity(c.id)
+}
+
 func (c *Component[T, TP]) init() {
 	c.setType(c.getComponentType())
 	c.setState(ComponentStateInvalid)
@@ -168,10 +172,7 @@ func (c *Component[T, TP]) newCollection() interface{} {
 
 func (c *Component[T, TP]) setOwner(entity *EntityInfo) {
 	c.owner = entity
-}
-
-func (c *Component[T, TP]) setID(id int64) {
-	c.id = id
+	c.id = int64(entity.Entity())
 }
 
 func (c *Component[T, TP]) ID() int64 {

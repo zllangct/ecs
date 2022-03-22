@@ -2,15 +2,6 @@ package ecs
 
 import "reflect"
 
-const (
-	TrunkSize = 1024 * 16
-)
-
-type trunk[T ComponentObject, TP ComponentPointer[T]] struct {
-	data [TrunkSize]T
-	len  int64
-}
-
 type Collection[T ComponentObject, TP ComponentPointer[T]] struct {
 	data []T
 	ids  map[int64]int64
@@ -26,17 +17,6 @@ func NewCollection[T ComponentObject, TP ComponentPointer[T]]() *Collection[T, T
 	return c
 }
 
-func (c *Collection[T, TP]) getID() int64 {
-	ok := false
-	for !ok {
-		c.seq++
-		if _, exist := c.ids[c.seq]; !exist {
-			break
-		}
-	}
-	return c.seq
-}
-
 func (c *Collection[T, TP]) Add(element *T) (int64, *T) {
 	//Log.Info("collection Add:", ObjectToString(element))
 	if int64(len(c.data)) > c.len {
@@ -45,12 +25,11 @@ func (c *Collection[T, TP]) Add(element *T) (int64, *T) {
 		c.data = append(c.data, *element)
 	}
 	idx := c.len
-	id := c.getID()
+	id := TP(element).ID()
 	c.ids[id] = idx
 	c.ids[-idx] = -id
 	ret := TP(&(c.data[idx]))
 	c.len++
-	ret.setID(id)
 	return id, (*T)(ret)
 }
 

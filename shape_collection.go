@@ -91,8 +91,14 @@ func (c *ShapeCollection[T, TP]) RemoveAndReturn(entity Entity) *T {
 		return nil
 	}
 	p := index.chunk.RemoveAndReturn(entity)
-	c.shrink()
 	c.len--
+	delete(c.ids, entity)
+	if index.chunk != c.pend {
+		if _, ok := c.holeList[index.chunk]; !ok {
+			c.holeList[index.chunk] = struct{}{}
+		}
+	}
+	c.shrink()
 	var r T
 	tp := TP(&r)
 	tp.parse(p, c.eleSize)

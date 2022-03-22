@@ -50,7 +50,6 @@ func (c *CollectionByte[T, TP]) Add(element *T) (int64, *T) {
 	real := (*T)(unsafe.Pointer(&(c.data[uintptr(idx)*c.eleSize])))
 	c.len++
 	c.pend += c.eleSize
-	TP(real).setID(id)
 	return id, real
 }
 

@@ -69,20 +69,12 @@ func newWorld(runtime *ecsRuntime, config *WorldConfig) *ecsWorld {
 		id:         UniqueID(),
 		systemFlow: nil,
 		config:     config,
-		//components: NewComponentCollection(config.HashCount),
-		components: newComponentCollection2(),
+		components: NewComponentCollection(config.HashCount),
 		entities:   NewEntityCollection(config.HashCount),
 		status:     StatusInit,
 		wStop:      make(chan struct{}),
 	}
 	world.optimizer = newOptimizer(world)
-
-	switch config.CollectionVersion {
-	case 2:
-		world.components = newComponentCollection2()
-	default:
-		world.components = NewComponentCollection(config.HashCount)
-	}
 
 	if world.config.DefaultFrameInterval <= 0 {
 		world.config.DefaultFrameInterval = time.Millisecond * 33
