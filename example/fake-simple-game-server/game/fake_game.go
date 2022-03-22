@@ -144,14 +144,14 @@ func (f *FakeGame) Dispatch(pkg interface{}, sess *Session) {
 
 		v, _ := strconv.Atoi(split[2])
 
-		//e := ecs.GetEntityInfo(f.world, sess.Entity)
+		//e := ecs.GetEntityInfo(f.world, sess.entity)
 		//e.Add(&MoveChange2{
 		//	V:   v,
 		//	Dir: dir,
 		//})
 
 		//f.world.addFreeComponent(&MoveChange{
-		//	Entity: sess.Entity,
+		//	entity: sess.entity,
 		//	V:      v,
 		//	Dir:    dir,
 		//})

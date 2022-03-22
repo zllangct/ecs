@@ -8,8 +8,9 @@ type ShapeIterator[T ShapeObject] interface {
 	Empty() bool
 }
 
-type ShapeIter[T ShapeObject, TP ComponentPointer[T]] struct {
-	c      *Collection[T, TP]
+/*
+type ShapeIter[T ShapeObject, TP ShapePointer[T]] struct {
+	c      *ShapeCollection[T, TP]
 	len    int
 	offset int
 	cur    *T
@@ -17,11 +18,11 @@ type ShapeIter[T ShapeObject, TP ComponentPointer[T]] struct {
 	eleSize []uintptr
 }
 
-func EmptyShapeIter[T ComponentObject, TP ComponentPointer[T]]() Iterator[T, TP] {
+func EmptyShapeIter[T ShapeObject, TP ShapePointer[T]]() ShapeIter[T, TP] {
 	return &ShapeIter[T, TP]{}
 }
 
-func NewShapeIterator[T ComponentObject, TP ComponentPointer[T]](collection *Collection[T, TP]) Iterator[T, TP] {
+func NewShapeIterator[T ShapeObject, TP ShapePointer[T]](collection *ShapeCollection[T, TP]) ShapeIter[T, TP] {
 	iter := &ShapeIter[T, TP]{
 		c:      collection,
 		len:    collection.Len(),
@@ -67,3 +68,4 @@ func (i *ShapeIter[T, TP]) Next() *T {
 	}
 	return i.cur
 }
+*/

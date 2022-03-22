@@ -44,21 +44,21 @@ func (m *MoveSystem) Update(event ecs.Event) {
 
 	d := map[ecs.Entity]*MoveSystemData{}
 
-	//聚合方式 1：根据组件的Owner（EntityInfo.Entity）来匹配数据
+	//聚合方式 1：根据组件的Owner（EntityInfo.entity）来匹配数据
 	//for iter := iterPos; !iter.End(); iter.Next() {
 	//	c := iter.Val()
-	//	if cd, ok := d[c.Owner().Entity()]; ok {
+	//	if cd, ok := d[c.Owner().entity()]; ok {
 	//		cd.P = c
 	//	}else {
-	//		d[c.Owner().Entity()] = &MoveSystemData{P: c}
+	//		d[c.Owner().entity()] = &MoveSystemData{P: c}
 	//	}
 	//}
 	//for iter := iterMov; !iter.End(); iter.Next() {
 	//	c := iter.Val()
-	//	if cd, ok := d[c.Owner().Entity()]; ok {
+	//	if cd, ok := d[c.Owner().entity()]; ok {
 	//		cd.M = c
 	//	}else{
-	//		d[c.Owner().Entity()] = &MoveSystemData{M: c}
+	//		d[c.Owner().entity()] = &MoveSystemData{M: c}
 	//	}
 	//}
 

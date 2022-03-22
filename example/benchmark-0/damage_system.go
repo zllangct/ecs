@@ -61,7 +61,7 @@ func (d *DamageSystem) DataMatch() ([]Caster, []Target) {
 	var targets []Target
 	for p := iterPos.Begin(); !iterPos.End(); p = iterPos.Next() {
 		target := p.Owner()
-		//if _, ok := idTemp[target.Entity()]; ok {
+		//if _, ok := idTemp[target.entity()]; ok {
 		//	continue
 		//}
 

@@ -39,7 +39,7 @@ func (c *CollectionByte[T, TP]) Add(element *T) (int64, *T) {
 	p := (*byte)(unsafe.Pointer(element))
 	b := unsafe.Slice(p, c.eleSize)
 	if int64(len(c.data)) >= int64(c.pend+c.eleSize) {
-		copy(c.data[c.pend+1:], b)
+		copy(c.data[c.pend:], b)
 	} else {
 		c.data = append(c.data, b...)
 	}

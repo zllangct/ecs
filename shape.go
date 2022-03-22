@@ -6,14 +6,13 @@ import (
 )
 
 type IShapeGetter interface {
-	optimize(collections map[reflect.Type]interface{})
 	base() *getterBase
 	getType() reflect.Type
 }
 
 type IShape interface {
-	shapeSize() int
-	setID(ids []int64)
+	setEntity(e Entity)
+	parse(head unsafe.Pointer, eleSize []uintptr)
 	getElements() []unsafe.Pointer
 }
 
@@ -23,7 +22,7 @@ type ShapePointer[T ShapeObject] interface {
 }
 
 type ShapeObject interface {
-	elementSize() []uintptr
+	//elementSize() []uintptr
 }
 
 type getterBase struct {
@@ -41,13 +40,34 @@ func (s *getterBase) getType() reflect.Type {
 	return s.typ
 }
 
+type ShapeBase struct {
+	head   unsafe.Pointer
+	entity Entity
+}
+
+// set entity
+func (s *ShapeBase) setEntity(e Entity) {
+	s.entity = e
+}
+
 type Shape2[T1, T2 ComponentObject] struct {
+	ShapeBase
 	C1 *T1
 	C2 *T2
 }
 
-func (s Shape2[T1, T2]) elementSize() []uintptr {
-	return []uintptr{TypeOf[T1]().Size(), TypeOf[T2]().Size()}
+func (s Shape2[T1, T2]) getElements() []unsafe.Pointer {
+	return []unsafe.Pointer{unsafe.Pointer(s.C1), unsafe.Pointer(s.C2)}
+}
+
+func (s *Shape2[T1, T2]) parse(head unsafe.Pointer, eleSize []uintptr) {
+	s.head = head
+	offset := uintptr(0)
+	b := unsafe.Slice((*byte)(head), eleSize[0])
+	s.C1 = (*T1)(unsafe.Pointer(uintptr(head) + offset))
+	_ = b
+	offset += eleSize[0]
+	s.C2 = (*T2)(unsafe.Pointer(uintptr(head) + offset))
 }
 
 type ShapeGetter2[T1, T2 ComponentObject] struct{ getterBase }
@@ -55,8 +75,8 @@ type ShapeGetter2[T1, T2 ComponentObject] struct{ getterBase }
 func NewShapeGetter2[T1, T2 ComponentObject](sys ISystem) *ShapeGetter2[T1, T2] {
 	getter := &ShapeGetter2[T1, T2]{getterBase{sys: sys}}
 	opt := sys.getOptimizer()
-	if _, ok := opt.shapeUsage[reflect.TypeOf(getter)]; !ok {
-		opt.shapeUsage[reflect.TypeOf(getter)] = getter
+	if _, ok := opt.shapeUsage[getter.getType()]; !ok {
+		opt.shapeUsage[getter.getType()] = getter
 	}
 	return getter
 }
@@ -67,8 +87,4 @@ func (s *ShapeGetter2[T1, T2]) Get() Shape2[T1, T2] {
 	s.executeNum++
 
 	return Shape2[T1, T2]{}
-}
-
-func (s *Shape2[T1, T2]) optimize(collections map[reflect.Type]interface{}) {
-	// 执行内存布局优化
 }
