@@ -6,7 +6,8 @@ import (
 
 const (
 	//ChunkSize int64 = 1024 * 16
-	ChunkSize int64 = 512
+	ChunkSize  int64   = 512
+	EntitySize uintptr = 8
 )
 
 const (
@@ -38,9 +39,11 @@ func (c *Chunk) MaxLength() int64 {
 }
 
 func (c *Chunk) Add(element unsafe.Pointer, entity Entity) (unsafe.Pointer, int) {
-	b := unsafe.Slice((*byte)(element), c.eleSize)
+	bEntity := unsafe.Slice((*byte)(unsafe.Pointer(&entity)), c.eleSize)
+	bElement := unsafe.Slice((*byte)(element), c.eleSize)
 	if ChunkSize >= int64(c.pend+c.eleSize) {
-		copy(c.data[c.pend+1:], b)
+		copy(c.data[c.pend:], bEntity)
+		copy(c.data[c.pend+EntitySize:], bElement)
 	} else {
 		return nil, ChunkAddCodeFull
 	}
@@ -55,7 +58,9 @@ func (c *Chunk) Add(element unsafe.Pointer, entity Entity) (unsafe.Pointer, int)
 
 func (c *Chunk) AddDiscrete(element []unsafe.Pointer, size []uintptr, entity Entity) (unsafe.Pointer, int) {
 	if ChunkSize >= int64(c.pend+c.eleSize) {
-		off := uintptr(0)
+		bEntity := unsafe.Slice((*byte)(unsafe.Pointer(&entity)), c.eleSize)
+		copy(c.data[c.pend:], bEntity)
+		off := EntitySize
 		for i, e := range element {
 			b := unsafe.Slice((*byte)(e), size[i])
 			copy(c.data[c.pend+off:], b)

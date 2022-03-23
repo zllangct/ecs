@@ -24,7 +24,7 @@ type ShapeCollection[T ShapeObject, TP ShapePointer[T]] struct {
 
 func NewShapeCollection[T ShapeObject, TP ShapePointer[T]](eleType []reflect.Type) *ShapeCollection[T, TP] {
 	var eleSize = make([]uintptr, len(eleType))
-	chunkEleSize := uintptr(0)
+	chunkEleSize := EntitySize
 	size := uintptr(0)
 	for i, t := range eleType {
 		size = t.Size()
@@ -44,7 +44,11 @@ func NewShapeCollection[T ShapeObject, TP ShapePointer[T]](eleType []reflect.Typ
 	return c
 }
 
-func (c *ShapeCollection[T, TP]) Add(shape TP, entity Entity) *T {
+func (c *ShapeCollection[T, TP]) Add(shape TP) *T {
+	entity := shape.GetEntity()
+	if entity == 0 {
+		return nil
+	}
 	elements := shape.getElements()
 	Log.Infof("%+v", elements)
 	var p unsafe.Pointer
@@ -61,7 +65,7 @@ func (c *ShapeCollection[T, TP]) Add(shape TP, entity Entity) *T {
 			}
 		}
 		if p == nil {
-			return c.Add(shape, entity)
+			return c.Add(shape)
 		}
 	} else {
 		p, code = c.pend.AddDiscrete(elements, c.eleSize, entity)
@@ -73,7 +77,7 @@ func (c *ShapeCollection[T, TP]) Add(shape TP, entity Entity) *T {
 				nt.pre = c.pend
 				c.pend = nt
 				c.chunkCount++
-				return c.Add(shape, entity)
+				return c.Add(shape)
 			}
 		}
 	}

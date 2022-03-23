@@ -67,8 +67,8 @@ func (s Shape2[T1, T2]) getElements() []unsafe.Pointer {
 
 func (s *Shape2[T1, T2]) parse(head unsafe.Pointer, eleSize []uintptr) {
 	s.head = head
-	offset := uintptr(0)
-	s.setEntity(getComponentOwnerEntity(unsafe.Pointer(uintptr(head))))
+	s.setEntity(*(*Entity)(head))
+	offset := EntitySize
 	s.C1 = (*T1)(unsafe.Pointer(uintptr(head) + offset))
 	offset += eleSize[0]
 	s.C2 = (*T2)(unsafe.Pointer(uintptr(head) + offset))

@@ -66,17 +66,17 @@ func TestShapeCollection_Add(t *testing.T) {
 
 	Log.Infof("p:%p : %+v", &shp1, shp1)
 	c := NewShapeCollection[Shape2[Position, Movement]]([]reflect.Type{TypeOf[Position](), TypeOf[Movement]()})
-	ret := c.Add(shp1, shp1.entity)
+	ret := c.Add(shp1)
 	Log.Infof("p:%p : %+v", &ret, ret)
 	ret1 := c.RemoveAndReturn(1)
 	Log.Infof("p:%p : %+v", &ret1, ret1)
 
-	c.Add(shp2, shp2.entity)
-	c.Add(shp3, shp3.entity)
-	c.Add(shp4, shp4.entity)
-	c.Add(shp5, shp5.entity)
-	c.Add(shp6, shp6.entity)
-	c.Add(shp7, shp7.entity)
+	c.Add(shp2)
+	c.Add(shp3)
+	c.Add(shp4)
+	c.Add(shp5)
+	c.Add(shp6)
+	c.Add(shp7)
 
 	//ret = c.RemoveAndReturn(5) //TODO 有bug
 
