@@ -78,7 +78,7 @@ func TestShapeCollection_Add(t *testing.T) {
 	c.Add(shp6)
 	c.Add(shp7)
 
-	//ret = c.RemoveAndReturn(5) //TODO 有bug
+	ret = c.RemoveAndReturn(5) //TODO 有bug
 
 	iter := NewShapeIterator[Shape2[Position, Movement]](c)
 	for shp := iter.Begin(); !iter.End(); shp = iter.Next() {

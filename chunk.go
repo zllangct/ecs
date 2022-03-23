@@ -92,7 +92,7 @@ func (c *Chunk) Remove(entity Entity) {
 	delete(c.ids, int64(entity))
 
 	offset := uintptr(idx) * c.eleSize
-	lastOffset := uintptr(c.len) * c.eleSize
+	lastOffset := uintptr(lastIdx) * c.eleSize
 	copy(c.data[offset:offset+c.eleSize], c.data[lastOffset:lastOffset+c.eleSize])
 	c.len--
 }
@@ -109,7 +109,7 @@ func (c *Chunk) RemoveAndReturn(entity Entity) unsafe.Pointer {
 	delete(c.ids, -lastIdx)
 	delete(c.ids, int64(entity))
 	offset := uintptr(idx) * c.eleSize
-	lastOffset := uintptr(c.len) * c.eleSize
+	lastOffset := uintptr(lastIdx) * c.eleSize
 	var r = make([]byte, c.eleSize, c.eleSize)
 	copy(r, c.data[offset:offset+c.eleSize])
 	copy(c.data[offset:offset+c.eleSize], c.data[lastOffset:lastOffset+c.eleSize])
