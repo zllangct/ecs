@@ -39,37 +39,12 @@ func (c *Chunk) MaxLength() int64 {
 }
 
 func (c *Chunk) Add(element unsafe.Pointer, entity Entity) (unsafe.Pointer, int) {
-	bEntity := unsafe.Slice((*byte)(unsafe.Pointer(&entity)), c.eleSize)
 	bElement := unsafe.Slice((*byte)(element), c.eleSize)
 	if ChunkSize >= int64(c.pend+c.eleSize) {
-		copy(c.data[c.pend:], bEntity)
-		copy(c.data[c.pend+EntitySize:], bElement)
+		copy(c.data[c.pend:], bElement)
 	} else {
 		return nil, ChunkAddCodeFull
 	}
-	idx := c.len
-	c.ids[int64(entity)] = idx
-	c.ids[-idx] = int64(-entity)
-	real := unsafe.Pointer(&(c.data[uintptr(idx)*c.eleSize]))
-	c.len++
-	c.pend += c.eleSize
-	return real, ChunkAddCodeSuccess
-}
-
-func (c *Chunk) AddDiscrete(element []unsafe.Pointer, size []uintptr, entity Entity) (unsafe.Pointer, int) {
-	if ChunkSize >= int64(c.pend+c.eleSize) {
-		bEntity := unsafe.Slice((*byte)(unsafe.Pointer(&entity)), c.eleSize)
-		copy(c.data[c.pend:], bEntity)
-		off := EntitySize
-		for i, e := range element {
-			b := unsafe.Slice((*byte)(e), size[i])
-			copy(c.data[c.pend+off:], b)
-			off += size[i]
-		}
-	} else {
-		return nil, ChunkAddCodeFull
-	}
-
 	idx := c.len
 	c.ids[int64(entity)] = idx
 	c.ids[-idx] = int64(-entity)

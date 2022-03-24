@@ -1,7 +1,6 @@
 package ecs
 
 import (
-	"reflect"
 	"unsafe"
 )
 
@@ -9,54 +8,43 @@ type ChunkIndex struct {
 	chunk *Chunk
 }
 
-type ShapeCollection[T ShapeObject, TP ShapePointer[T]] struct {
-	data         *Chunk
-	ids          map[Entity]ChunkIndex
-	pend         *Chunk
-	holeList     map[*Chunk]struct{}
-	eleType      []reflect.Type
-	eleSize      []uintptr
-	chunkEleSize uintptr
-	seq          int64
-	len          int64
-	chunkCount   int64
+type ShapeCollection[T ComponentObject, TP ComponentPointer[T]] struct {
+	data       *Chunk
+	ids        map[Entity]ChunkIndex
+	pend       *Chunk
+	holeList   map[*Chunk]struct{}
+	eleSize    uintptr
+	seq        int64
+	len        int64
+	chunkCount int64
 }
 
-func NewShapeCollection[T ShapeObject, TP ShapePointer[T]](eleType []reflect.Type) *ShapeCollection[T, TP] {
-	var eleSize = make([]uintptr, len(eleType))
-	chunkEleSize := EntitySize
-	size := uintptr(0)
-	for i, t := range eleType {
-		size = t.Size()
-		eleSize[i] = size
-		chunkEleSize += size
-	}
+func NewShapeCollection[T ComponentObject, TP ComponentPointer[T]]() *ShapeCollection[T, TP] {
+	var e T
+	size := unsafe.Sizeof(e)
 	c := &ShapeCollection[T, TP]{
-		ids:          map[Entity]ChunkIndex{},
-		data:         NewChunk(chunkEleSize),
-		eleSize:      eleSize,
-		eleType:      eleType,
-		chunkEleSize: chunkEleSize,
-		holeList:     map[*Chunk]struct{}{},
-		chunkCount:   1,
+		ids:        map[Entity]ChunkIndex{},
+		data:       NewChunk(size),
+		eleSize:    size,
+		holeList:   map[*Chunk]struct{}{},
+		chunkCount: 1,
 	}
 	c.pend = c.data
 	return c
 }
 
-func (c *ShapeCollection[T, TP]) Add(shape TP) *T {
-	entity := shape.GetEntity()
+func (c *ShapeCollection[T, TP]) Add(shape *T) *T {
+	entity := shape.ID()
 	if entity == 0 {
 		return nil
 	}
-	elements := shape.getElements()
-	Log.Infof("%+v", elements)
+	var pElement = unsafe.Pointer(shape)
 	var p unsafe.Pointer
 	var code int
 	if len(c.holeList) > 0 {
 		// 优先放置到有空洞的chunk中
 		for chunk := range c.holeList {
-			p, code = chunk.AddDiscrete(elements, c.eleSize, entity)
+			p, code = chunk.Add(pElement, entity)
 			if code != 0 {
 				if code == 1 {
 					delete(c.holeList, chunk)
@@ -68,11 +56,11 @@ func (c *ShapeCollection[T, TP]) Add(shape TP) *T {
 			return c.Add(shape)
 		}
 	} else {
-		p, code = c.pend.AddDiscrete(elements, c.eleSize, entity)
+		p, code = c.pend.Add(pElement, entity)
 		if code != 0 {
 			// 扩容
 			if code == 1 {
-				nt := NewChunk(c.chunkEleSize)
+				nt := NewChunk(c.eleSize)
 				c.pend.next = nt
 				nt.pre = c.pend
 				c.pend = nt
@@ -85,8 +73,7 @@ func (c *ShapeCollection[T, TP]) Add(shape TP) *T {
 		chunk: c.pend,
 	}
 	c.len++
-	shape.parse(p, c.eleSize)
-	return (*T)(shape)
+	return (*T)(p)
 }
 
 func (c *ShapeCollection[T, TP]) RemoveAndReturn(entity Entity) *T {
@@ -103,11 +90,7 @@ func (c *ShapeCollection[T, TP]) RemoveAndReturn(entity Entity) *T {
 		}
 	}
 	c.shrink()
-	var r T
-	tp := TP(&r)
-	tp.parse(p, c.eleSize)
-	tp.setEntity(entity)
-	return &r
+	return &*(*T)(p)
 }
 
 func (c *ShapeCollection[T, TP]) shrink() {
