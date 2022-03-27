@@ -67,7 +67,11 @@ func (c *Collection[T, TP]) Remove(id int64) *T {
 	c.data[idx], c.data[lastIdx] = c.data[lastIdx], c.data[idx]
 	c.shrink()
 	c.len--
-	cpy := c.data[lastIdx]
+	return &c.data[lastIdx]
+}
+
+func (c *Collection[T, TP]) RemoveAndReturn(id int64) *T {
+	cpy := *c.Remove(id)
 	return &cpy
 }
 

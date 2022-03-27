@@ -159,10 +159,8 @@ func (c *Component[T, TP]) deleteFromCollection(collection interface{}) {
 		Log.Info("add to collection, collecion is nil")
 		return
 	}
-	ret := cc.Remove(c.ID())
-	if ret != nil {
-		TP(ret).setState(ComponentStateDisable)
-	}
+	c.setState(ComponentStateDisable)
+	cc.Remove(c.ID())
 	return
 }
 
