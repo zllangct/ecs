@@ -35,6 +35,7 @@ type IComponent interface {
 	ID() int64
 
 	setOwner(owner *EntityInfo)
+	setID(id int64)
 	setState(state ComponentState)
 	getState() ComponentState
 	getComponentType() ComponentType
@@ -119,10 +120,9 @@ func (f FreeDisposableComponent[T, TP]) freeComponentIdentification() {}
 func (f FreeDisposableComponent[T, TP]) disposableComponentIdentification() {}
 
 type Component[T ComponentObject, TP ComponentPointer[T]] struct {
-	id       int64
-	st       uint8
-	owner    *EntityInfo
-	realType reflect.Type
+	id    int64
+	owner *EntityInfo
+	st    uint8
 }
 
 func (c Component[T, TP]) componentIdentification() {}
@@ -146,7 +146,7 @@ func (c *Component[T, TP]) addToCollection(collection interface{}) IComponent {
 		Log.Info("add to collection, collecion is nil")
 		return nil
 	}
-	_, ins := cc.Add(c.rawInstance())
+	ins := cc.Add(c.rawInstance())
 	insP := TP(ins)
 	insP.setState(ComponentStateActive)
 	*c.rawInstance() = *insP
@@ -173,6 +173,10 @@ func (c *Component[T, TP]) newCollection() interface{} {
 func (c *Component[T, TP]) setOwner(entity *EntityInfo) {
 	c.owner = entity
 	c.id = int64(entity.Entity())
+}
+
+func (c *Component[T, TP]) setID(id int64) {
+	c.id = id
 }
 
 func (c *Component[T, TP]) ID() int64 {
@@ -224,10 +228,7 @@ func (c *Component[T, TP]) Owner() *EntityInfo {
 }
 
 func (c *Component[T, TP]) Type() reflect.Type {
-	if c.realType == nil {
-		c.realType = TypeOf[T]()
-	}
-	return c.realType
+	return TypeOf[T]()
 }
 
 func (c *Component[T, TP]) ToString() string {

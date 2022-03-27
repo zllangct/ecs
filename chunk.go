@@ -1,12 +1,8 @@
 package ecs
 
-import (
-	"unsafe"
-)
-
 const (
-	//ChunkSize int64 = 1024 * 16
-	ChunkSize  int64   = 512
+	ChunkSize uintptr = 1024 * 16
+	//ChunkSize  int64   = 512
 	EntitySize uintptr = 8
 )
 
@@ -16,64 +12,69 @@ const (
 	ChunkAddCodeInvalidElement
 )
 
-type Chunk struct {
-	data    [ChunkSize]byte
+type Chunk[T ComponentObject, TP ComponentPointer[T]] struct {
+	data    []T
 	ids     map[int64]int64
 	len     int64
+	max     int64
 	eleSize uintptr
 	pend    uintptr
-	pre     *Chunk
-	next    *Chunk
+	pre     *Chunk[T, TP]
+	next    *Chunk[T, TP]
 }
 
-func NewChunk(eleSize uintptr) *Chunk {
-	c := &Chunk{
-		eleSize: eleSize,
+func NewChunk[T ComponentObject, TP ComponentPointer[T]]() *Chunk[T, TP] {
+	size := TypeOf[T]().Size()
+	max := ChunkSize / size
+	c := &Chunk[T, TP]{
+		data:    make([]T, max, max),
+		eleSize: size,
+		max:     int64(max),
 		ids:     make(map[int64]int64),
 	}
 	return c
 }
 
-func (c *Chunk) MaxLength() int64 {
-	return ChunkSize / int64(c.eleSize)
-}
-
-func (c *Chunk) Add(element unsafe.Pointer, entity Entity) (unsafe.Pointer, int) {
-	bElement := unsafe.Slice((*byte)(element), c.eleSize)
-	if ChunkSize >= int64(c.pend+c.eleSize) {
-		copy(c.data[c.pend:], bElement)
+func (c *Chunk[T, TP]) Add(element *T, id int64) (*T, int) {
+	if uintptr(len(c.data)) >= c.pend+c.eleSize {
+		c.data[c.pend+1] = *element
 	} else {
 		return nil, ChunkAddCodeFull
 	}
 	idx := c.len
-	c.ids[int64(entity)] = idx
-	c.ids[-idx] = int64(-entity)
-	real := unsafe.Pointer(&(c.data[c.pend]))
+	c.ids[id] = idx
+	c.ids[-idx] = -id
+	real := &(c.data[c.pend])
 	c.len++
 	c.pend += c.eleSize
 	return real, ChunkAddCodeSuccess
 }
 
-func (c *Chunk) Remove(entity Entity) {
-	idx, ok := c.ids[int64(entity)]
+func (c *Chunk[T, TP]) Remove(id int64) {
+	if id < 0 {
+		return
+	}
+	idx, ok := c.ids[id]
 	if !ok {
 		return
 	}
 	lastIdx := c.len - 1
 	lastId := -c.ids[-lastIdx]
+
 	c.ids[lastId] = idx
 	c.ids[-idx] = -lastId
 	delete(c.ids, -lastIdx)
-	delete(c.ids, int64(entity))
+	delete(c.ids, id)
 
-	offset := uintptr(idx) * c.eleSize
-	lastOffset := uintptr(lastIdx) * c.eleSize
-	copy(c.data[offset:offset+c.eleSize], c.data[lastOffset:lastOffset+c.eleSize])
+	c.data[idx], c.data[lastIdx] = c.data[lastIdx], c.data[idx]
 	c.len--
 }
 
-func (c *Chunk) RemoveAndReturn(entity Entity) unsafe.Pointer {
-	idx, ok := c.ids[int64(entity)]
+func (c *Chunk[T, TP]) RemoveAndReturn(id int64) *T {
+	if id < 0 {
+		return nil
+	}
+	idx, ok := c.ids[id]
 	if !ok {
 		return nil
 	}
@@ -82,32 +83,29 @@ func (c *Chunk) RemoveAndReturn(entity Entity) unsafe.Pointer {
 	c.ids[lastId] = idx
 	c.ids[-idx] = -lastId
 	delete(c.ids, -lastIdx)
-	delete(c.ids, int64(entity))
-	offset := uintptr(idx) * c.eleSize
-	lastOffset := uintptr(lastIdx) * c.eleSize
-	var r = make([]byte, c.eleSize, c.eleSize)
-	copy(r, c.data[offset:offset+c.eleSize])
-	copy(c.data[offset:offset+c.eleSize], c.data[lastOffset:lastOffset+c.eleSize])
+	delete(c.ids, id)
+
+	c.data[idx], c.data[lastIdx] = c.data[lastIdx], c.data[idx]
+	r := &(c.data[lastIdx])
 	c.len--
 	c.pend -= c.eleSize
-	return unsafe.Pointer(&r[0])
+	return r
 }
 
-func (c *Chunk) MoveTo(target *Chunk) []Entity {
-	available := target.MaxLength() - target.len
+func (c *Chunk[T, TP]) MoveTo(target *Chunk[T, TP]) []int64 {
 	moveSize := uintptr(0)
-	if c.len < available {
+	if c.len < c.max {
 		moveSize = uintptr(c.len)
 	} else {
-		moveSize = uintptr(available)
+		moveSize = uintptr(c.max)
 	}
-	copy(target.data[target.pend:target.pend+moveSize*c.eleSize], c.data[c.pend-moveSize*c.eleSize:c.pend])
+	copy(target.data[target.pend:target.pend+moveSize], c.data[c.pend-moveSize:c.pend])
 
-	var entities []Entity
+	var moved []int64
 	for i := int64(0); i < int64(moveSize); i++ {
 		idx := c.len - int64(moveSize) + i
-		entity := Entity(c.ids[-idx])
-		entities = append(entities, entity)
+		id := c.ids[-idx]
+		moved = append(moved, id)
 	}
 
 	target.pend += moveSize * c.eleSize
@@ -115,24 +113,24 @@ func (c *Chunk) MoveTo(target *Chunk) []Entity {
 	target.len += int64(moveSize)
 	c.len -= int64(moveSize)
 
-	return entities
+	return moved
 }
 
-func (c *Chunk) Get(entity Entity) unsafe.Pointer {
-	idx, ok := c.ids[int64(entity)]
+func (c *Chunk[T, TP]) Get(id int64) *T {
+	idx, ok := c.ids[id]
 	if !ok {
 		return nil
 	}
-	return unsafe.Pointer(&(c.data[idx*int64(c.eleSize)]))
+	return &(c.data[idx])
 }
 
-func (c *Chunk) GetByIndex(idx int64) unsafe.Pointer {
+func (c *Chunk[T, TP]) GetByIndex(idx int64) *T {
 	if idx < 0 || idx >= c.len {
 		return nil
 	}
-	return unsafe.Pointer(&(c.data[idx*int64(c.eleSize)]))
+	return &(c.data[idx])
 }
 
-func (c *Chunk) Len() int64 {
+func (c *Chunk[T, TP]) Len() int64 {
 	return c.len
 }

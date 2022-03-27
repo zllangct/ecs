@@ -17,7 +17,18 @@ func NewCollection[T ComponentObject, TP ComponentPointer[T]]() *Collection[T, T
 	return c
 }
 
-func (c *Collection[T, TP]) Add(element *T) (int64, *T) {
+func (c *Collection[T, TP]) getID() int64 {
+	ok := false
+	for !ok {
+		c.seq++
+		if _, exist := c.ids[c.seq]; !exist {
+			break
+		}
+	}
+	return c.seq
+}
+
+func (c *Collection[T, TP]) Add(element *T) *T {
 	//Log.Info("collection Add:", ObjectToString(element))
 	if int64(len(c.data)) > c.len {
 		c.data[c.len] = *element
@@ -26,11 +37,15 @@ func (c *Collection[T, TP]) Add(element *T) (int64, *T) {
 	}
 	idx := c.len
 	id := TP(element).ID()
+	if id == 0 {
+		id = c.getID()
+		TP(element).setID(id)
+	}
 	c.ids[id] = idx
 	c.ids[-idx] = -id
 	ret := TP(&(c.data[idx]))
 	c.len++
-	return id, (*T)(ret)
+	return (*T)(ret)
 }
 
 func (c *Collection[T, TP]) Remove(id int64) *T {
@@ -41,7 +56,6 @@ func (c *Collection[T, TP]) Remove(id int64) *T {
 	if !ok {
 		return nil
 	}
-	//Log.Info("collection Remove:", ObjectToString(c.data[idx]))
 	lastIdx := c.len - 1
 	lastId := -c.ids[-lastIdx]
 
@@ -53,7 +67,8 @@ func (c *Collection[T, TP]) Remove(id int64) *T {
 	c.data[idx], c.data[lastIdx] = c.data[lastIdx], c.data[idx]
 	c.shrink()
 	c.len--
-	return &(c.data[lastIdx])
+	cpy := c.data[lastIdx]
+	return &cpy
 }
 
 func (c *Collection[T, TP]) shrink() {
