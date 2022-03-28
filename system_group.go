@@ -64,7 +64,7 @@ func NewSystemGroup() *SystemGroup {
 	}
 }
 
-func (p *SystemGroup) refCount(rqs map[reflect.Type]struct{}) int {
+func (p *SystemGroup) refCount(rqs map[reflect.Type]IRequirement) int {
 	ref := 0
 	for com, _ := range rqs {
 		ref += p.ref[com] - 1

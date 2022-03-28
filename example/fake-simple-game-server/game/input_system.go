@@ -9,8 +9,7 @@ type InputSystem struct {
 }
 
 func (is *InputSystem) Init() {
-	// is.SetRequirements(&Movement{},&MoveChange{})
-	ecs.AddRequireComponent2[Movement, MoveChange](is)
+	is.SetRequirements(&Movement{}, &MoveChange{})
 }
 
 func (is *InputSystem) PreUpdate(event ecs.Event) {

@@ -39,6 +39,7 @@ type IComponent interface {
 	setState(state ComponentState)
 	getState() ComponentState
 	getComponentType() ComponentType
+	getPermission() ComponentPermission
 
 	instance() IComponent
 	newCollection() interface{}
@@ -227,6 +228,10 @@ func (c *Component[T, TP]) Owner() *EntityInfo {
 
 func (c *Component[T, TP]) Type() reflect.Type {
 	return TypeOf[T]()
+}
+
+func (c *Component[T, TP]) getPermission() ComponentPermission {
+	return ComponentReadWrite
 }
 
 func (c *Component[T, TP]) ToString() string {

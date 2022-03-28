@@ -81,10 +81,6 @@ func EntityDestroy(world IWorld, entity Entity) {
 
 // system api
 
-func AddRequireComponent[T ComponentObject](sys ISystem) {
-	sys.setRequirementsByType(TypeOf[T]())
-}
-
 func NewPeripheralSystem[T PeripheralSystemObject, TP PeripheralSystemPointer[T]]() *T {
 	var ins T
 	psys := IPeripheralSystem(TP(&ins))

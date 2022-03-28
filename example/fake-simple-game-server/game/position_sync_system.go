@@ -12,7 +12,7 @@ type SyncSystem struct {
 }
 
 func (m *SyncSystem) Init() {
-	ecs.AddRequireComponent2[Position, PlayerComponent](m)
+	m.SetRequirements(&Position{}, &PlayerComponent{})
 }
 
 func (m *SyncSystem) PostUpdate(event ecs.Event) {

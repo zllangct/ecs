@@ -16,8 +16,7 @@ type InputSystem2 struct {
 }
 
 func (is *InputSystem2) Init() {
-	// is.SetRequirements(&Movement{},&MoveChange{})
-	ecs.AddRequireComponent2[Movement, MoveChange2](is)
+	is.SetRequirements(&Movement{}, &MoveChange{})
 }
 
 func (is *InputSystem2) PreUpdate(event ecs.Event) {

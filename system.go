@@ -31,7 +31,7 @@ type ISystem interface {
 	Type() reflect.Type
 	Order() Order
 	World() IWorld
-	Requirements() map[reflect.Type]struct{}
+	Requirements() map[reflect.Type]IRequirement
 	Emit(event CustomEventName, args ...interface{})
 	IsRequire(component IComponent) bool
 	ID() int64
@@ -41,8 +41,7 @@ type ISystem interface {
 
 	isRequire(componentType reflect.Type) bool
 	setOrder(order Order)
-	setRequirements(rqs ...IComponent)
-	setRequirementsByType(rqs ...reflect.Type)
+	setRequirements(rqs ...IRequirement)
 	getState() SystemState
 	setState(state SystemState)
 	checkoutComponent(entity *EntityInfo, com IComponent) IComponent
@@ -62,7 +61,7 @@ type SystemPointer[T SystemObject] interface {
 
 type System[T SystemObject, TP SystemPointer[T]] struct {
 	lock              sync.Mutex
-	requirements      map[reflect.Type]struct{}
+	requirements      map[reflect.Type]IRequirement
 	events            map[CustomEventName]CustomEventHandler
 	eventQueue        *list.List
 	order             Order
@@ -129,7 +128,7 @@ func (s *System[T, TP]) eventDispatch() {
 	s.eventQueue.Init()
 }
 
-func (s *System[T, TP]) SetRequirements(rqs ...IComponent) {
+func (s *System[T, TP]) SetRequirements(rqs ...IRequirement) {
 	s.setRequirements(rqs...)
 }
 
@@ -137,15 +136,15 @@ func (s *System[T, TP]) isInitialized() bool {
 	return s.state >= SystemStateInit
 }
 
-func (s *System[T, TP]) setRequirements(rqs ...IComponent) {
+func (s *System[T, TP]) setRequirements(rqs ...IRequirement) {
 	if s.isInitialized() {
 		return
 	}
 	if s.requirements == nil {
-		s.requirements = map[reflect.Type]struct{}{}
+		s.requirements = map[reflect.Type]IRequirement{}
 	}
 	for _, value := range rqs {
-		s.requirements[value.Type()] = struct{}{}
+		s.requirements[value.Type()] = value
 	}
 }
 
@@ -196,19 +195,7 @@ func (s *System[T, TP]) setState(state SystemState) {
 	s.state = state
 }
 
-func (s *System[T, TP]) setRequirementsByType(rqs ...reflect.Type) {
-	if s.isInitialized() {
-		return
-	}
-	if s.requirements == nil {
-		s.requirements = map[reflect.Type]struct{}{}
-	}
-	for _, value := range rqs {
-		s.requirements[value] = struct{}{}
-	}
-}
-
-func (s *System[T, TP]) Requirements() map[reflect.Type]struct{} {
+func (s *System[T, TP]) Requirements() map[reflect.Type]IRequirement {
 	return s.requirements
 }
 
@@ -222,7 +209,7 @@ func (s *System[T, TP]) isRequire(typ reflect.Type) bool {
 }
 
 func (s *System[T, TP]) baseInit(world *ecsWorld, ins ISystem) {
-	s.requirements = map[reflect.Type]struct{}{}
+	s.requirements = map[reflect.Type]IRequirement{}
 	s.events = make(map[CustomEventName]CustomEventHandler)
 	s.eventQueue = list.New()
 
