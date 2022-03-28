@@ -16,9 +16,12 @@ type Node struct {
 }
 
 func (p *Node) isFriend(node *Node) bool {
-	for com, _ := range p.val.Requirements() {
-		for comTarget, _ := range node.val.Requirements() {
+	for com, r := range p.val.Requirements() {
+		for comTarget, rTarget := range node.val.Requirements() {
 			if comTarget == com {
+				if r.getPermission() == ComponentReadOnly && rTarget.getPermission() == ComponentReadOnly {
+					continue
+				}
 				return true
 			}
 		}

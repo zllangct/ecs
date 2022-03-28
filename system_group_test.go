@@ -41,7 +41,7 @@ type TestSystem struct {
 	Name int
 }
 
-func NewTestSystem(ID int, rqs ...IComponent) *TestSystem {
+func NewTestSystem(ID int, rqs ...IRequirement) *TestSystem {
 	s := &TestSystem{Name: ID}
 	s.SetRequirements(rqs...)
 	return s
@@ -62,7 +62,7 @@ func (p *TestSystem) Filter(component IComponent, op CollectionOperate) {
 func TestNewSystemGroup(t *testing.T) {
 	tests := []ISystem{
 		NewTestSystem(1, &Com1{}, &Com2{}),
-		NewTestSystem(2, &Com1{}, &Com3{}),
+		NewTestSystem(2, &ReadOnly[Com1]{}, &Com3{}),
 		NewTestSystem(3, &Com2{}, &Com5{}),
 		NewTestSystem(4, &Com2{}, &Com3{}, &Com6{}),
 		NewTestSystem(5, &Com7{}),
@@ -71,6 +71,7 @@ func TestNewSystemGroup(t *testing.T) {
 		NewTestSystem(8, &Com1{}, &Com5{}),
 		NewTestSystem(9, &Com4{}, &Com6{}),
 		NewTestSystem(10, &Com7{}, &Com5{}),
+		NewTestSystem(11, &ReadOnly[Com1]{}),
 	}
 	sg := NewSystemGroup()
 	for _, test := range tests {
