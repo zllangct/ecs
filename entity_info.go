@@ -229,3 +229,7 @@ func (e *EntityInfo) getComponentByType(typ reflect.Type) IComponent {
 
 	return e.components[typ]
 }
+
+func (e *EntityInfo) getComponentByTypeInSystem(typ reflect.Type) IComponent {
+	return e.components[typ]
+}

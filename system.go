@@ -33,13 +33,13 @@ type ISystem interface {
 	World() IWorld
 	Requirements() map[reflect.Type]IRequirement
 	Emit(event CustomEventName, args ...interface{})
-	IsRequire(component IComponent) bool
+	IsRequire(component IComponent) (IRequirement, bool)
 	ID() int64
 	Pause()
 	Resume()
 	Stop()
 
-	isRequire(componentType reflect.Type) bool
+	isRequire(componentType reflect.Type) (IRequirement, bool)
 	setOrder(order Order)
 	setRequirements(rqs ...IRequirement)
 	getState() SystemState
@@ -199,13 +199,13 @@ func (s *System[T, TP]) Requirements() map[reflect.Type]IRequirement {
 	return s.requirements
 }
 
-func (s *System[T, TP]) IsRequire(com IComponent) bool {
+func (s *System[T, TP]) IsRequire(com IComponent) (IRequirement, bool) {
 	return s.isRequire(com.Type())
 }
 
-func (s *System[T, TP]) isRequire(typ reflect.Type) bool {
-	_, ok := s.requirements[typ]
-	return ok
+func (s *System[T, TP]) isRequire(typ reflect.Type) (IRequirement, bool) {
+	r, ok := s.requirements[typ]
+	return r, ok
 }
 
 func (s *System[T, TP]) baseInit(world *ecsWorld, ins ISystem) {
@@ -277,7 +277,7 @@ func (s *System[T, TP]) CheckoutComponent(info *EntityInfo, com IComponent) ICom
 }
 
 func (s *System[T, TP]) checkoutComponent(entity *EntityInfo, com IComponent) IComponent {
-	isRequire := s.IsRequire(com)
+	_, isRequire := s.IsRequire(com)
 	if !isRequire {
 		return nil
 	}

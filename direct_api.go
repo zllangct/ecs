@@ -102,8 +102,11 @@ func GetInterestedComponents[T ComponentObject, TP ComponentPointer[T]](sys ISys
 		return setError("must init system first")
 	}
 	typ := GetType[T]()
-	if _, ok := sys.Requirements()[typ]; !ok {
+	readOnly := false
+	if r, ok := sys.Requirements()[typ]; !ok {
 		return setError("not require, typ:", typ)
+	} else {
+		readOnly = r.getPermission() == ComponentReadOnly
 	}
 	if sys.World() == nil {
 		return setError("world is nil")
@@ -112,7 +115,7 @@ func GetInterestedComponents[T ComponentObject, TP ComponentPointer[T]](sys ISys
 	if c == nil {
 		return EmptyIter[T, TP]()
 	}
-	return NewIterator(c.(*Collection[T, TP]))
+	return NewIterator(c.(*Collection[T, TP]), readOnly)
 }
 
 func GetRelatedComponent[T ComponentObject](sys ISystem, entity *EntityInfo) *T {
@@ -120,10 +123,17 @@ func GetRelatedComponent[T ComponentObject](sys ISystem, entity *EntityInfo) *T 
 		return nil
 	}
 	typ := TypeOf[T]()
-	isRequire := sys.isRequire(typ)
+	r, isRequire := sys.isRequire(typ)
 	if !isRequire {
 		return nil
 	}
 	c := entity.getComponentByType(typ)
-	return (*T)(unsafe.Pointer((*iface)(unsafe.Pointer(&c)).data))
+	var ret *T
+	if r.getPermission() == ComponentReadOnly {
+		temp := *(*T)((*iface)(unsafe.Pointer(&c)).data)
+		ret = &temp
+	} else {
+		ret = (*T)((*iface)(unsafe.Pointer(&c)).data)
+	}
+	return ret
 }
