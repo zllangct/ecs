@@ -11,12 +11,10 @@ type MoveSystemData struct {
 
 type MoveSystem struct {
 	ecs.System[MoveSystem, *MoveSystem]
-	shp1 *ecs.ShapeGetter2[Position, Movement]
 }
 
 func (m *MoveSystem) Init() {
 	m.SetRequirements(&Position{}, &Movement{})
-	m.shp1 = ecs.NewShapeGetter2[Position, Movement](m)
 }
 
 func (m *MoveSystem) Update(event ecs.Event) {
@@ -32,8 +30,6 @@ func (m *MoveSystem) Update(event ecs.Event) {
 	我们可以知道Position和Movement应该是同一个实体的两组件配合使用，组件的配对，在数据聚合阶段完成，可知，
 	当两组件拥有相同的Owner时，完成匹配。
 	*/
-
-	m.shp1.Get()
 
 	iterPos := ecs.GetInterestedComponents[Position](m)
 	iterMov := ecs.GetInterestedComponents[Movement](m)

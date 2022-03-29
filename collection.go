@@ -1,6 +1,19 @@
 package ecs
 
-import "reflect"
+import (
+	"reflect"
+)
+
+const (
+	InitMaxSize = 1024 * 16
+)
+
+type ICollection interface {
+	Len() int
+	ElementType() reflect.Type
+
+	getByIndex(idx int64) IComponent
+}
 
 type Collection[T ComponentObject, TP ComponentPointer[T]] struct {
 	data []T
@@ -10,9 +23,10 @@ type Collection[T ComponentObject, TP ComponentPointer[T]] struct {
 }
 
 func NewCollection[T ComponentObject, TP ComponentPointer[T]]() *Collection[T, TP] {
+	size := InitMaxSize / TypeOf[T]().Size()
 	c := &Collection[T, TP]{
 		ids:  map[int64]int64{},
-		data: make([]T, 0, 1),
+		data: make([]T, 0, size),
 	}
 	return c
 }
@@ -96,6 +110,10 @@ func (c *Collection[T, TP]) Get(id int64) *T {
 		return nil
 	}
 	return &(c.data[idx])
+}
+
+func (c *Collection[T, TP]) getByIndex(idx int64) IComponent {
+	return TP(&(c.data[idx]))
 }
 
 func (c *Collection[T, TP]) Len() int {

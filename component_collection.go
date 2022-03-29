@@ -19,12 +19,12 @@ type IComponentCollection interface {
 	getTempTasks() []func()
 	collectorRun()
 	clearDisposable()
-	getCollection(typ reflect.Type) interface{}
-	getCollections() map[reflect.Type]interface{}
+	getCollection(typ reflect.Type) ICollection
+	getCollections() map[reflect.Type]ICollection
 }
 
 type ComponentCollection struct {
-	collections map[reflect.Type]interface{}
+	collections map[reflect.Type]ICollection
 	bucket      int64
 	locks       []sync.RWMutex
 	opLog       []map[reflect.Type]*opTaskList
@@ -33,7 +33,7 @@ type ComponentCollection struct {
 
 func NewComponentCollection(k int) *ComponentCollection {
 	cc := &ComponentCollection{
-		collections: map[reflect.Type]interface{}{},
+		collections: map[reflect.Type]ICollection{},
 	}
 
 	for i := 1; ; i++ {
@@ -211,11 +211,11 @@ func (c *ComponentCollection) opExecute(taskList *opTaskList, collection any) {
 	taskList.Reset()
 }
 
-func (c *ComponentCollection) getCollection(typ reflect.Type) interface{} {
+func (c *ComponentCollection) getCollection(typ reflect.Type) ICollection {
 	return c.collections[typ]
 }
 
-func (c *ComponentCollection) getCollections() map[reflect.Type]interface{} {
+func (c *ComponentCollection) getCollections() map[reflect.Type]ICollection {
 	return c.collections
 }
 

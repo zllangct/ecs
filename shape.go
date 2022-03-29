@@ -61,7 +61,8 @@ type Shape2[T1, T2 ComponentObject] struct {
 
 func (s *Shape2[T1, T2]) baseIndex(sys ISystem, typs []reflect.Type) func() *EntityInfo {
 	c := sys.World().getComponents(typs[0])
-
+	_ = c
+	return nil
 }
 
 func (s *Shape2[T1, T2]) parse(info *EntityInfo, typs []reflect.Type) bool {
@@ -76,8 +77,8 @@ func (s *Shape2[T1, T2]) parse(info *EntityInfo, typs []reflect.Type) bool {
 	if c2 == nil {
 		return false
 	}
-	s.C1 = c1.(*T1)
-	s.C2 = c2.(*T2)
+	//s.C1 = c1.(*T1)
+	//s.C2 = c2.(*T2)
 	return true
 }
 
@@ -103,4 +104,20 @@ func (s *ShapeGetter[T, TP]) Get() *T {
 	s.executeNum++
 
 	return nil
+}
+
+func GetRelated[T ShapeObject]() *T {
+
+	return nil
+}
+
+func (s *ShapeGetter[T, TP]) getRelated(sys ISystem, typ []reflect.Type) IShapeIterator {
+	var min ICollection
+	for _, t := range typ {
+		c := sys.World().getComponents(t)
+		if min.Len() > c.Len() {
+			min = c
+		}
+	}
+	return NewShapeIterator(min, typ, false)
 }

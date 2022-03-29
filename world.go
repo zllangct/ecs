@@ -34,7 +34,7 @@ type IWorld interface {
 	GetSystem(sys reflect.Type) (ISystem, bool)
 	Optimize(t time.Duration)
 
-	getComponents(typ reflect.Type) interface{}
+	getComponents(typ reflect.Type) ICollection
 	registerForT(system interface{}, order ...Order)
 }
 
@@ -211,7 +211,7 @@ func (w *ecsWorld) deleteEntity(info *EntityInfo) {
 	w.entities.delete(info.entity)
 }
 
-func (w *ecsWorld) getComponents(typ reflect.Type) interface{} {
+func (w *ecsWorld) getComponents(typ reflect.Type) ICollection {
 	return w.components.getCollection(typ)
 }
 
