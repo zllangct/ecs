@@ -5,78 +5,29 @@ import (
 	"math/rand"
 )
 
-type Caster struct {
-	A *Action
-	F *Force
-	P *Position
-	E *ecs.EntityInfo
-}
-
-type Target struct {
-	P  *Position
-	HP *HealthPoint
-}
-
 type DamageSystem struct {
 	ecs.System[DamageSystem, *DamageSystem]
+	casterGetter *ecs.ShapeGetter[ecs.Shape3[Action, Position, Force],
+		*ecs.Shape3[Action, Position, Force]]
+	targetGetter *ecs.ShapeGetter[ecs.Shape2[HealthPoint, Position],
+		*ecs.Shape2[HealthPoint, Position]]
 }
 
 func (d *DamageSystem) Init() {
-	d.SetRequirements(&Position{}, &HealthPoint{}, &Force{}, &Action{})
-}
-
-func (d *DamageSystem) DataMatch() ([]Caster, []Target) {
-	iterAction := ecs.GetInterestedComponents[Action](d)
-	if iterAction.Empty() {
-		return nil, nil
+	d.SetRequirements(
+		&ecs.ReadOnly[Position]{},
+		&ecs.ReadOnly[Force]{},
+		&ecs.ReadOnly[Action]{},
+		&HealthPoint{})
+	var err error
+	d.casterGetter, err = ecs.NewShapeGetter[ecs.Shape3[Action, Position, Force]](d)
+	if err != nil {
+		ecs.Log.Error(err)
 	}
-
-	//ecs.Log.Infof("iterAction: %v", iterAction.Empty())
-
-	idTemp := map[ecs.Entity]struct{}{}
-	var casters []Caster
-	for a := iterAction.Begin(); !iterAction.End(); a = iterAction.Next() {
-		caster := a.Owner()
-		p := ecs.GetRelatedComponent[Position](d, caster)
-		if p == nil {
-			continue
-		}
-		f := ecs.GetRelatedComponent[Force](d, caster)
-		if f == nil {
-			continue
-		}
-		casters = append(casters, Caster{
-			A: a,
-			P: p,
-			F: f,
-			E: caster,
-		})
-		idTemp[caster.Entity()] = struct{}{}
+	d.targetGetter, err = ecs.NewShapeGetter[ecs.Shape2[HealthPoint, Position]](d)
+	if err != nil {
+		ecs.Log.Error(err)
 	}
-
-	iterPos := ecs.GetInterestedComponents[Position](d)
-	if iterPos.Empty() {
-		return nil, nil
-	}
-	var targets []Target
-	for p := iterPos.Begin(); !iterPos.End(); p = iterPos.Next() {
-		target := p.Owner()
-		//if _, ok := idTemp[target.entity()]; ok {
-		//	continue
-		//}
-
-		hp := ecs.GetRelatedComponent[HealthPoint](d, target)
-		if hp == nil {
-			continue
-		}
-
-		targets = append(targets, Target{
-			P:  p,
-			HP: hp,
-		})
-	}
-
-	return casters, targets
 }
 
 // Update will be called every frame
@@ -89,39 +40,40 @@ func (d *DamageSystem) Update(event ecs.Event) {
 	  此处使用Action方式，仅简单处理。
 	*/
 
-	/*  聚合数据
+	/*  伤害结算逻辑
 	  - 分析'攻击'行为，我们需要考虑攻击的相关计算公式所需组件，如当前示例中的Force组件，包含基础攻击、力量、
 	暴击倍率、暴击率、攻击范围等数据。考虑攻击范围时需要，知道位置相关信息，由Position组件提供数据支持，在全遍历
 	所有位置关系时，消耗比较大，可通过AOI优化，减小遍历规模，优化搜索效率，此处示例不做额外处理。
-	聚合数据时，需要匹配攻击者的位置、攻击基础信息，需要匹配被攻击者的位置和血量组件。此外提醒，Entity本身是聚合
-	了'个体'的相关组件，天然聚合了相关组件，可以通过Entity得到攻击者或被攻击者的需要聚合的组件。
 	*/
-	//ecs.Log.Info("DamageSystem Update")
-	casters, targets := d.DataMatch()
 
-	// 伤害主逻辑
-	for _, caster := range casters {
-		for _, target := range targets {
-			if caster.A.Owner().Entity() == target.P.Owner().Entity() {
+	casterIter := d.casterGetter.Iter()
+	targetIter := d.targetGetter.Iter()
+	for caster := casterIter.Begin(); !casterIter.End(); caster = casterIter.Next() {
+		casterPos := caster.C2
+		casterForce := caster.C3
+		for target := targetIter.Begin(); !targetIter.End(); target = targetIter.Next() {
+			if caster.C1.Owner().Entity() == target.C1.Owner().Entity() {
 				continue
 			}
+			targetHp := target.C1
+			targetPos := target.C2
 			//计算距离
-			distance := Distance2D(caster.P, target.P)
-			if distance > caster.F.AttackRange {
+			distance := Distance2D(casterPos, targetPos)
+			if distance > casterForce.AttackRange {
 				continue
 			}
 
 			//伤害公式：伤害=（基础攻击+力量）+ 暴击伤害， 暴击伤害=基础攻击 * 2
-			damage := caster.F.PhysicalBaseAttack + caster.F.Strength
+			damage := casterForce.PhysicalBaseAttack + casterForce.Strength
 			critical := 0
-			if rand.Intn(100) < caster.F.CriticalChange {
-				critical = caster.F.PhysicalBaseAttack * caster.F.CriticalMultiple
+			if rand.Intn(100) < casterForce.CriticalChange {
+				critical = casterForce.PhysicalBaseAttack * casterForce.CriticalMultiple
 			}
 			damage = damage + critical
 			//ecs.Log.Infof("Damage:%v", damage)
-			target.HP.HP -= damage
-			if target.HP.HP < 0 {
-				target.HP.HP = 0
+			targetHp.HP -= damage
+			if targetHp.HP < 0 {
+				targetHp.HP = 0
 			}
 		}
 	}

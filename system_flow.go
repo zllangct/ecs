@@ -134,7 +134,7 @@ func (p *systemFlow) run(event Event) {
 						if state == SystemStateInit {
 							switch period {
 							case StageStart:
-								system, ok := ss[i].(StartReceiver)
+								system, ok := sys.(StartReceiver)
 								fn = system.Start
 								imp = ok
 							}
@@ -146,18 +146,18 @@ func (p *systemFlow) run(event Event) {
 								fn = system.PreUpdate
 								imp = ok
 							case StageUpdate:
-								system, ok := ss[i].(UpdateReceiver)
+								system, ok := sys.(UpdateReceiver)
 								fn = system.Update
 								imp = ok
 							case StagePostUpdate:
-								system, ok := ss[i].(PostUpdateReceiver)
+								system, ok := sys.(PostUpdateReceiver)
 								fn = system.PostUpdate
 								imp = ok
 							}
 						} else if state == SystemStateDestroy {
 							switch period {
 							case StageDestroy:
-								system, ok := ss[i].(DestroyReceiver)
+								system, ok := sys.(DestroyReceiver)
 								fn = system.Destroy
 								imp = ok
 								sys.setState(SystemStateDestroyed)
@@ -172,7 +172,12 @@ func (p *systemFlow) run(event Event) {
 						p.wg.Add(1)
 						wg := p.wg
 						Runtime.addJob(func() {
-							defer wg.Done()
+							defer func() {
+								sys.setExecuting(false)
+								wg.Done()
+							}()
+
+							sys.setExecuting(true)
 							fn(event)
 						})
 					}

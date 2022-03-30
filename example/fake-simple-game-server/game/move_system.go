@@ -14,11 +14,17 @@ type MoveSystem struct {
 	ecs.System[MoveSystem, *MoveSystem]
 	timeScale float64
 	deltaTime time.Duration
+	getter    *ecs.ShapeGetter[ecs.Shape2[Movement, Position], *ecs.Shape2[Movement, Position]]
 }
 
 func (m *MoveSystem) Init() {
 	m.SetRequirements(&Position{}, &Movement{})
 	m.EventRegister("UpdateTimeScale", m.UpdateTimeScale)
+	getter, err := ecs.NewShapeGetter[ecs.Shape2[Movement, Position]](m)
+	if err != nil {
+		ecs.Log.Error(err)
+	}
+	m.getter = getter
 }
 
 func (m *MoveSystem) UpdateTimeScale(timeScale []interface{}) {
@@ -36,36 +42,18 @@ func (m *MoveSystem) Update(event ecs.Event) {
 		m.deltaTime = 0
 	}
 
-	iterPos := ecs.GetInterestedComponents[Position](m)
-	iterMov := ecs.GetInterestedComponents[Movement](m)
-
-	if iterPos.Empty() || iterMov.Empty() {
-		return
-	}
-
-	d := map[ecs.Entity]*MoveSystemData{}
-
-	for iter := iterPos; !iter.End(); iter.Next() {
-		position := iter.Val()
-		owner := position.Owner()
-		movement := ecs.GetRelatedComponent[Movement](m, owner)
-		if movement == nil {
-			continue
-		}
-
-		d[position.Owner().Entity()] = &MoveSystemData{P: position, M: movement}
-	}
-
-	for e, data := range d {
-		if data.M == nil || data.P == nil {
-			continue
-		}
-		data.P.X = data.P.X + int(float64(data.M.Dir[0]*data.M.V)*delta.Seconds())
-		data.P.Y = data.P.Y + int(float64(data.M.Dir[1]*data.M.V)*delta.Seconds())
-		data.P.Z = data.P.Z + int(float64(data.M.Dir[2]*data.M.V)*delta.Seconds())
+	iter := m.getter.Iter()
+	for shp := iter.Begin(); !iter.End(); shp = iter.Next() {
+		mv := shp.C1
+		p := shp.C2
+		_, _ = p, mv
+		p.X = p.X + int(float64(mv.Dir[0]*mv.V)*delta.Seconds())
+		p.Y = p.Y + int(float64(mv.Dir[1]*mv.V)*delta.Seconds())
+		p.Z = p.Z + int(float64(mv.Dir[2]*mv.V)*delta.Seconds())
 
 		if isPrint {
-			ecs.Log.Info("target id:", e, "delta:", delta, " current position:", data.P.X, data.P.Y, data.P.Z)
+			e := p.Owner().Entity()
+			ecs.Log.Info("target id:", e, " delta:", delta, " current position:", p.X, p.Y, p.Z)
 		}
 	}
 }

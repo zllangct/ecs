@@ -44,6 +44,8 @@ type ISystem interface {
 	setRequirements(rqs ...IRequirement)
 	getState() SystemState
 	setState(state SystemState)
+	setExecuting(isExecuting bool)
+	isExecuting() bool
 	checkoutComponent(entity *EntityInfo, com IComponent) IComponent
 	baseInit(world *ecsWorld, ins ISystem)
 	eventDispatch()
@@ -69,6 +71,7 @@ type System[T SystemObject, TP SystemPointer[T]] struct {
 	world             *ecsWorld
 	realType          reflect.Type
 	state             SystemState
+	executing         bool
 	id                int64
 }
 
@@ -193,6 +196,14 @@ func (s *System[T, TP]) getState() SystemState {
 
 func (s *System[T, TP]) setState(state SystemState) {
 	s.state = state
+}
+
+func (s *System[T, TP]) setExecuting(isExecuting bool) {
+	s.executing = isExecuting
+}
+
+func (s *System[T, TP]) isExecuting() bool {
+	return s.executing
 }
 
 func (s *System[T, TP]) Requirements() map[reflect.Type]IRequirement {

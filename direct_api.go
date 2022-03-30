@@ -101,6 +101,9 @@ func GetInterestedComponents[T ComponentObject, TP ComponentPointer[T]](sys ISys
 	if sys.getState() == SystemStateInvalid {
 		return setError("must init system first")
 	}
+	if !sys.isExecuting() {
+		return setError("must called in system")
+	}
 	typ := GetType[T]()
 	readOnly := false
 	if r, ok := sys.Requirements()[typ]; !ok {
