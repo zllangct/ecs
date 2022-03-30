@@ -1,6 +1,9 @@
 package ecs
 
-import "reflect"
+import (
+	"errors"
+	"reflect"
+)
 
 type IShapeGetter interface {
 	base() *getterBase
@@ -27,7 +30,7 @@ func (s *getterBase) init(typ reflect.Type, getter IShapeGetter) {
 
 type ShapeGetter[T ShapeObject, TP ShapeObjectPointer[T]] struct{ getterBase }
 
-func NewShapeGetter[T ShapeObject, TP ShapeObjectPointer[T]](sys ISystem) *ShapeGetter[T, TP] {
+func NewShapeGetter[T ShapeObject, TP ShapeObjectPointer[T]](sys ISystem) (*ShapeGetter[T, TP], error) {
 	getter := &ShapeGetter[T, TP]{getterBase{sys: sys}}
 	typ := reflect.TypeOf(getter)
 	getter.init(typ, getter)
@@ -37,10 +40,12 @@ func NewShapeGetter[T ShapeObject, TP ShapeObjectPointer[T]](sys ISystem) *Shape
 	for _, t := range TP(&temp).eleTypes() {
 		if r, ok := sysReq[t]; ok {
 			req = append(req, r)
+		} else {
+			return nil, errors.New("component not interested")
 		}
 	}
 	getter.req = req
-	return getter
+	return getter, nil
 }
 
 func (s *ShapeGetter[T, TP]) getType() reflect.Type {
