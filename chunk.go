@@ -15,6 +15,7 @@ const (
 type Chunk[T ComponentObject, TP ComponentPointer[T]] struct {
 	data    []T
 	ids     map[int64]int64
+	idx2id  map[int64]int64
 	len     int64
 	max     int64
 	eleSize uintptr
@@ -31,6 +32,7 @@ func NewChunk[T ComponentObject, TP ComponentPointer[T]]() *Chunk[T, TP] {
 		eleSize: size,
 		max:     int64(max),
 		ids:     make(map[int64]int64),
+		idx2id:  make(map[int64]int64),
 	}
 	return c
 }
@@ -43,7 +45,7 @@ func (c *Chunk[T, TP]) Add(element *T, id int64) (*T, int) {
 	}
 	idx := c.len
 	c.ids[id] = idx
-	c.ids[-idx] = -id
+	c.idx2id[idx] = id
 	real := &(c.data[c.pend])
 	c.len++
 	c.pend += c.eleSize
@@ -59,11 +61,11 @@ func (c *Chunk[T, TP]) Remove(id int64) {
 		return
 	}
 	lastIdx := c.len - 1
-	lastId := -c.ids[-lastIdx]
+	lastId := c.idx2id[lastIdx]
 
 	c.ids[lastId] = idx
-	c.ids[-idx] = -lastId
-	delete(c.ids, -lastIdx)
+	c.idx2id[idx] = lastId
+	delete(c.idx2id, lastIdx)
 	delete(c.ids, id)
 
 	c.data[idx], c.data[lastIdx] = c.data[lastIdx], c.data[idx]
@@ -79,10 +81,10 @@ func (c *Chunk[T, TP]) RemoveAndReturn(id int64) *T {
 		return nil
 	}
 	lastIdx := c.len - 1
-	lastId := -c.ids[-lastIdx]
+	lastId := c.idx2id[lastIdx]
 	c.ids[lastId] = idx
-	c.ids[-idx] = -lastId
-	delete(c.ids, -lastIdx)
+	c.idx2id[idx] = lastId
+	delete(c.idx2id, lastIdx)
 	delete(c.ids, id)
 
 	c.data[idx], c.data[lastIdx] = c.data[lastIdx], c.data[idx]
@@ -104,7 +106,7 @@ func (c *Chunk[T, TP]) MoveTo(target *Chunk[T, TP]) []int64 {
 	var moved []int64
 	for i := int64(0); i < int64(moveSize); i++ {
 		idx := c.len - int64(moveSize) + i
-		id := c.ids[-idx]
+		id := c.idx2id[idx]
 		moved = append(moved, id)
 	}
 

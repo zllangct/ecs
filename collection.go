@@ -16,17 +16,19 @@ type ICollection interface {
 }
 
 type Collection[T ComponentObject, TP ComponentPointer[T]] struct {
-	data []T
-	ids  map[int64]int64
-	seq  int64
-	len  int64
+	data   []T
+	ids    map[int64]int64
+	idx2id map[int64]int64
+	seq    int64
+	len    int64
 }
 
 func NewCollection[T ComponentObject, TP ComponentPointer[T]]() *Collection[T, TP] {
 	size := InitMaxSize / TypeOf[T]().Size()
 	c := &Collection[T, TP]{
-		ids:  map[int64]int64{},
-		data: make([]T, 0, size),
+		ids:    map[int64]int64{},
+		idx2id: map[int64]int64{},
+		data:   make([]T, 0, size),
 	}
 	return c
 }
@@ -56,7 +58,7 @@ func (c *Collection[T, TP]) Add(element *T) *T {
 		TP(element).setID(id)
 	}
 	c.ids[id] = idx
-	c.ids[-idx] = -id
+	c.idx2id[idx] = id
 	ret := TP(&(c.data[idx]))
 	c.len++
 	return (*T)(ret)
@@ -71,11 +73,11 @@ func (c *Collection[T, TP]) Remove(id int64) *T {
 		return nil
 	}
 	lastIdx := c.len - 1
-	lastId := -c.ids[-lastIdx]
+	lastId := c.idx2id[lastIdx]
 
 	c.ids[lastId] = idx
-	c.ids[-idx] = -lastId
-	delete(c.ids, -lastIdx)
+	c.idx2id[idx] = lastId
+	delete(c.idx2id, lastIdx)
 	delete(c.ids, id)
 
 	c.data[idx], c.data[lastIdx] = c.data[lastIdx], c.data[idx]
