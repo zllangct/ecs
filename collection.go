@@ -2,6 +2,7 @@ package ecs
 
 import (
 	"reflect"
+	"unsafe"
 )
 
 const (
@@ -12,28 +13,31 @@ type ICollection interface {
 	Len() int
 	ElementType() reflect.Type
 
-	getByIndex(idx int64) IComponent
+	getByIndex(idx int64) unsafe.Pointer
 }
 
-type Collection[T ComponentObject, TP ComponentPointer[T]] struct {
-	data   []T
-	ids    map[int64]int64
-	idx2id map[int64]int64
-	seq    int64
-	len    int64
+type Collection[T any] struct {
+	data    []T
+	ids     map[int64]int64
+	idx2id  map[int64]int64
+	eleSize uintptr
+	seq     int64
+	len     int64
 }
 
-func NewCollection[T ComponentObject, TP ComponentPointer[T]]() *Collection[T, TP] {
-	size := InitMaxSize / TypeOf[T]().Size()
-	c := &Collection[T, TP]{
-		ids:    map[int64]int64{},
-		idx2id: map[int64]int64{},
-		data:   make([]T, 0, size),
+func NewCollection[T any]() *Collection[T] {
+	eleSize := TypeOf[T]().Size()
+	size := InitMaxSize / eleSize
+	c := &Collection[T]{
+		ids:     map[int64]int64{},
+		idx2id:  map[int64]int64{},
+		data:    make([]T, 0, size),
+		eleSize: eleSize,
 	}
 	return c
 }
 
-func (c *Collection[T, TP]) getID() int64 {
+func (c *Collection[T]) getID() int64 {
 	ok := false
 	for !ok {
 		c.seq++
@@ -44,27 +48,26 @@ func (c *Collection[T, TP]) getID() int64 {
 	return c.seq
 }
 
-func (c *Collection[T, TP]) Add(element *T) *T {
-	//Log.Info("collection Add:", ObjectToString(element))
+func (c *Collection[T]) Add(element *T, elementID ...int64) (*T, int64) {
 	if int64(len(c.data)) > c.len {
 		c.data[c.len] = *element
 	} else {
 		c.data = append(c.data, *element)
 	}
 	idx := c.len
-	id := TP(element).ID()
-	if id == 0 {
+	var id int64
+	if len(elementID) > 0 {
+		id = elementID[0]
+	} else {
 		id = c.getID()
-		TP(element).setID(id)
 	}
 	c.ids[id] = idx
 	c.idx2id[idx] = id
-	ret := TP(&(c.data[idx]))
 	c.len++
-	return (*T)(ret)
+	return &c.data[idx], id
 }
 
-func (c *Collection[T, TP]) Remove(id int64) *T {
+func (c *Collection[T]) Remove(id int64) *T {
 	if id < 0 {
 		return nil
 	}
@@ -86,12 +89,12 @@ func (c *Collection[T, TP]) Remove(id int64) *T {
 	return &c.data[lastIdx]
 }
 
-func (c *Collection[T, TP]) RemoveAndReturn(id int64) *T {
+func (c *Collection[T]) RemoveAndReturn(id int64) *T {
 	cpy := *c.Remove(id)
 	return &cpy
 }
 
-func (c *Collection[T, TP]) shrink() {
+func (c *Collection[T]) shrink() {
 	var threshold int64
 	if len(c.data) < 1024 {
 		threshold = c.len * 2
@@ -103,7 +106,7 @@ func (c *Collection[T, TP]) shrink() {
 	}
 }
 
-func (c *Collection[T, TP]) Get(id int64) *T {
+func (c *Collection[T]) Get(id int64) *T {
 	if id < 0 {
 		return nil
 	}
@@ -111,17 +114,19 @@ func (c *Collection[T, TP]) Get(id int64) *T {
 	if !ok {
 		return nil
 	}
-	return &(c.data[idx])
+	base := uintptr(unsafe.Pointer(&c.data[0]))
+	return (*T)(unsafe.Pointer(base + uintptr(idx)*c.eleSize))
 }
 
-func (c *Collection[T, TP]) getByIndex(idx int64) IComponent {
-	return TP(&(c.data[idx]))
+func (c *Collection[T]) getByIndex(idx int64) unsafe.Pointer {
+	base := uintptr(unsafe.Pointer(&c.data[0]))
+	return unsafe.Pointer(base + uintptr(idx)*c.eleSize)
 }
 
-func (c *Collection[T, TP]) Len() int {
+func (c *Collection[T]) Len() int {
 	return int(c.len)
 }
 
-func (c *Collection[T, TP]) ElementType() reflect.Type {
+func (c *Collection[T]) ElementType() reflect.Type {
 	return TypeOf[T]()
 }

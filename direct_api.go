@@ -118,7 +118,7 @@ func GetInterestedComponents[T ComponentObject, TP ComponentPointer[T]](sys ISys
 	if c == nil {
 		return EmptyIter[T, TP]()
 	}
-	return NewIterator(c.(*Collection[T, TP]), readOnly)
+	return NewIterator[T, TP](c.(*Collection[T]), readOnly)
 }
 
 func GetRelatedComponent[T ComponentObject](sys ISystem, entity *EntityInfo) *T {

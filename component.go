@@ -143,12 +143,12 @@ func (c *Component[T, TP]) getComponentType() ComponentType {
 }
 
 func (c *Component[T, TP]) addToCollection(collection interface{}) IComponent {
-	cc, ok := collection.(*Collection[T, TP])
+	cc, ok := collection.(*Collection[T])
 	if !ok {
 		Log.Info("add to collection, collecion is nil")
 		return nil
 	}
-	ins := cc.Add(c.rawInstance())
+	ins, _ := cc.Add(c.rawInstance(), c.id)
 	insP := TP(ins)
 	insP.setState(ComponentStateActive)
 	*c.rawInstance() = *insP
@@ -156,7 +156,7 @@ func (c *Component[T, TP]) addToCollection(collection interface{}) IComponent {
 }
 
 func (c *Component[T, TP]) deleteFromCollection(collection interface{}) {
-	cc, ok := collection.(*Collection[T, TP])
+	cc, ok := collection.(*Collection[T])
 	if !ok {
 		Log.Info("add to collection, collecion is nil")
 		return
@@ -167,7 +167,7 @@ func (c *Component[T, TP]) deleteFromCollection(collection interface{}) {
 }
 
 func (c *Component[T, TP]) newCollection() ICollection {
-	return NewCollection[T, TP]()
+	return NewCollection[T]()
 }
 
 func (c *Component[T, TP]) setOwner(entity *EntityInfo) {

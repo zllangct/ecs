@@ -93,8 +93,6 @@ func (p *systemFlow) run(event Event) {
 	}
 	p.wg.Wait()
 
-	p.world.components.collectorRun()
-
 	var sq SystemGroupList
 
 	//Log.Info("system flow # Event Dispatch #")

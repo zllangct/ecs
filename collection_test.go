@@ -29,7 +29,7 @@ func TestCollectionIterator(t *testing.T) {
 	//添加数据
 	cmp := map[int64]int{}
 	for i := 0; i < caseCount; i++ {
-		ret := c.Add(&srcList[i])
+		ret, _ := c.Add(&srcList[i])
 		ret.setID(int64(i))
 		cmp[int64(i)] = i
 	}
@@ -91,7 +91,7 @@ func BenchmarkCollectionWrite(b *testing.B) {
 		item := &Item{
 			Count: n,
 		}
-		ret := c.Add(item)
+		ret, _ := c.Add(item)
 		_ = ret
 	}
 }
@@ -105,27 +105,7 @@ func BenchmarkCollectionRead(b *testing.B) {
 			Count: n,
 		}
 		item.setID(int64(n + 1))
-		_ = c.Add(item)
-		ids = append(ids, int64(n+1))
-	}
-
-	b.ResetTimer()
-
-	for n := 0; n < b.N; n++ {
-		_ = c.Get(ids[(n+1)%total])
-	}
-}
-
-func BenchmarkCollection2Read(b *testing.B) {
-	c := NewCollection2[Item]()
-	var ids []int64
-	total := 100000
-	for n := 0; n < total; n++ {
-		item := &Item{
-			Count: n,
-		}
-		item.setID(int64(n + 1))
-		_ = c.Add(item)
+		_, _ = c.Add(item)
 		ids = append(ids, int64(n+1))
 	}
 
@@ -145,38 +125,11 @@ func BenchmarkCollectionIter(b *testing.B) {
 			Count: n,
 		}
 		item.setID(int64(n))
-		_ = c.Add(item)
+		_, _ = c.Add(item)
 		ids = append(ids, int64(n))
 	}
 
 	iter := NewIterator(c)
-
-	b.ResetTimer()
-
-	for n := 0; n < b.N; n++ {
-		v := iter.Val()
-		_ = v
-		iter.Next()
-		if iter.End() {
-			iter.Begin()
-		}
-	}
-}
-
-func BenchmarkCollectionIter2(b *testing.B) {
-	c := NewCollection2[Item]()
-	var ids []int64
-	total := 100000
-	for n := 0; n < total; n++ {
-		item := &Item{
-			Count: n,
-		}
-		item.setID(int64(n))
-		_ = c.Add(item)
-		ids = append(ids, int64(n))
-	}
-
-	iter := NewIterator2(c)
 
 	b.ResetTimer()
 
