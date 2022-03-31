@@ -20,7 +20,7 @@ func TestFrame(t *testing.T) {
 		doFrame(game.world, uint64(i), delta)
 		game.attack()
 		delta = time.Since(ts)
-		ecs.Log.Info("===== Frame:", i, "=====", delta)
+		//ecs.Log.Info("===== Frame:", i, "=====", delta)
 	}
 }
 

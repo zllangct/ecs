@@ -44,6 +44,7 @@ func (m *MoveSystem) Update(event ecs.Event) {
 	//	   mv := shp.C2
 	//}
 
+	count := 0
 	iter := m.getter.Iter()
 	for shp := iter.Begin(); !iter.End(); shp = iter.Next() {
 		mv := shp.C1
@@ -53,8 +54,13 @@ func (m *MoveSystem) Update(event ecs.Event) {
 		p.Y = p.Y + int(float64(mv.Dir[1]*mv.V)*delta.Seconds())
 		p.Z = p.Z + int(float64(mv.Dir[2]*mv.V)*delta.Seconds())
 
+		count++
 		//e := p.Owner().Entity()
 		//ecs.Log.Info("target id:", e, " delta:", delta, " current position:", p.X, p.Y, p.Z)
+	}
+
+	if count != iter.Len() {
+		ecs.Log.Error("move system, count:", count, " iter.Len():", iter.Len())
 	}
 
 	//聚合方式 2：直接从Entity聚合相关组件

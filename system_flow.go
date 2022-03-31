@@ -75,10 +75,15 @@ func (p *systemFlow) run(event Event) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
+	reporter := Runtime.metrics.NewReporter("system_flow_run")
+	reporter.Start()
+
 	removeList := map[int64]ISystem{}
 
 	//Log.Info("system flow # Clear Disposable #")
 	p.world.components.clearDisposable()
+
+	reporter.Sample("Clear Disposable")
 
 	//Log.Info("system flow # Temp Task Execute #")
 	tasks := p.world.components.getTempTasks()
@@ -92,6 +97,8 @@ func (p *systemFlow) run(event Event) {
 		})
 	}
 	p.wg.Wait()
+
+	reporter.Sample("Temp Task Execute")
 
 	var sq SystemGroupList
 
@@ -116,6 +123,8 @@ func (p *systemFlow) run(event Event) {
 			}
 		}
 	}
+
+	reporter.Sample("Event Dispatch")
 
 	//Log.Info("system flow # Logic #")
 	for _, period := range p.stageList {
@@ -185,10 +194,16 @@ func (p *systemFlow) run(event Event) {
 		}
 	}
 
+	reporter.Sample("system execute")
+
 	//do something clean
 	for _, system := range removeList {
 		p.unregister(system)
 	}
+
+	reporter.Sample("clean")
+	reporter.Stop()
+	reporter.Print()
 }
 
 //register method only in world init or func init(){}

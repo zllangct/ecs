@@ -5,7 +5,9 @@ import (
 )
 
 type RuntimeConfig struct {
-	Debug           bool   //Debug模式
+	Debug           bool //Debug模式
+	IsMetrics       bool
+	IsMetricsPrint  bool
 	CpuNum          int    //使用的最大cpu数量
 	MaxPoolThread   uint32 //线程池最大线程数量
 	MaxPoolJobQueue uint32 //线程池最大任务队列长度
@@ -15,6 +17,8 @@ type RuntimeConfig struct {
 func NewDefaultRuntimeConfig() *RuntimeConfig {
 	return &RuntimeConfig{
 		Debug:           true,
+		IsMetrics:       true,
+		IsMetricsPrint:  false,
 		CpuNum:          runtime.NumCPU(),
 		Logger:          NewStdLog(),
 		MaxPoolThread:   uint32(runtime.NumCPU() * 4),

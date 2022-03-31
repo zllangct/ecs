@@ -83,6 +83,31 @@ func BenchmarkSliceRead(b *testing.B) {
 	}
 }
 
+func BenchmarkSliceIter(b *testing.B) {
+	var slice []Item
+	// collection 有ID生成，此处用通常方式模拟
+	var id2index = map[int]int{}
+
+	var ids []int64
+	total := 100000
+	for n := 0; n < total; n++ {
+		item := &Item{
+			Count: n,
+		}
+		slice = append(slice, *item)
+		id2index[n] = n
+		ids = append(ids, int64(n))
+	}
+
+	b.ResetTimer()
+
+	for n := 0; n < b.N; n++ {
+		for i := 0; i < 10000; i++ {
+			_ = slice[i]
+		}
+	}
+}
+
 func BenchmarkCollectionWrite(b *testing.B) {
 	c := NewCollection[Item]()
 	b.ResetTimer()
@@ -134,11 +159,8 @@ func BenchmarkCollectionIter(b *testing.B) {
 	b.ResetTimer()
 
 	for n := 0; n < b.N; n++ {
-		v := iter.Val()
-		_ = v
-		iter.Next()
-		if iter.End() {
-			iter.Begin()
+		for item := iter.Begin(); !iter.End(); item = iter.Next() {
+			_ = item
 		}
 	}
 }

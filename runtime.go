@@ -30,6 +30,8 @@ type ecsRuntime struct {
 	//world collections
 	world []*ecsWorld
 
+	metrics *Metrics
+
 	isInited bool
 	rtStop   chan struct{}
 }
@@ -41,6 +43,8 @@ func newRuntime() *ecsRuntime {
 func (r *ecsRuntime) Configure(config *RuntimeConfig) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
+
+	r.metrics = NewMetrics(config.IsMetrics, config.IsMetricsPrint)
 
 	r.config = config
 	if r.config.MaxPoolThread <= 0 {
@@ -153,4 +157,8 @@ func (r *ecsRuntime) addJob(job func(), hashKey ...uint32) {
 		panic("you must config the runtime first")
 	}
 	r.workPool.Add(job, hashKey...)
+}
+
+func (r *ecsRuntime) GetMetrics() *Metrics {
+	return r.metrics
 }

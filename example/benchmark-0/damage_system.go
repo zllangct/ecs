@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/zllangct/ecs"
-	"math/rand"
 )
 
 type DamageSystem struct {
@@ -45,36 +44,50 @@ func (d *DamageSystem) Update(event ecs.Event) {
 	暴击倍率、暴击率、攻击范围等数据。考虑攻击范围时需要，知道位置相关信息，由Position组件提供数据支持，在全遍历
 	所有位置关系时，消耗比较大，可通过AOI优化，减小遍历规模，优化搜索效率，此处示例不做额外处理。
 	*/
-
+	reporter := ecs.Runtime.GetMetrics().NewReporter("damage system")
+	reporter.Start()
 	casterIter := d.casterGetter.Iter()
 	targetIter := d.targetGetter.Iter()
-	for caster := casterIter.Begin(); !casterIter.End(); caster = casterIter.Next() {
-		casterPos := caster.C2
-		casterForce := caster.C3
-		for target := targetIter.Begin(); !targetIter.End(); target = targetIter.Next() {
-			if caster.C1.Owner().Entity() == target.C1.Owner().Entity() {
-				continue
-			}
-			targetHp := target.C1
-			targetPos := target.C2
-			//计算距离
-			distance := Distance2D(casterPos, targetPos)
-			if distance > casterForce.AttackRange {
-				continue
-			}
+	_, _ = casterIter, targetIter
+	count := 0
+	for i := 0; i < 1000; i++ {
 
-			//伤害公式：伤害=（基础攻击+力量）+ 暴击伤害， 暴击伤害=基础攻击 * 2
-			damage := casterForce.PhysicalBaseAttack + casterForce.Strength
-			critical := 0
-			if rand.Intn(100) < casterForce.CriticalChange {
-				critical = casterForce.PhysicalBaseAttack * casterForce.CriticalMultiple
-			}
-			damage = damage + critical
-			//ecs.Log.Infof("Damage:%v", damage)
-			targetHp.HP -= damage
-			if targetHp.HP < 0 {
-				targetHp.HP = 0
-			}
+		for caster := casterIter.Begin(); !casterIter.End(); caster = casterIter.Next() {
+			casterPos := caster.C2
+			casterForce := caster.C3
+			_, _ = casterPos, casterForce
+			count++
+			//for target := targetIter.Begin(); !targetIter.End(); target = targetIter.Next() {
+			//	if caster.C1.Owner().Entity() == target.C1.Owner().Entity() {
+			//		continue
+			//	}
+			//targetHp := target.C1
+			//targetPos := target.C2
+			////计算距离
+			//distance := Distance2D(casterPos, targetPos)
+			//if distance > casterForce.AttackRange {
+			//	continue
+			//}
+			//
+			////伤害公式：伤害=（基础攻击+力量）+ 暴击伤害， 暴击伤害=基础攻击 * 2
+			//damage := casterForce.PhysicalBaseAttack + casterForce.Strength
+			//critical := 0
+			//if rand.Intn(100) < casterForce.CriticalChange {
+			//	critical = casterForce.PhysicalBaseAttack * casterForce.CriticalMultiple
+			//}
+			//damage = damage + critical
+			////ecs.Log.Infof("Damage:%v", damage)
+			//targetHp.HP -= damage
+			//if targetHp.HP < 0 {
+			//	targetHp.HP = 0
+			//}
+			//}
 		}
 	}
+	if count != casterIter.Len()*1000 {
+		ecs.Log.Error("damage system, count:", count, " iter.Len():", casterIter.Len())
+	}
+	reporter.Sample("damage")
+	reporter.Stop()
+	reporter.Print()
 }
