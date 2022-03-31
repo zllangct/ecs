@@ -15,12 +15,12 @@ func TestFrame(t *testing.T) {
 
 	var delta time.Duration
 	var ts time.Time
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 10; i++ {
 		ts = time.Now()
 		doFrame(game.world, uint64(i), delta)
 		game.attack()
 		delta = time.Since(ts)
-		//ecs.Log.Info("===== Frame:", i, "=====", delta)
+		ecs.Log.Info("===== Frame:", i, "=====", delta)
 	}
 }
 

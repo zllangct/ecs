@@ -13,7 +13,7 @@ type ICollection interface {
 	Len() int
 	ElementType() reflect.Type
 
-	getByIndex(idx int64) unsafe.Pointer
+	getByIndex(idx int64) any
 }
 
 type Collection[T any] struct {
@@ -118,9 +118,9 @@ func (c *Collection[T]) Get(id int64) *T {
 	return (*T)(unsafe.Pointer(base + uintptr(idx)*c.eleSize))
 }
 
-func (c *Collection[T]) getByIndex(idx int64) unsafe.Pointer {
+func (c *Collection[T]) getByIndex(idx int64) any {
 	base := uintptr(unsafe.Pointer(&c.data[0]))
-	return unsafe.Pointer(base + uintptr(idx)*c.eleSize)
+	return (*T)(unsafe.Pointer(base + uintptr(idx)*c.eleSize))
 }
 
 func (c *Collection[T]) Len() int {

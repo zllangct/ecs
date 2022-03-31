@@ -33,7 +33,7 @@ func NewShapeIterator[T ShapeObject, TP ShapeObjectPointer[T]](collection IColle
 
 	if iter.len != 0 {
 		com := collection.getByIndex(0)
-		TP(iter.cur).parse(com.Owner(), iter.req)
+		TP(iter.cur).parse(com.(IComponent).Owner(), iter.req)
 	}
 
 	return iter
@@ -57,7 +57,7 @@ func (i *ShapeIter[T, TP]) Begin() *T {
 	if i.len != 0 {
 		i.offset = 0
 		com := i.c.getByIndex(int64(i.offset))
-		TP(i.cur).parse(com.Owner(), i.req)
+		TP(i.cur).parse(com.(IComponent).Owner(), i.req)
 	}
 	return i.cur
 }
@@ -70,7 +70,7 @@ func (i *ShapeIter[T, TP]) Next() *T {
 	i.offset++
 	if !i.End() {
 		com := i.c.getByIndex(int64(i.offset))
-		TP(i.cur).parse(com.Owner(), i.req)
+		TP(i.cur).parse(com.(IComponent).Owner(), i.req)
 	}
 	return i.cur
 }
