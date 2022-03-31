@@ -1,6 +1,7 @@
 package ecs
 
 type IShapeIterator[T ShapeObject, TP ShapeObjectPointer[T]] interface {
+	Len() int
 	Begin() *T
 	Val() *T
 	Next() *T
@@ -72,4 +73,8 @@ func (i *ShapeIter[T, TP]) Next() *T {
 		TP(i.cur).parse(com.Owner(), i.req)
 	}
 	return i.cur
+}
+
+func (i *ShapeIter[T, TP]) Len() int {
+	return i.len
 }

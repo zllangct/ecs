@@ -17,7 +17,6 @@ const (
 type IComponentCollection interface {
 	operate(op CollectionOperate, entity *EntityInfo, component IComponent)
 	getTempTasks() []func()
-	collectorRun()
 	clearDisposable()
 	getCollection(typ reflect.Type) ICollection
 	getCollections() map[reflect.Type]ICollection
@@ -221,7 +220,4 @@ func (c *ComponentCollection) getCollections() map[reflect.Type]ICollection {
 
 func (c *ComponentCollection) removeAllByType(typ reflect.Type) {
 	delete(c.collections, typ)
-}
-
-func (c *ComponentCollection) collectorRun() {
 }

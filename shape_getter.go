@@ -60,6 +60,9 @@ func (s *ShapeGetter[T, TP]) Iter() IShapeIterator[T, TP] {
 	var min ICollection
 	for _, r := range s.req {
 		c := s.sys.World().getComponents(r.Type())
+		if c == nil || c.Len() == 0 {
+			return EmptyShapeIter[T, TP]()
+		}
 		if min == nil || min.Len() > c.Len() {
 			min = c
 		}
