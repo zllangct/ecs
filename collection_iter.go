@@ -85,12 +85,10 @@ func (i *Iter[T, TP]) Next() *T {
 	i.pend += i.eleSize
 	if !i.End() {
 		if i.readOnly {
-			//i.curTemp = i.data[i.offset]
 			i.curTemp = *(*T)(unsafe.Pointer(uintptr(i.head) + i.pend))
 			i.cur = &i.curTemp
 		} else {
 			i.cur = (*T)(unsafe.Pointer(uintptr(i.head) + i.pend))
-			//i.cur = &(i.data[i.offset])
 		}
 	} else {
 		i.cur = nil

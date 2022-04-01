@@ -56,3 +56,14 @@ type imethod struct {
 type tflag uint8
 type nameOff int32 // offset to a name
 type typeOff int32 // offset to an *rtype
+
+type SliceHeader struct {
+	Data unsafe.Pointer
+	Len  int
+	Cap  int
+}
+
+type StringHeader struct {
+	Data unsafe.Pointer
+	Len  int
+}
