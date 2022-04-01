@@ -18,7 +18,6 @@ type ICollection interface {
 
 type Collection[T any] struct {
 	data    []T
-	head    unsafe.Pointer
 	ids     map[int64]int64
 	idx2id  map[int64]int64
 	eleSize uintptr
@@ -35,7 +34,6 @@ func NewCollection[T any]() *Collection[T] {
 		data:    make([]T, 0, size),
 		eleSize: eleSize,
 	}
-	c.head = (*SliceHeader)(unsafe.Pointer(&c.data)).Data
 	return c
 }
 
@@ -116,11 +114,13 @@ func (c *Collection[T]) Get(id int64) *T {
 	if !ok {
 		return nil
 	}
-	return (*T)(unsafe.Pointer(uintptr(c.head) + uintptr(idx)*c.eleSize))
+	base := uintptr(unsafe.Pointer(&c.data[0]))
+	return (*T)(unsafe.Pointer(base + uintptr(idx)*c.eleSize))
 }
 
 func (c *Collection[T]) getByIndex(idx int64) any {
-	return (*T)(unsafe.Pointer(uintptr(c.head) + uintptr(idx)*c.eleSize))
+	base := uintptr(unsafe.Pointer(&c.data[0]))
+	return (*T)(unsafe.Pointer(base + uintptr(idx)*c.eleSize))
 }
 
 func (c *Collection[T]) Len() int {
