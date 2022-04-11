@@ -216,8 +216,8 @@ func (g *GameNormal) DoDamage() {
 			}
 
 			//计算距离
-			distance := int(math.Sqrt(math.Pow(2, float64(caster.X-target.X)) + math.Pow(2, float64(caster.Y-target.Y))))
-			if distance > caster.AttackRange {
+			distance := (caster.X-target.X)*(caster.X-target.X) + (caster.Y-target.Y)*(caster.Y-target.Y)
+			if distance > caster.AttackRange*caster.AttackRange {
 				continue
 			}
 

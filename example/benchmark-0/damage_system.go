@@ -63,8 +63,8 @@ func (d *DamageSystem) Update(event ecs.Event) {
 			targetHp := target.C1
 			targetPos := target.C2
 			//计算距离
-			distance := Distance2D(casterPos, targetPos)
-			if distance > casterForce.AttackRange {
+			distance := (casterPos.X-targetPos.X)*(casterPos.X-targetPos.X) + (casterPos.Y-targetPos.Y)*(casterPos.Y-targetPos.Y)
+			if distance > casterForce.AttackRange*casterForce.AttackRange {
 				continue
 			}
 
