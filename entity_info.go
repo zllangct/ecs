@@ -182,7 +182,7 @@ func (e *EntityInfo) addComponent(com IComponent) error {
 	com.setOwner(e)
 
 	if ct == ComponentTypeDisposable {
-		e.deleteComponent(com)
+		//e.deleteComponent(com)
 	}
 	e.world.addComponent(e, com)
 
@@ -217,6 +217,10 @@ func (e *EntityInfo) componentDeleted(typ reflect.Type, comType ComponentType) {
 
 	delete(e.components, typ)
 	//Log.Info("component removed: ", typ.Name())
+}
+
+func (e *EntityInfo) GetComponent(com IComponent) IComponent {
+	return e.getComponentByTypeInSystem(com.Type())
 }
 
 func (e *EntityInfo) getComponent(com IComponent) IComponent {
