@@ -47,8 +47,8 @@ func (d *DamageSystem) Update(event ecs.Event) {
 	*/
 	reporter := ecs.Runtime.GetMetrics().NewReporter("damage system")
 	reporter.Start()
-	casterIter := d.casterGetter.Iter()
-	targetIter := d.targetGetter.Iter()
+	casterIter := d.casterGetter.Get()
+	targetIter := d.targetGetter.Get()
 	_, _ = casterIter, targetIter
 	count := 0
 	for caster := casterIter.Begin(); !casterIter.End(); caster = casterIter.Next() {

@@ -28,6 +28,8 @@ func (s *getterBase) init(typ reflect.Type, getter IShapeGetter) {
 	}
 }
 
+var shapeCache = make(map[reflect.Type]interface{})
+
 type ShapeGetter[T ShapeObject, TP ShapeObjectPointer[T]] struct{ getterBase }
 
 func NewShapeGetter[T ShapeObject, TP ShapeObjectPointer[T]](sys ISystem) (*ShapeGetter[T, TP], error) {
@@ -55,7 +57,7 @@ func (s *ShapeGetter[T, TP]) getType() reflect.Type {
 	return s.typ
 }
 
-func (s *ShapeGetter[T, TP]) Iter() IShapeIterator[T, TP] {
+func (s *ShapeGetter[T, TP]) Get() IShapeIterator[T, TP] {
 	s.executeNum++
 	var min ICollection
 	for _, r := range s.req {

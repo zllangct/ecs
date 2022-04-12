@@ -42,7 +42,7 @@ func (m *MoveSystem) Update(event ecs.Event) {
 		m.deltaTime = 0
 	}
 
-	iter := m.getter.Iter()
+	iter := m.getter.Get()
 	for shp := iter.Begin(); !iter.End(); shp = iter.Next() {
 		mv := shp.C1
 		p := shp.C2

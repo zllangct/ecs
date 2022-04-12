@@ -38,14 +38,14 @@ func (m *MoveSystem) Update(event ecs.Event) {
 	// 聚合方式 1: 通过ShapeGetter获取同一实体的Position和Movement
 
 	// getter, err := ecs.NewShapeGetter[ecs.Shape2[Movement, Position]](m)
-	// iter := m.getter.Iter()
+	// iter := m.getter.Get()
 	// for shp := iter.Begin(); !iter.End(); shp = iter.Next() {
 	//     p := shp.C1
 	//	   mv := shp.C2
 	//}
 
 	count := 0
-	iter := m.getter.Iter()
+	iter := m.getter.Get()
 	for shp := iter.Begin(); !iter.End(); shp = iter.Next() {
 		mv := shp.C1
 		p := shp.C2
