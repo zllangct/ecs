@@ -3,6 +3,7 @@ package ecs
 import (
 	"errors"
 	"reflect"
+	"sync"
 )
 
 type IShapeGetter interface {
@@ -28,7 +29,7 @@ func (s *getterBase) init(typ reflect.Type, getter IShapeGetter) {
 	}
 }
 
-var shapeCache = make(map[reflect.Type]interface{})
+var shapeCaches = sync.Map{}
 
 type ShapeGetter[T ShapeObject, TP ShapeObjectPointer[T]] struct{ getterBase }
 
@@ -69,5 +70,17 @@ func (s *ShapeGetter[T, TP]) Get() IShapeIterator[T, TP] {
 			min = c
 		}
 	}
-	return NewShapeIterator[T, TP](min, s.req)
+	var cache *shapeCache[T] = nil
+	obj, ok := shapeCaches.Load(TypeOf[T]())
+	if ok {
+		cache = obj.(*shapeCache[T])
+	} else {
+		cache = &shapeCache[T]{
+			cache:  make([]T, min.Len()),
+			cached: make([]bool, min.Len()),
+		}
+		shapeCaches.Store(TypeOf[T](), cache)
+	}
+
+	return NewShapeIterator[T, TP](min, s.req, cache)
 }

@@ -59,10 +59,6 @@ func (m *MoveSystem) Update(event ecs.Event) {
 		//ecs.Log.Info("target id:", e, " delta:", delta, " current position:", p.X, p.Y, p.Z)
 	}
 
-	if count != iter.Len() {
-		ecs.Log.Error("move system, count:", count, " iter.Len():", iter.Len())
-	}
-
 	//聚合方式 2：直接从Entity聚合相关组件
 
 	//iterPos := ecs.GetInterestedComponents[Position](m)

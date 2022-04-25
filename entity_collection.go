@@ -1,8 +1,8 @@
 package ecs
 
 type EntityCollection struct {
-	collection []*Map[Entity, *EntityInfo]
-	bucket     int64
+	buckets []*Map[Entity, *EntityInfo]
+	bucket  int64
 }
 
 func NewEntityCollection(k int) *EntityCollection {
@@ -15,9 +15,9 @@ func NewEntityCollection(k int) *EntityCollection {
 		}
 	}
 
-	ec.collection = make([]*Map[Entity, *EntityInfo], ec.bucket+1)
-	for index := range ec.collection {
-		ec.collection[index] = &Map[Entity, *EntityInfo]{}
+	ec.buckets = make([]*Map[Entity, *EntityInfo], ec.bucket+1)
+	for index := range ec.buckets {
+		ec.buckets[index] = &Map[Entity, *EntityInfo]{}
 	}
 	return ec
 }
@@ -25,7 +25,7 @@ func NewEntityCollection(k int) *EntityCollection {
 func (p *EntityCollection) getInfo(entity Entity) *EntityInfo {
 	hash := int64(entity) & p.bucket
 
-	info, ok := p.collection[hash].Load(entity)
+	info, ok := p.buckets[hash].Load(entity)
 	if !ok {
 		return nil
 	}
@@ -35,15 +35,15 @@ func (p *EntityCollection) getInfo(entity Entity) *EntityInfo {
 func (p *EntityCollection) add(info *EntityInfo) {
 	hash := info.hashKey() & p.bucket
 
-	p.collection[hash].Store(info.entity, info)
+	p.buckets[hash].Store(info.entity, info)
 }
 
 func (p *EntityCollection) delete(entity Entity) {
 	hash := int64(entity) & p.bucket
 
-	p.collection[hash].Delete(entity)
+	p.buckets[hash].Delete(entity)
 }
 
 func (p *EntityCollection) getBuckets() []*Map[Entity, *EntityInfo] {
-	return p.collection
+	return p.buckets
 }
