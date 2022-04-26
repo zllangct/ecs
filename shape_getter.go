@@ -70,17 +70,41 @@ func (s *ShapeGetter[T, TP]) Get() IShapeIterator[T, TP] {
 			min = c
 		}
 	}
-	var cache *shapeCache[T] = nil
-	obj, ok := shapeCaches.Load(TypeOf[T]())
-	if ok {
-		cache = obj.(*shapeCache[T])
-	} else {
-		cache = &shapeCache[T]{
-			cache:  make([]T, min.Len()),
-			cached: make([]bool, min.Len()),
-		}
-		shapeCaches.Store(TypeOf[T](), cache)
+
+	if min.Len() == 0 {
+		return EmptyShapeIter[T, TP]()
 	}
 
-	return NewShapeIterator[T, TP](min, s.req, cache)
+	var cache []T
+	obj, ok := shapeCaches.Load(TypeOf[T]())
+	if ok {
+		cache = obj.([]T)
+	} else {
+		cache, ok = s.cache(min)
+		shapeCaches.LoadOrStore(TypeOf[T](), cache)
+	}
+
+	return NewShapeIterator[T, TP](cache)
+}
+
+func (s *ShapeGetter[T, TP]) cache(guide ICollection) ([]T, bool) {
+	var cache []T = make([]T, guide.Len())
+	var err error = nil
+	index := 0
+	guide.Range(func(ele any) bool {
+		c, ok := ele.(IComponent)
+		if !ok {
+			err = errors.New("element not component")
+			return false
+		}
+		ok = TP(&cache[index]).parse(c.Owner(), s.req)
+		if ok {
+			index++
+		}
+		return true
+	})
+	if err != nil {
+		return nil, false
+	}
+	return cache[:index], true
 }

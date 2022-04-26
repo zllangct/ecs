@@ -8,14 +8,8 @@ type IShapeIterator[T ShapeObject, TP ShapeObjectPointer[T]] interface {
 	Empty() bool
 }
 
-type shapeCache[T ShapeObject] struct {
-	cache  []T
-	cached []bool
-}
-
 type ShapeIter[T ShapeObject, TP ShapeObjectPointer[T]] struct {
-	c      ICollection
-	cache  *shapeCache[T]
+	shapes []T
 	len    int
 	offset int
 	req    []IRequirement
@@ -27,29 +21,15 @@ func EmptyShapeIter[T ShapeObject, TP ShapeObjectPointer[T]]() IShapeIterator[T,
 	return &ShapeIter[T, TP]{}
 }
 
-func NewShapeIterator[T ShapeObject, TP ShapeObjectPointer[T]](collection ICollection, req []IRequirement, cache any) IShapeIterator[T, TP] {
+func NewShapeIterator[T ShapeObject, TP ShapeObjectPointer[T]](shapes []T) IShapeIterator[T, TP] {
 	iter := &ShapeIter[T, TP]{
-		c:      collection,
-		len:    collection.Len(),
-		cache:  nil,
-		req:    req,
+		len:    len(shapes),
+		shapes: shapes,
 		offset: 0,
 	}
 
-	if sc, ok := cache.(*shapeCache[T]); ok {
-		iter.cache = sc
-	}
-
 	if iter.len != 0 {
-		if iter.cache != nil && iter.cache.cached[0] {
-			iter.cur = &iter.cache.cache[0]
-		} else {
-			iter.cur = new(T)
-			com := collection.getByIndex(0)
-			TP(iter.cur).parse(com.(IComponent).Owner(), iter.req)
-			iter.cache.cache[0] = *iter.cur
-			iter.cache.cached[0] = true
-		}
+		iter.cur = &iter.shapes[0]
 	}
 
 	return iter
@@ -72,17 +52,7 @@ func (i *ShapeIter[T, TP]) End() bool {
 func (i *ShapeIter[T, TP]) Begin() *T {
 	if i.len != 0 {
 		i.offset = 0
-		if i.cache != nil && i.cache.cached[i.offset] {
-			i.cur = &i.cache.cache[i.offset]
-		} else {
-			if i.cur == nil {
-				i.cur = new(T)
-			}
-			com := i.c.getByIndex(int64(i.offset))
-			TP(i.cur).parse(com.(IComponent).Owner(), i.req)
-			i.cache.cache[0] = *i.cur
-			i.cache.cached[i.offset] = true
-		}
+		i.cur = &i.shapes[i.offset]
 	}
 	return i.cur
 }
@@ -94,14 +64,7 @@ func (i *ShapeIter[T, TP]) Val() *T {
 func (i *ShapeIter[T, TP]) Next() *T {
 	i.offset++
 	if !i.End() {
-		if i.cache != nil && i.cache.cached[i.offset] {
-			i.cur = &i.cache.cache[i.offset]
-		} else {
-			com := i.c.getByIndex(int64(i.offset))
-			TP(i.cur).parse(com.(IComponent).Owner(), i.req)
-			i.cache.cache[i.offset] = *i.cur
-			i.cache.cached[i.offset] = true
-		}
+		i.cur = &i.shapes[i.offset]
 	} else {
 		i.cur = nil
 	}

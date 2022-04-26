@@ -11,6 +11,7 @@ const (
 
 type ICollection interface {
 	Len() int
+	Range(func(v any) bool)
 	ElementType() reflect.Type
 
 	getByIndex(idx int64) any
@@ -129,4 +130,16 @@ func (c *Collection[T]) Len() int {
 
 func (c *Collection[T]) ElementType() reflect.Type {
 	return TypeOf[T]()
+}
+
+func (c *Collection[T]) getData() []T {
+	return c.data
+}
+
+func (c *Collection[T]) Range(f func(element any) bool) {
+	for i := int64(0); i < c.len; i++ {
+		if !f(&c.data[i]) {
+			break
+		}
+	}
 }
