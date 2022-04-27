@@ -1,6 +1,6 @@
 package main
 
 const (
-	PlayerCount = 100
-	DummyMaxFor = 100000
+	PlayerCount = 500
+	DummyMaxFor = 10000
 )
