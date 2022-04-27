@@ -1,7 +1,6 @@
 package main
 
 import (
-	"math"
 	"math/rand"
 	"sync"
 	"time"
@@ -110,35 +109,35 @@ func (g *GameNormal) doFrame(parallel bool, frame uint64, delta time.Duration) {
 }
 func (g *GameNormal) SimuLoad1() {
 	for _, p := range g.players {
-		for i := 0; i < 1000; i++ {
+		for i := 0; i < DummyMaxFor; i++ {
 			p.Test1 += 1
 		}
 	}
 }
 func (g *GameNormal) SimuLoad2() {
 	for _, p := range g.players {
-		for i := 0; i < 1000; i++ {
+		for i := 0; i < DummyMaxFor; i++ {
 			p.Test2 += 1
 		}
 	}
 }
 func (g *GameNormal) SimuLoad3() {
 	for _, p := range g.players {
-		for i := 0; i < 1000; i++ {
+		for i := 0; i < DummyMaxFor; i++ {
 			p.Test3 += 1
 		}
 	}
 }
 func (g *GameNormal) SimuLoad4() {
 	for _, p := range g.players {
-		for i := 0; i < 1000; i++ {
+		for i := 0; i < DummyMaxFor; i++ {
 			p.Test4 += 1
 		}
 	}
 }
 func (g *GameNormal) SimuLoad5() {
 	for _, p := range g.players {
-		for i := 0; i < 1000; i++ {
+		for i := 0; i < DummyMaxFor; i++ {
 			p.Test5 += 1
 		}
 	}
@@ -147,7 +146,7 @@ func (g *GameNormal) SimuLoad5() {
 func (g *GameNormal) SimuLoadParallel1() {
 	for _, p := range g.players {
 		p.rw.Lock()
-		for i := 0; i < 1000; i++ {
+		for i := 0; i < DummyMaxFor; i++ {
 			p.Test1 += 1
 		}
 		p.rw.Unlock()
@@ -156,7 +155,7 @@ func (g *GameNormal) SimuLoadParallel1() {
 func (g *GameNormal) SimuLoadParallel2() {
 	for _, p := range g.players {
 		p.rw.Lock()
-		for i := 0; i < 1000; i++ {
+		for i := 0; i < DummyMaxFor; i++ {
 			p.Test2 += 1
 		}
 		p.rw.Unlock()
@@ -165,7 +164,7 @@ func (g *GameNormal) SimuLoadParallel2() {
 func (g *GameNormal) SimuLoadParallel3() {
 	for _, p := range g.players {
 		p.rw.Lock()
-		for i := 0; i < 1000; i++ {
+		for i := 0; i < DummyMaxFor; i++ {
 			p.Test3 += 1
 		}
 		p.rw.Unlock()
@@ -174,7 +173,7 @@ func (g *GameNormal) SimuLoadParallel3() {
 func (g *GameNormal) SimuLoadParallel4() {
 	for _, p := range g.players {
 		p.rw.Lock()
-		for i := 0; i < 1000; i++ {
+		for i := 0; i < DummyMaxFor; i++ {
 			p.Test4 += 1
 		}
 		p.rw.Unlock()
@@ -183,7 +182,7 @@ func (g *GameNormal) SimuLoadParallel4() {
 func (g *GameNormal) SimuLoadParallel5() {
 	for _, p := range g.players {
 		p.rw.Lock()
-		for i := 0; i < 1000; i++ {
+		for i := 0; i < DummyMaxFor; i++ {
 			p.Test5 += 1
 		}
 		p.rw.Unlock()
@@ -245,9 +244,8 @@ func (g *GameNormal) DoDamageParallel() {
 
 			target.rw.Lock()
 			//计算距离
-			distance := int(math.Sqrt(math.Pow(2, float64(caster.X-target.X)) + math.Pow(2, float64(caster.Y-target.Y))))
-			if distance > caster.AttackRange {
-				target.rw.Unlock()
+			distance := (caster.X-target.X)*(caster.X-target.X) + (caster.Y-target.Y)*(caster.Y-target.Y)
+			if distance > caster.AttackRange*caster.AttackRange {
 				continue
 			}
 
