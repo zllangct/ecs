@@ -32,11 +32,9 @@ const (
 type IComponent interface {
 	Owner() *EntityInfo
 	Type() reflect.Type
-	ID() int64
 	Clone() IComponent
 
 	setOwner(owner *EntityInfo)
-	setID(id int64)
 	setState(state ComponentState)
 	getState() ComponentState
 	getComponentType() ComponentType
@@ -122,15 +120,17 @@ func (f FreeDisposableComponent[T, TP]) freeComponentIdentification() {}
 func (f FreeDisposableComponent[T, TP]) disposableComponentIdentification() {}
 
 type Component[T ComponentObject, TP ComponentPointer[T]] struct {
-	id    int64
-	owner *EntityInfo
 	st    uint8
+	o1    uint8
+	o2    uint16
+	seq   uint32
+	owner *EntityInfo
 }
 
 func (c Component[T, TP]) componentIdentification() {}
 
 func (c Component[T, TP]) getEntity() Entity {
-	return Entity(c.id)
+	return c.owner.Entity()
 }
 
 func (c *Component[T, TP]) init() {
@@ -148,7 +148,7 @@ func (c *Component[T, TP]) addToCollection(collection interface{}) IComponent {
 		Log.Info("add to collection, collecion is nil")
 		return nil
 	}
-	ins, _ := cc.Add(c.rawInstance(), c.id)
+	ins, _ := cc.Add(c.rawInstance(), int64(c.owner.entity))
 	insP := TP(ins)
 	insP.setState(ComponentStateActive)
 	*c.rawInstance() = *insP
@@ -162,7 +162,7 @@ func (c *Component[T, TP]) deleteFromCollection(collection interface{}) {
 		return
 	}
 	c.setState(ComponentStateDisable)
-	cc.Remove(c.ID())
+	cc.Remove(int64(c.owner.Entity()))
 	return
 }
 
@@ -172,15 +172,6 @@ func (c *Component[T, TP]) newCollection() ICollection {
 
 func (c *Component[T, TP]) setOwner(entity *EntityInfo) {
 	c.owner = entity
-	c.id = int64(entity.Entity())
-}
-
-func (c *Component[T, TP]) setID(id int64) {
-	c.id = id
-}
-
-func (c *Component[T, TP]) ID() int64 {
-	return c.id
 }
 
 func (c *Component[T, TP]) rawInstance() *T {

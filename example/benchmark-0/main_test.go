@@ -1,10 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"github.com/zllangct/ecs"
 	_ "net/http/pprof"
+	"reflect"
 	"testing"
 	"time"
+	"unsafe"
 	_ "unsafe"
 )
 
@@ -44,4 +47,15 @@ func TestEcsOptimizer(t *testing.T) {
 			delta = frameInterval
 		}
 	}
+}
+
+func TestOthers(t *testing.T) {
+	var a1 = [...]reflect.Type{ecs.TypeOf[Test1](), ecs.TypeOf[Test2](), ecs.TypeOf[Test3]()}
+	var a2 = [...]reflect.Type{ecs.TypeOf[Test1](), ecs.TypeOf[Test2](), ecs.TypeOf[Test3]()}
+	m := map[interface{}]string{}
+	m[a1] = "this is a1"
+	m[a2] = "this is a2"
+	fmt.Printf("%v\n", m)
+
+	println(unsafe.Sizeof(ecs.Component[Test1, *Test1]{}))
 }
