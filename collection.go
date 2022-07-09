@@ -12,6 +12,8 @@ const (
 type ICollection interface {
 	Len() int
 	Range(func(v any) bool)
+	ChangeCount() int64
+	ChangeReset()
 	ElementType() reflect.Type
 
 	getByIndex(idx int64) any
@@ -24,6 +26,7 @@ type Collection[T any] struct {
 	eleSize uintptr
 	seq     int64
 	len     int64
+	change  int64
 }
 
 func NewCollection[T any]() *Collection[T] {
@@ -65,6 +68,7 @@ func (c *Collection[T]) Add(element *T, elementID ...int64) (*T, int64) {
 	c.ids[id] = idx
 	c.idx2id[idx] = id
 	c.len++
+	c.change++
 	return &c.data[idx], id
 }
 
@@ -87,6 +91,7 @@ func (c *Collection[T]) Remove(id int64) *T {
 	c.data[idx], c.data[lastIdx] = c.data[lastIdx], c.data[idx]
 	c.shrink()
 	c.len--
+	c.change++
 	return &c.data[lastIdx]
 }
 
@@ -126,6 +131,14 @@ func (c *Collection[T]) getByIndex(idx int64) any {
 
 func (c *Collection[T]) Len() int {
 	return int(c.len)
+}
+
+func (c *Collection[T]) ChangeCount() int64 {
+	return c.change
+}
+
+func (c *Collection[T]) ChangeReset() {
+	c.change = 0
 }
 
 func (c *Collection[T]) ElementType() reflect.Type {
