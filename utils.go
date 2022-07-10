@@ -19,7 +19,7 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
-func UniqueID() int64 {
+func LocalUniqueID() int64 {
 	tNow := int64(time.Now().UnixNano()) << 32
 	tTemp := atomic.LoadInt64(&timestamp)
 	if tTemp != tNow {

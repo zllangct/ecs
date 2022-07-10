@@ -66,7 +66,7 @@ type ecsWorld struct {
 
 func newWorld(runtime *ecsRuntime, config *WorldConfig) *ecsWorld {
 	world := &ecsWorld{
-		id:         UniqueID(),
+		id:         LocalUniqueID(),
 		systemFlow: nil,
 		config:     config,
 		components: NewComponentCollection(config.HashCount),

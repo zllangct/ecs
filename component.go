@@ -32,7 +32,6 @@ const (
 type IComponent interface {
 	Owner() *EntityInfo
 	Type() reflect.Type
-	Clone() IComponent
 
 	setOwner(owner *EntityInfo)
 	setState(state ComponentState)
@@ -40,7 +39,6 @@ type IComponent interface {
 	getComponentType() ComponentType
 	getPermission() ComponentPermission
 
-	instance() IComponent
 	newCollection() ICollection
 	addToCollection(collection interface{}) IComponent
 	deleteFromCollection(collection interface{})
@@ -176,16 +174,6 @@ func (c *Component[T, TP]) setOwner(entity *EntityInfo) {
 
 func (c *Component[T, TP]) rawInstance() *T {
 	return (*T)(unsafe.Pointer(c))
-}
-
-func (c *Component[T, TP]) instance() (com IComponent) {
-	(*iface)(unsafe.Pointer(&com)).data = unsafe.Pointer(c)
-	return
-}
-
-func (c *Component[T, TP]) Clone() IComponent {
-	clone := *c.rawInstance()
-	return TP(&clone)
 }
 
 func (c *Component[T, TP]) setState(state ComponentState) {

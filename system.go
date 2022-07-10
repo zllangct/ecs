@@ -88,7 +88,7 @@ func (s *System[T, TP]) rawInstance() *T {
 
 func (s *System[T, TP]) ID() int64 {
 	if s.id == 0 {
-		s.id = UniqueID()
+		s.id = LocalUniqueID()
 	}
 	return s.id
 }

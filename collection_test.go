@@ -29,8 +29,7 @@ func TestCollectionIterator(t *testing.T) {
 	//添加数据
 	cmp := map[int64]int{}
 	for i := 0; i < caseCount; i++ {
-		ret, _ := c.Add(&srcList[i])
-		ret.setID(int64(i))
+		_, _ = c.Add(&srcList[i])
 		cmp[int64(i)] = i
 	}
 
@@ -129,7 +128,6 @@ func BenchmarkCollectionRead(b *testing.B) {
 		item := &Item{
 			Count: n,
 		}
-		item.setID(int64(n + 1))
 		_, _ = c.Add(item)
 		ids = append(ids, int64(n+1))
 	}
@@ -149,7 +147,6 @@ func BenchmarkCollectionIter(b *testing.B) {
 		item := &Item{
 			Count: n,
 		}
-		item.setID(int64(n))
 		_, _ = c.Add(item)
 		ids = append(ids, int64(n))
 	}
