@@ -5,14 +5,14 @@ import (
 )
 
 type MoveChange2 struct {
-	ecs.DisposableComponent[MoveChange2, *MoveChange2]
+	ecs.DisposableComponent[MoveChange2]
 	Entity ecs.Entity
 	V      int
 	Dir    []int
 }
 
 type InputSystem2 struct {
-	ecs.System[InputSystem2, *InputSystem2]
+	ecs.System[InputSystem2]
 }
 
 func (is *InputSystem2) Init() {

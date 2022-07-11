@@ -6,7 +6,7 @@ import (
 )
 
 type DamageSystem struct {
-	ecs.System[DamageSystem, *DamageSystem]
+	ecs.System[DamageSystem]
 	casterGetter *ecs.ShapeGetter[ecs.Shape3[Action, Position, Force],
 		*ecs.Shape3[Action, Position, Force]]
 	targetGetter *ecs.ShapeGetter[ecs.Shape2[HealthPoint, Position],

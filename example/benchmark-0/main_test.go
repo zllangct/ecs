@@ -57,5 +57,5 @@ func TestOthers(t *testing.T) {
 	m[a2] = "this is a2"
 	fmt.Printf("%v\n", m)
 
-	println(unsafe.Sizeof(ecs.Component[Test1, *Test1]{}))
+	println(unsafe.Sizeof(ecs.Component[Test1]{}))
 }

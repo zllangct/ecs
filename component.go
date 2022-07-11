@@ -85,39 +85,39 @@ type FreeDisposableComponentPointer[T FreeDisposableComponentObject] interface {
 	*T
 }
 
-type FreeComponent[T FreeComponentObject, TP FreeComponentPointer[T]] struct {
-	Component[T, TP]
+type FreeComponent[T FreeComponentObject] struct {
+	Component[T]
 }
 
-func (f *FreeComponent[T, TP]) getComponentType() ComponentType {
+func (f *FreeComponent[T]) getComponentType() ComponentType {
 	return ComponentTypeFree
 }
 
-func (f FreeComponent[T, TP]) freeComponentIdentification() {}
+func (f FreeComponent[T]) freeComponentIdentification() {}
 
-type DisposableComponent[T DisposableComponentObject, TP DisposableComponentPointer[T]] struct {
-	Component[T, TP]
+type DisposableComponent[T DisposableComponentObject] struct {
+	Component[T]
 }
 
-func (f *DisposableComponent[T, TP]) getComponentType() ComponentType {
+func (f *DisposableComponent[T]) getComponentType() ComponentType {
 	return ComponentTypeDisposable
 }
 
-func (f DisposableComponent[T, TP]) disposableComponentIdentification() {}
+func (f DisposableComponent[T]) disposableComponentIdentification() {}
 
-type FreeDisposableComponent[T FreeDisposableComponentObject, TP FreeDisposableComponentPointer[T]] struct {
-	Component[T, TP]
+type FreeDisposableComponent[T FreeDisposableComponentObject] struct {
+	Component[T]
 }
 
-func (f *FreeDisposableComponent[T, TP]) getComponentType() ComponentType {
+func (f *FreeDisposableComponent[T]) getComponentType() ComponentType {
 	return ComponentTypeFreeDisposable
 }
 
-func (f FreeDisposableComponent[T, TP]) freeComponentIdentification() {}
+func (f FreeDisposableComponent[T]) freeComponentIdentification() {}
 
-func (f FreeDisposableComponent[T, TP]) disposableComponentIdentification() {}
+func (f FreeDisposableComponent[T]) disposableComponentIdentification() {}
 
-type Component[T ComponentObject, TP ComponentPointer[T]] struct {
+type Component[T ComponentObject] struct {
 	st    uint8
 	o1    uint8
 	o2    uint16
@@ -125,35 +125,39 @@ type Component[T ComponentObject, TP ComponentPointer[T]] struct {
 	owner *EntityInfo
 }
 
-func (c Component[T, TP]) componentIdentification() {}
+func (c Component[T]) componentIdentification() {}
 
-func (c Component[T, TP]) getEntity() Entity {
+func (c Component[T]) getEntity() Entity {
 	return c.owner.Entity()
 }
 
-func (c *Component[T, TP]) init() {
+func (c *Component[T]) init() {
 	c.setType(c.getComponentType())
 	c.setState(ComponentStateInvalid)
 }
 
-func (c *Component[T, TP]) getComponentType() ComponentType {
+func (c *Component[T]) getComponentType() ComponentType {
 	return ComponentTypeNormal
 }
 
-func (c *Component[T, TP]) addToCollection(collection interface{}) IComponent {
+func conv[T any](in T, p *T) IComponent {
+	return nil
+}
+
+func (c *Component[T]) addToCollection(collection interface{}) IComponent {
 	cc, ok := collection.(*Collection[T])
 	if !ok {
 		Log.Info("add to collection, collecion is nil")
 		return nil
 	}
 	ins, _ := cc.Add(c.rawInstance(), int64(c.owner.entity))
-	insP := TP(ins)
-	insP.setState(ComponentStateActive)
-	*c.rawInstance() = *insP
-	return insP
+	*c.rawInstance() = *ins
+	i := interface{}(ins).(IComponent)
+	i.setState(ComponentStateActive)
+	return i
 }
 
-func (c *Component[T, TP]) deleteFromCollection(collection interface{}) {
+func (c *Component[T]) deleteFromCollection(collection interface{}) {
 	cc, ok := collection.(*Collection[T])
 	if !ok {
 		Log.Info("add to collection, collecion is nil")
@@ -164,61 +168,61 @@ func (c *Component[T, TP]) deleteFromCollection(collection interface{}) {
 	return
 }
 
-func (c *Component[T, TP]) newCollection() ICollection {
+func (c *Component[T]) newCollection() ICollection {
 	return NewCollection[T]()
 }
 
-func (c *Component[T, TP]) setOwner(entity *EntityInfo) {
+func (c *Component[T]) setOwner(entity *EntityInfo) {
 	c.owner = entity
 }
 
-func (c *Component[T, TP]) rawInstance() *T {
+func (c *Component[T]) rawInstance() *T {
 	return (*T)(unsafe.Pointer(c))
 }
 
-func (c *Component[T, TP]) setState(state ComponentState) {
+func (c *Component[T]) setState(state ComponentState) {
 	c.st = (c.st & l4) | (uint8(state) << 4)
 }
 
-func (c *Component[T, TP]) getState() ComponentState {
+func (c *Component[T]) getState() ComponentState {
 	return ComponentState(c.st & h4 >> 4)
 }
 
-func (c *Component[T, TP]) setType(typ ComponentType) {
+func (c *Component[T]) setType(typ ComponentType) {
 	c.st = (c.st & h4) | uint8(typ)
 }
 
-func (c *Component[T, TP]) getType() ComponentType {
+func (c *Component[T]) getType() ComponentType {
 	return ComponentType(c.st & l4)
 }
 
-func (c *Component[T, TP]) invalidate() {
+func (c *Component[T]) invalidate() {
 	c.setState(ComponentStateInvalid)
 }
 
-func (c *Component[T, TP]) active() {
+func (c *Component[T]) active() {
 	c.setState(ComponentStateActive)
 }
 
-func (c *Component[T, TP]) remove() {
+func (c *Component[T]) remove() {
 	if c.owner == nil {
 		return
 	}
 	c.owner.Remove(c)
 }
 
-func (c *Component[T, TP]) Owner() *EntityInfo {
+func (c *Component[T]) Owner() *EntityInfo {
 	return c.owner
 }
 
-func (c *Component[T, TP]) Type() reflect.Type {
+func (c *Component[T]) Type() reflect.Type {
 	return TypeOf[T]()
 }
 
-func (c *Component[T, TP]) getPermission() ComponentPermission {
+func (c *Component[T]) getPermission() ComponentPermission {
 	return ComponentReadWrite
 }
 
-func (c *Component[T, TP]) ToString() string {
+func (c *Component[T]) ToString() string {
 	return fmt.Sprintf("%+v", c.rawInstance())
 }

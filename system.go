@@ -61,7 +61,7 @@ type SystemPointer[T SystemObject] interface {
 	*T
 }
 
-type System[T SystemObject, TP SystemPointer[T]] struct {
+type System[T SystemObject] struct {
 	lock              sync.Mutex
 	requirements      map[reflect.Type]IRequirement
 	events            map[CustomEventName]CustomEventHandler
@@ -75,32 +75,32 @@ type System[T SystemObject, TP SystemPointer[T]] struct {
 	id                int64
 }
 
-func (s System[T, TP]) systemIdentification() {}
+func (s System[T]) systemIdentification() {}
 
-func (s *System[T, TP]) instance() (sys ISystem) {
+func (s *System[T]) instance() (sys ISystem) {
 	(*iface)(unsafe.Pointer(&sys)).data = unsafe.Pointer(s)
 	return
 }
 
-func (s *System[T, TP]) rawInstance() *T {
+func (s *System[T]) rawInstance() *T {
 	return (*T)(unsafe.Pointer(s))
 }
 
-func (s *System[T, TP]) ID() int64 {
+func (s *System[T]) ID() int64 {
 	if s.id == 0 {
 		s.id = LocalUniqueID()
 	}
 	return s.id
 }
 
-func (s *System[T, TP]) EventRegister(event CustomEventName, fn CustomEventHandler) {
+func (s *System[T]) EventRegister(event CustomEventName, fn CustomEventHandler) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
 	s.events[event] = fn
 }
 
-func (s *System[T, TP]) Emit(event CustomEventName, args ...interface{}) {
+func (s *System[T]) Emit(event CustomEventName, args ...interface{}) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -110,7 +110,7 @@ func (s *System[T, TP]) Emit(event CustomEventName, args ...interface{}) {
 	})
 }
 
-func (s *System[T, TP]) eventDispatch() {
+func (s *System[T]) eventDispatch() {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -131,15 +131,15 @@ func (s *System[T, TP]) eventDispatch() {
 	s.eventQueue.Init()
 }
 
-func (s *System[T, TP]) SetRequirements(rqs ...IRequirement) {
+func (s *System[T]) SetRequirements(rqs ...IRequirement) {
 	s.setRequirements(rqs...)
 }
 
-func (s *System[T, TP]) isInitialized() bool {
+func (s *System[T]) isInitialized() bool {
 	return s.state >= SystemStateInit
 }
 
-func (s *System[T, TP]) setRequirements(rqs ...IRequirement) {
+func (s *System[T]) setRequirements(rqs ...IRequirement) {
 	if s.isInitialized() {
 		return
 	}
@@ -151,19 +151,19 @@ func (s *System[T, TP]) setRequirements(rqs ...IRequirement) {
 	}
 }
 
-func (s *System[T, TP]) Pause() {
+func (s *System[T]) Pause() {
 	s.Emit(SystemCustomEventPause, nil)
 }
 
-func (s *System[T, TP]) Resume() {
+func (s *System[T]) Resume() {
 	s.Emit(SystemCustomEventResume, nil)
 }
 
-func (s *System[T, TP]) Stop() {
+func (s *System[T]) Stop() {
 	s.Emit(SystemCustomEventStop, nil)
 }
 
-func (s *System[T, TP]) pause(e []interface{}) error {
+func (s *System[T]) pause(e []interface{}) error {
 	if s.getState() == SystemStateUpdate {
 		s.setState(SystemStatePause)
 	} else {
@@ -172,7 +172,7 @@ func (s *System[T, TP]) pause(e []interface{}) error {
 	return nil
 }
 
-func (s *System[T, TP]) resume(e []interface{}) error {
+func (s *System[T]) resume(e []interface{}) error {
 	if s.getState() == SystemStatePause {
 		s.setState(SystemStateUpdate)
 	} else {
@@ -181,7 +181,7 @@ func (s *System[T, TP]) resume(e []interface{}) error {
 	return nil
 }
 
-func (s *System[T, TP]) stop(e []interface{}) error {
+func (s *System[T]) stop(e []interface{}) error {
 	if s.getState() == SystemStatePause {
 		s.setState(SystemStateUpdate)
 	} else {
@@ -190,36 +190,36 @@ func (s *System[T, TP]) stop(e []interface{}) error {
 	return nil
 }
 
-func (s *System[T, TP]) getState() SystemState {
+func (s *System[T]) getState() SystemState {
 	return s.state
 }
 
-func (s *System[T, TP]) setState(state SystemState) {
+func (s *System[T]) setState(state SystemState) {
 	s.state = state
 }
 
-func (s *System[T, TP]) setExecuting(isExecuting bool) {
+func (s *System[T]) setExecuting(isExecuting bool) {
 	s.executing = isExecuting
 }
 
-func (s *System[T, TP]) isExecuting() bool {
+func (s *System[T]) isExecuting() bool {
 	return s.executing
 }
 
-func (s *System[T, TP]) Requirements() map[reflect.Type]IRequirement {
+func (s *System[T]) Requirements() map[reflect.Type]IRequirement {
 	return s.requirements
 }
 
-func (s *System[T, TP]) IsRequire(com IComponent) (IRequirement, bool) {
+func (s *System[T]) IsRequire(com IComponent) (IRequirement, bool) {
 	return s.isRequire(com.Type())
 }
 
-func (s *System[T, TP]) isRequire(typ reflect.Type) (IRequirement, bool) {
+func (s *System[T]) isRequire(typ reflect.Type) (IRequirement, bool) {
 	r, ok := s.requirements[typ]
 	return r, ok
 }
 
-func (s *System[T, TP]) baseInit(world *ecsWorld, ins ISystem) {
+func (s *System[T]) baseInit(world *ecsWorld, ins ISystem) {
 	s.requirements = map[reflect.Type]IRequirement{}
 	s.events = make(map[CustomEventName]CustomEventHandler)
 	s.eventQueue = list.New()
@@ -260,14 +260,14 @@ func (s *System[T, TP]) baseInit(world *ecsWorld, ins ISystem) {
 	s.state = SystemStateInit
 }
 
-func (s *System[T, TP]) Type() reflect.Type {
+func (s *System[T]) Type() reflect.Type {
 	if s.realType == nil {
 		s.realType = TypeOf[T]()
 	}
 	return s.realType
 }
 
-func (s *System[T, TP]) setOrder(order Order) {
+func (s *System[T]) setOrder(order Order) {
 	if s.isInitialized() {
 		return
 	}
@@ -275,19 +275,19 @@ func (s *System[T, TP]) setOrder(order Order) {
 	s.order = order
 }
 
-func (s *System[T, TP]) Order() Order {
+func (s *System[T]) Order() Order {
 	return s.order
 }
 
-func (s *System[T, TP]) World() IWorld {
+func (s *System[T]) World() IWorld {
 	return s.world
 }
 
-func (s *System[T, TP]) CheckoutComponent(info *EntityInfo, com IComponent) IComponent {
+func (s *System[T]) CheckoutComponent(info *EntityInfo, com IComponent) IComponent {
 	return s.checkoutComponent(info, com)
 }
 
-func (s *System[T, TP]) checkoutComponent(entity *EntityInfo, com IComponent) IComponent {
+func (s *System[T]) checkoutComponent(entity *EntityInfo, com IComponent) IComponent {
 	_, isRequire := s.IsRequire(com)
 	if !isRequire {
 		return nil
@@ -296,12 +296,12 @@ func (s *System[T, TP]) checkoutComponent(entity *EntityInfo, com IComponent) IC
 	return entity.getComponent(com)
 }
 
-func (s *System[T, TP]) GetEntityInfo(entity Entity) *EntityInfo {
+func (s *System[T]) GetEntityInfo(entity Entity) *EntityInfo {
 	return s.world.GetEntityInfo(entity)
 }
 
 // get optimizer
-func (s *System[T, TP]) getOptimizer() *OptimizerReporter {
+func (s *System[T]) getOptimizer() *OptimizerReporter {
 	if s.optimizerReporter == nil {
 		s.optimizerReporter = &OptimizerReporter{}
 		s.optimizerReporter.init()
