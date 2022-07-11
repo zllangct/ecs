@@ -140,10 +140,6 @@ func (c *Component[T]) getComponentType() ComponentType {
 	return ComponentTypeNormal
 }
 
-func conv[T any](in T, p *T) IComponent {
-	return nil
-}
-
 func (c *Component[T]) addToCollection(collection interface{}) IComponent {
 	cc, ok := collection.(*Collection[T])
 	if !ok {
