@@ -5,9 +5,9 @@ import (
 	"testing"
 )
 
-//待存储的数据定义
+// 待存储的数据定义
 type Item struct {
-	Component[Item, *Item]
+	Component[Item]
 	Count int
 	Arr   [3]int
 }

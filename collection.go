@@ -15,6 +15,7 @@ type ICollection interface {
 	ChangeCount() int64
 	ChangeReset()
 	ElementType() reflect.Type
+	ElementMeta() ComponentMetaInfo
 
 	getByIndex(idx int64) any
 }
@@ -26,17 +27,20 @@ type Collection[T any] struct {
 	eleSize uintptr
 	seq     int64
 	len     int64
+	meta    ComponentMetaInfo
 	change  int64
 }
 
 func NewCollection[T any]() *Collection[T] {
-	eleSize := TypeOf[T]().Size()
+	typ := TypeOf[T]()
+	eleSize := typ.Size()
 	size := InitMaxSize / eleSize
 	c := &Collection[T]{
 		ids:     map[int64]int64{},
 		idx2id:  map[int64]int64{},
 		data:    make([]T, 0, size),
 		eleSize: eleSize,
+		meta:    ComponentMeta.GenComponentMetaInfo(typ),
 	}
 	return c
 }
@@ -147,6 +151,10 @@ func (c *Collection[T]) ElementType() reflect.Type {
 
 func (c *Collection[T]) getData() []T {
 	return c.data
+}
+
+func (c *Collection[T]) ElementMeta() ComponentMetaInfo {
+	return c.meta
 }
 
 func (c *Collection[T]) Range(f func(element any) bool) {

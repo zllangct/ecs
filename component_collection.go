@@ -176,9 +176,11 @@ func (c *ComponentCollection) getTempTasks() []func() {
 	return tasks
 }
 
-func (c *ComponentCollection) opExecute(taskList *opTaskList, collection any) {
+func (c *ComponentCollection) opExecute(taskList *opTaskList, collection ICollection) {
 	var t reflect.Type
+	meta := collection.ElementMeta()
 	for task := taskList.head; task != nil; task = task.next {
+		task.com.setIntType(meta.it)
 		t = task.com.Type()
 		switch task.op {
 		case CollectionOperateAdd:

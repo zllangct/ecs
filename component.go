@@ -35,7 +35,9 @@ type IComponent interface {
 
 	setOwner(owner *EntityInfo)
 	setState(state ComponentState)
+	setIntType(typ uint16)
 	getState() ComponentState
+	getIntType() int32
 	getComponentType() ComponentType
 	getPermission() ComponentPermission
 
@@ -120,7 +122,7 @@ func (f FreeDisposableComponent[T]) disposableComponentIdentification() {}
 type Component[T ComponentObject] struct {
 	st    uint8
 	o1    uint8
-	o2    uint16
+	it    uint16
 	seq   uint32
 	owner *EntityInfo
 }
@@ -190,6 +192,14 @@ func (c *Component[T]) setType(typ ComponentType) {
 
 func (c *Component[T]) getType() ComponentType {
 	return ComponentType(c.st & l4)
+}
+
+func (c *Component[T]) setIntType(typ uint16) {
+	c.it = typ
+}
+
+func (c *Component[T]) getIntType() int32 {
+	return int32(c.it)
 }
 
 func (c *Component[T]) invalidate() {
