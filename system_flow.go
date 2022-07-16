@@ -28,7 +28,7 @@ const (
 // SystemGroupList extension of system group slice
 type SystemGroupList []*SystemGroup
 
-//system execute flow
+// system execute flow
 type systemFlow struct {
 	lock      sync.Mutex
 	world     *ecsWorld
@@ -47,7 +47,7 @@ func newSystemFlow(runtime *ecsWorld) *systemFlow {
 	return sf
 }
 
-//initialize the system flow
+// initialize the system flow
 func (p *systemFlow) init() {
 	p.stageList = []Stage{
 		StageStart,
@@ -201,12 +201,14 @@ func (p *systemFlow) run(event Event) {
 		p.unregister(system)
 	}
 
+	ShapeCacheDispose()
+
 	reporter.Sample("clean")
 	reporter.Stop()
 	reporter.Print()
 }
 
-//register method only in world init or func init(){}
+// register method only in world init or func init(){}
 func (p *systemFlow) register(system ISystem) {
 	p.lock.Lock()
 	defer p.lock.Unlock()

@@ -52,6 +52,7 @@ type EntityInfo struct {
 	world      *ecsWorld
 	mu         sync.RWMutex
 	components map[reflect.Type]IComponent
+	compound   Compound
 	adding     TypeList
 	removing   TypeList
 	entity     Entity
@@ -236,4 +237,11 @@ func (e *EntityInfo) getComponentByType(typ reflect.Type) IComponent {
 
 func (e *EntityInfo) getComponentByTypeInSystem(typ reflect.Type) IComponent {
 	return e.components[typ]
+}
+
+func (e *EntityInfo) getCompound() Compound {
+	if len(e.compound) != len(e.components) {
+		e.compound = newCompoundFromMap(e.components)
+	}
+	return e.compound
 }

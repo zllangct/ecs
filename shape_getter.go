@@ -31,6 +31,10 @@ func (s *getterBase) init(typ reflect.Type, getter IShapeGetter) {
 
 var shapeCaches = sync.Map{}
 
+func ShapeCacheDispose() {
+	shapeCaches = sync.Map{}
+}
+
 type ShapeGetter[T ShapeObject, TP ShapeObjectPointer[T]] struct{ getterBase }
 
 func NewShapeGetter[T ShapeObject, TP ShapeObjectPointer[T]](sys ISystem) (*ShapeGetter[T, TP], error) {

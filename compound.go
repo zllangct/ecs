@@ -1,10 +1,28 @@
 package ecs
 
-import "errors"
+import (
+	"errors"
+	"reflect"
+)
 
 type Compound []uint16
 
+func newCompoundFromMap(components map[reflect.Type]IComponent) Compound {
+	c := make(Compound, 0, len(components))
+	var err error
+	for _, component := range components {
+		err = c.Add(component.getIntType())
+		if err != nil {
+			Log.Error(err)
+		}
+	}
+	return c
+}
+
 func (c Compound) insertIndex(it uint16) int {
+	if len(c) == 0 {
+		return 0
+	}
 	l := 0
 	r := len(c) - 1
 	m := 0
@@ -27,7 +45,7 @@ func (c Compound) insertIndex(it uint16) int {
 	return l
 }
 
-func (c Compound) find(it uint16) int {
+func (c Compound) Find(it uint16) int {
 	l := 0
 	r := len(c) - 1
 	m := 0
@@ -56,7 +74,7 @@ func (c *Compound) Add(it uint16) error {
 }
 
 func (c *Compound) Remove(it uint16) {
-	idx := c.find(it)
+	idx := c.Find(it)
 	if idx < 0 {
 		return
 	}

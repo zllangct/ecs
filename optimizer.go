@@ -22,7 +22,9 @@ func (o *OptimizerReporter) init() {
 
 type optimizer struct {
 	world                  *ecsWorld
+	startTime              time.Time
 	expireTime             time.Time
+	lastSample             time.Time
 	shapeInfos             []*ShapeInfo
 	lastCollectConsumption time.Duration
 }
@@ -75,14 +77,80 @@ func (o *optimizer) collect() {
 
 func (o *optimizer) optimize(IdleTime time.Duration) {
 	Log.Infof("start optimize, rest time: %v", IdleTime)
-	o.expireTime = time.Now().Add(IdleTime)
+	o.startTime = time.Now()
+	o.lastSample = time.Now()
+	o.expireTime = o.startTime.Add(IdleTime)
 
 	o.collect()
+	elapsed := o.elapsedStep()
+	Log.Infof("collect step 1: %v", elapsed)
+
+	o.memTidy()
 
 	rest := o.expire()
-	Log.Infof("rest time: %v", rest)
+	total := time.Now().Sub(o.startTime)
+	Log.Infof("end optimize, rest time: %v, total: %v", rest, total)
 }
 
 func (o *optimizer) expire() time.Duration {
 	return time.Until(o.expireTime)
+}
+
+func (o *optimizer) elapsed() time.Duration {
+	return time.Now().Sub(o.startTime)
+}
+
+func (o *optimizer) elapsedStep() time.Duration {
+	now := time.Now()
+	r := now.Sub(o.lastSample)
+	o.lastSample = now
+	return r
+}
+
+func (o *optimizer) memTidy() {
+	seq := uint32(0)
+	m := map[interface{}][]*EntityInfo{}
+	o.world.entities.foreach(func(entity Entity, info *EntityInfo) bool {
+		c := info.getCompound().Type()
+		_, ok := m[c]
+		if !ok {
+			m[c] = []*EntityInfo{}
+		}
+		m[c] = append(m[c], info)
+		return true
+	})
+
+	elapsed := o.elapsedStep()
+	rest := o.expire()
+	Log.Infof("memTidy step 1: %v, expire: %v", elapsed, rest)
+	if rest < time.Millisecond {
+		return
+	}
+
+	for _, infos := range m {
+		for _, info := range infos {
+			seq++
+			for _, component := range info.components {
+				component.setSeq(seq)
+			}
+		}
+	}
+
+	elapsed = o.elapsedStep()
+	rest = o.expire()
+	Log.Infof("memTidy step 2: %v, expire: %v", elapsed, rest)
+	if rest < time.Millisecond {
+		return
+	}
+
+	for _, collection := range o.world.components.getCollections() {
+		collection.Sort()
+		if o.expire() < time.Millisecond {
+			break
+		}
+	}
+
+	elapsed = o.elapsedStep()
+	rest = o.expire()
+	Log.Infof("memTidy step 3: %v, expire: %v", elapsed, rest)
 }

@@ -2,11 +2,13 @@ package ecs
 
 import (
 	"reflect"
+	"sort"
 	"unsafe"
 )
 
 const (
-	InitMaxSize = 1024 * 16
+	InitMaxSize        = 1024 * 16
+	SeqMax      uint32 = 0xFFFFFFFF
 )
 
 type ICollection interface {
@@ -16,11 +18,12 @@ type ICollection interface {
 	ChangeReset()
 	ElementType() reflect.Type
 	ElementMeta() ComponentMetaInfo
+	Sort()
 
 	getByIndex(idx int64) any
 }
 
-type Collection[T any] struct {
+type Collection[T ComponentObject] struct {
 	data    []T
 	ids     map[int64]int64
 	idx2id  map[int64]int64
@@ -31,7 +34,7 @@ type Collection[T any] struct {
 	change  int64
 }
 
-func NewCollection[T any]() *Collection[T] {
+func NewCollection[T ComponentObject]() *Collection[T] {
 	typ := TypeOf[T]()
 	eleSize := typ.Size()
 	size := InitMaxSize / eleSize
@@ -40,7 +43,7 @@ func NewCollection[T any]() *Collection[T] {
 		idx2id:  map[int64]int64{},
 		data:    make([]T, 0, size),
 		eleSize: eleSize,
-		meta:    ComponentMeta.GenComponentMetaInfo(typ),
+		meta:    ComponentMeta.GetComponentMetaInfo(typ),
 	}
 	return c
 }
@@ -131,6 +134,35 @@ func (c *Collection[T]) Get(id int64) *T {
 func (c *Collection[T]) getByIndex(idx int64) any {
 	base := uintptr(unsafe.Pointer(&c.data[0]))
 	return (*T)(unsafe.Pointer(base + uintptr(idx)*c.eleSize))
+}
+
+func (c *Collection[T]) Sort() {
+	if c.change == 0 {
+		return
+	}
+	var zeroSeq = SeqMax
+	seq2id := map[uint32]int64{}
+	var cp *Component[T]
+	for i := int64(0); i < c.len; i++ {
+		cp = (*Component[T])(unsafe.Pointer(&(c.data[i])))
+		if cp.seq == 0 {
+			zeroSeq--
+			cp.seq = zeroSeq
+		}
+		seq2id[cp.seq] = c.idx2id[i]
+	}
+	sort.Slice(c.data, func(i, j int) bool {
+		return (*Component[T])(unsafe.Pointer(&(c.data[i]))).seq < (*Component[T])(unsafe.Pointer(&(c.data[j]))).seq
+	})
+	var id int64
+	var seq uint32
+	for i := int64(0); i < c.len; i++ {
+		seq = (*Component[T])(unsafe.Pointer(&(c.data[i]))).seq
+		id = seq2id[seq]
+		c.ids[id] = i
+		c.idx2id[i] = id
+	}
+	c.change = 0
 }
 
 func (c *Collection[T]) Len() int {

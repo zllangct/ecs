@@ -36,10 +36,12 @@ type IComponent interface {
 	setOwner(owner *EntityInfo)
 	setState(state ComponentState)
 	setIntType(typ uint16)
+	setSeq(seq uint32)
 	getState() ComponentState
-	getIntType() int32
+	getIntType() uint16
 	getComponentType() ComponentType
 	getPermission() ComponentPermission
+	getSeq() uint32
 
 	newCollection() ICollection
 	addToCollection(collection interface{}) IComponent
@@ -120,6 +122,7 @@ func (f FreeDisposableComponent[T]) freeComponentIdentification() {}
 func (f FreeDisposableComponent[T]) disposableComponentIdentification() {}
 
 type Component[T ComponentObject] struct {
+	id    int64
 	st    uint8
 	o1    uint8
 	it    uint16
@@ -198,8 +201,16 @@ func (c *Component[T]) setIntType(typ uint16) {
 	c.it = typ
 }
 
-func (c *Component[T]) getIntType() int32 {
-	return int32(c.it)
+func (c *Component[T]) getIntType() uint16 {
+	return c.it
+}
+
+func (c *Component[T]) setSeq(seq uint32) {
+	c.seq = seq
+}
+
+func (c *Component[T]) getSeq() uint32 {
+	return c.seq
 }
 
 func (c *Component[T]) invalidate() {

@@ -3,6 +3,7 @@ package ecs
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"unsafe"
 )
 
@@ -139,4 +140,9 @@ func GetRelatedComponent[T ComponentObject](sys ISystem, entity *EntityInfo) *T 
 		ret = (*T)((*iface)(unsafe.Pointer(&c)).data)
 	}
 	return ret
+}
+
+func GetIntType(typ reflect.Type) uint16 {
+	info := ComponentMeta.GetComponentMetaInfo(typ)
+	return info.it
 }

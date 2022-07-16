@@ -20,7 +20,7 @@ type componentMeta struct {
 	types map[reflect.Type]uint16
 }
 
-func (c *componentMeta) GenComponentMetaInfo(typ reflect.Type) ComponentMetaInfo {
+func (c *componentMeta) GetComponentMetaInfo(typ reflect.Type) ComponentMetaInfo {
 	it := uint16(0)
 	c.mu.RLock()
 	if v, ok := c.types[typ]; ok {
@@ -33,7 +33,6 @@ func (c *componentMeta) GenComponentMetaInfo(typ reflect.Type) ComponentMetaInfo
 		if v, ok = c.types[typ]; ok {
 			it = v
 		} else {
-			c.seq++
 			it = c.seq
 		}
 		c.mu.Unlock()

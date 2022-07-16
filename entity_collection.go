@@ -1,8 +1,11 @@
 package ecs
 
+import "sync/atomic"
+
 type EntityCollection struct {
 	buckets []*Map[Entity, *EntityInfo]
 	bucket  int64
+	change  int64
 }
 
 func NewEntityCollection(k int) *EntityCollection {
@@ -36,14 +39,24 @@ func (p *EntityCollection) add(info *EntityInfo) {
 	hash := info.hashKey() & p.bucket
 
 	p.buckets[hash].Store(info.entity, info)
+	atomic.AddInt64(&p.change, 1)
 }
 
 func (p *EntityCollection) delete(entity Entity) {
 	hash := int64(entity) & p.bucket
 
 	p.buckets[hash].Delete(entity)
+	atomic.AddInt64(&p.change, -1)
 }
 
 func (p *EntityCollection) getBuckets() []*Map[Entity, *EntityInfo] {
 	return p.buckets
+}
+
+func (p *EntityCollection) foreach(fn func(entity Entity, info *EntityInfo) bool) {
+	for _, bucket := range p.buckets {
+		if !bucket.Range(fn) {
+			break
+		}
+	}
 }
