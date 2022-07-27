@@ -6,7 +6,7 @@ import (
 
 func getCompoundType(compound Compound) interface{} {
 	length := len(compound)
-	if length == 0 {
+	if length == 0 || length > 255 {
 		return nil
 	}
 	switch length {

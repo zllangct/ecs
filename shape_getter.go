@@ -31,6 +31,7 @@ func (s *getterBase) init(typ reflect.Type, getter IShapeGetter) {
 
 var shapeCaches = sync.Map{}
 
+// TODO 同一一个Shape永远不会有竞争，因为相关组件都会在统一线程执行，shape可以在主流程中预先建立key，系统执行阶段为只读
 func ShapeCacheDispose() {
 	shapeCaches = sync.Map{}
 }

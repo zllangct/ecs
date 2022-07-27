@@ -28,7 +28,7 @@ func (m *MoveSystem) Update(event ecs.Event) {
 	_ = delta
 	//获取系统所需的单个组件
 	//方式 1:
-	//iterPos := m.GetInterested(ecs.GetType[Position]()).(*ecs.Collection[Position])
+	//iterPos := m.GetInterested(ecs.GetType[Position]()).(*ecs.UnorderedCollectionWithID[Position])
 	//方式 2:
 	//iterPos := ecs.GetInterestedComponents[Position](m)
 

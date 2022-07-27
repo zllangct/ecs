@@ -25,7 +25,7 @@ import (
 
 func getCompoundType(compound Compound) interface{} {
 	length := len(compound)
-	if length == 0 {
+	if length == 0 || length > 255 {
 		return nil
 	}
 	switch length {`
@@ -195,5 +195,51 @@ func TestCompound_Type(t *testing.T) {
 				t.Errorf("Type() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func BenchmarkCompound_Add(b *testing.B) {
+	c := Compound{}
+	for i := 0; i < b.N; i++ {
+		c.Add(uint16(i % 65535))
+	}
+}
+
+const (
+	CompoundSize = 20
+)
+
+func BenchmarkCompound_Find(b *testing.B) {
+	c := Compound{}
+	for i := 0; i < CompoundSize; i++ {
+		c.Add(uint16(i % CompoundSize))
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		c.Find(uint16(i % CompoundSize))
+	}
+}
+
+func BenchmarkCompound_MapFind(b *testing.B) {
+	m := map[uint16]struct{}{}
+	for i := 0; i < CompoundSize; i++ {
+		m[(uint16(i % CompoundSize))] = struct{}{}
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, ok := m[(uint16(i % CompoundSize))]
+		_ = ok
+	}
+}
+
+func BenchmarkCompound_BigMapFind(b *testing.B) {
+	m := map[int]struct{}{}
+	for i := 0; i < 50000; i++ {
+		m[i] = struct{}{}
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, ok := m[i%50000]
+		_ = ok
 	}
 }

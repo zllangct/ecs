@@ -75,7 +75,7 @@ func (o *optimizer) collect() {
 	o.lastCollectConsumption = time.Since(start)
 }
 
-func (o *optimizer) optimize(IdleTime time.Duration) {
+func (o *optimizer) optimize(IdleTime time.Duration, force bool) {
 	Log.Infof("start optimize, rest time: %v", IdleTime)
 	o.startTime = time.Now()
 	o.lastSample = time.Now()
@@ -85,7 +85,7 @@ func (o *optimizer) optimize(IdleTime time.Duration) {
 	elapsed := o.elapsedStep()
 	Log.Infof("collect step 1: %v", elapsed)
 
-	o.memTidy()
+	o.memTidy(force)
 
 	rest := o.expire()
 	total := time.Now().Sub(o.startTime)
@@ -107,50 +107,56 @@ func (o *optimizer) elapsedStep() time.Duration {
 	return r
 }
 
-func (o *optimizer) memTidy() {
-	seq := uint32(0)
-	m := map[interface{}][]*EntityInfo{}
-	o.world.entities.foreach(func(entity Entity, info *EntityInfo) bool {
-		c := info.getCompound().Type()
-		_, ok := m[c]
-		if !ok {
-			m[c] = []*EntityInfo{}
-		}
-		m[c] = append(m[c], info)
-		return true
-	})
-
-	elapsed := o.elapsedStep()
-	rest := o.expire()
-	Log.Infof("memTidy step 1: %v, expire: %v", elapsed, rest)
-	if rest < time.Millisecond {
-		return
-	}
-
-	for _, infos := range m {
-		for _, info := range infos {
-			seq++
-			for _, component := range info.components {
-				component.setSeq(seq)
-			}
-		}
-	}
-
-	elapsed = o.elapsedStep()
-	rest = o.expire()
-	Log.Infof("memTidy step 2: %v, expire: %v", elapsed, rest)
-	if rest < time.Millisecond {
-		return
-	}
-
-	for _, collection := range o.world.components.getCollections() {
-		collection.Sort()
-		if o.expire() < time.Millisecond {
-			break
-		}
-	}
-
-	elapsed = o.elapsedStep()
-	rest = o.expire()
-	Log.Infof("memTidy step 3: %v, expire: %v", elapsed, rest)
+func (o *optimizer) memTidy(force bool) {
+	//seq := uint32(0)
+	//m := map[interface{}][]*EntityInfo{}
+	//o.world.entities.foreach(func(entity Entity, info *EntityInfo) bool {
+	//	c := info.getCompound().Type()
+	//	_, ok := m[c]
+	//	if !ok {
+	//		m[c] = []*EntityInfo{}
+	//	}
+	//	m[c] = append(m[c], info)
+	//	return true
+	//})
+	//
+	//elapsed := o.elapsedStep()
+	//rest := o.expire()
+	//Log.Infof("memTidy step 1: %v, expire: %v", elapsed, rest)
+	//if !force && rest < time.Millisecond {
+	//	return
+	//}
+	//
+	//for _, infos := range m {
+	//	for _, info := range infos {
+	//		seq++
+	//		for _, component := range info.components {
+	//			component.setSeq(seq)
+	//			c := o.world.components.getCollection(component.Type()).GetByID(int64(component.Owner().Entity()))
+	//			verify := c.(IComponent)
+	//			println(component.debugAddress(), verify.debugAddress())
+	//			if verify.getSeq() != component.getSeq() {
+	//				Log.Errorf("component seq error, %v, %v", verify.getSeq(), component.getSeq())
+	//			}
+	//		}
+	//	}
+	//}
+	//
+	//elapsed = o.elapsedStep()
+	//rest = o.expire()
+	//Log.Infof("memTidy step 2: %v, expire: %v", elapsed, rest)
+	//if !force && rest < time.Millisecond {
+	//	return
+	//}
+	//
+	//for _, collection := range o.world.components.getCollections() {
+	//	collection.Sort()
+	//	if !force && o.expire() < time.Millisecond {
+	//		break
+	//	}
+	//}
+	//
+	//elapsed = o.elapsedStep()
+	//rest = o.expire()
+	//Log.Infof("memTidy step 3: %v, expire: %v", elapsed, rest)
 }

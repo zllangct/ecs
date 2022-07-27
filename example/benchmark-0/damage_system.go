@@ -57,7 +57,7 @@ func (d *DamageSystem) Update(event ecs.Event) {
 		_, _ = casterPos, casterForce
 		count++
 		for target := targetIter.Begin(); !targetIter.End(); target = targetIter.Next() {
-			if caster.C1.Owner().Entity() == target.C1.Owner().Entity() {
+			if caster.C1.Owner() == target.C1.Owner() {
 				continue
 			}
 			targetHp := target.C1

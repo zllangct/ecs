@@ -5,14 +5,14 @@ import (
 )
 
 type opTask struct {
-	target *EntityInfo
+	target Entity
 	com    IComponent
 	op     CollectionOperate
 	next   *opTask
 }
 
 func (o *opTask) Reset() {
-	o.target = nil
+	o.target = 0
 	o.com = nil
 	o.op = CollectionOperateNone
 	o.next = nil

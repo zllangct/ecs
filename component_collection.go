@@ -15,24 +15,26 @@ const (
 )
 
 type IComponentCollection interface {
-	operate(op CollectionOperate, entity *EntityInfo, component IComponent)
+	operate(op CollectionOperate, entity Entity, component IComponent)
 	getTempTasks() []func()
 	clearDisposable()
-	getCollection(typ reflect.Type) ICollection
-	getCollections() map[reflect.Type]ICollection
+	getCollection(typ reflect.Type) IComponentSet
+	getCollections() map[reflect.Type]IComponentSet
 }
 
 type ComponentCollection struct {
-	collections map[reflect.Type]ICollection
+	collections map[reflect.Type]IComponentSet
+	world       *ecsWorld
 	bucket      int64
 	locks       []sync.RWMutex
 	opLog       []map[reflect.Type]*opTaskList
 	once        []map[reflect.Type]struct{}
 }
 
-func NewComponentCollection(k int) *ComponentCollection {
+func NewComponentCollection(world *ecsWorld, k int) *ComponentCollection {
 	cc := &ComponentCollection{
-		collections: map[reflect.Type]ICollection{},
+		world:       world,
+		collections: map[reflect.Type]IComponentSet{},
 	}
 
 	for i := 1; ; i++ {
@@ -70,17 +72,13 @@ func (c *ComponentCollection) initOnce() {
 	}
 }
 
-func (c *ComponentCollection) operate(op CollectionOperate, entity *EntityInfo, component IComponent) {
+func (c *ComponentCollection) operate(op CollectionOperate, entity Entity, component IComponent) {
 	var hash int64
 	switch component.getComponentType() {
 	case ComponentTypeFree, ComponentTypeFreeDisposable:
 		hash = int64((uintptr)(unsafe.Pointer(&hash))) & c.bucket
 	case ComponentTypeNormal, ComponentTypeDisposable:
-		if entity == nil {
-			Log.Errorf("invalid operate, entity is nil")
-			return
-		}
-		hash = entity.hashKey() & c.bucket
+		hash = int64(entity) & c.bucket
 	}
 
 	typ := component.Type()
@@ -124,12 +122,8 @@ func (c *ComponentCollection) disposableTemp(com IComponent, typ reflect.Type) {
 	case ComponentTypeFree, ComponentTypeFreeDisposable:
 		hash = int64((uintptr)(unsafe.Pointer(&hash))) & c.bucket
 	case ComponentTypeNormal, ComponentTypeDisposable:
-		info := com.Owner()
-		if info == nil {
-			Log.Errorf("invalid operate, entity is nil")
-			return
-		}
-		hash = info.hashKey() & c.bucket
+		e := com.Owner()
+		hash = int64(e) & c.bucket
 	}
 	c.locks[hash].Lock()
 	defer c.locks[hash].Unlock()
@@ -176,9 +170,10 @@ func (c *ComponentCollection) getTempTasks() []func() {
 	return tasks
 }
 
-func (c *ComponentCollection) opExecute(taskList *opTaskList, collection ICollection) {
+func (c *ComponentCollection) opExecute(taskList *opTaskList, collection IComponentSet) {
 	var t reflect.Type
-	meta := collection.ElementMeta()
+	meta := collection.GetElementMeta()
+	world := c.world
 	for task := taskList.head; task != nil; task = task.next {
 		task.com.setIntType(meta.it)
 		t = task.com.Type()
@@ -187,10 +182,12 @@ func (c *ComponentCollection) opExecute(taskList *opTaskList, collection ICollec
 			ret := task.com.addToCollection(collection)
 			switch task.com.getComponentType() {
 			case ComponentTypeNormal:
-				task.target.componentAdded(t, ret)
+				//task.target.componentAdded(t, ret)
+				world.siblingCache.ch <- cacheOpPool.Get().(*CacheOp).Set(task.target, meta.it, uint8(1))
 			case ComponentTypeDisposable:
 				c.disposableTemp(task.com, t)
-				task.target.componentAdded(t, ret)
+				//task.target.componentAdded(t, ret)
+				world.siblingCache.ch <- cacheOpPool.Get().(*CacheOp).Set(task.target, meta.it, uint8(1))
 			case ComponentTypeFreeDisposable:
 				c.disposableTemp(task.com, t)
 			}
@@ -199,7 +196,8 @@ func (c *ComponentCollection) opExecute(taskList *opTaskList, collection ICollec
 			task.com.deleteFromCollection(collection)
 			switch task.com.getComponentType() {
 			case ComponentTypeNormal, ComponentTypeDisposable:
-				task.target.componentDeleted(t, task.com.getComponentType())
+				//task.target.componentDeleted(t, task.com.getComponentType())
+				world.siblingCache.ch <- cacheOpPool.Get().(*CacheOp).Set(task.target, meta.it, uint8(2))
 			}
 		}
 	}
@@ -212,11 +210,11 @@ func (c *ComponentCollection) opExecute(taskList *opTaskList, collection ICollec
 	taskList.Reset()
 }
 
-func (c *ComponentCollection) getCollection(typ reflect.Type) ICollection {
+func (c *ComponentCollection) getCollection(typ reflect.Type) IComponentSet {
 	return c.collections[typ]
 }
 
-func (c *ComponentCollection) getCollections() map[reflect.Type]ICollection {
+func (c *ComponentCollection) getCollections() map[reflect.Type]IComponentSet {
 	return c.collections
 }
 

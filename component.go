@@ -30,10 +30,10 @@ const (
 )
 
 type IComponent interface {
-	Owner() *EntityInfo
+	Owner() Entity
 	Type() reflect.Type
 
-	setOwner(owner *EntityInfo)
+	setOwner(owner Entity)
 	setState(state ComponentState)
 	setIntType(typ uint16)
 	setSeq(seq uint32)
@@ -43,14 +43,15 @@ type IComponent interface {
 	getPermission() ComponentPermission
 	getSeq() uint32
 
-	newCollection() ICollection
+	newCollection() IComponentSet
 	addToCollection(collection interface{}) IComponent
 	deleteFromCollection(collection interface{})
+
+	debugAddress() unsafe.Pointer
 }
 
 type ComponentObject interface {
 	componentIdentification()
-	getEntity() Entity
 }
 
 type FreeComponentObject interface {
@@ -122,19 +123,14 @@ func (f FreeDisposableComponent[T]) freeComponentIdentification() {}
 func (f FreeDisposableComponent[T]) disposableComponentIdentification() {}
 
 type Component[T ComponentObject] struct {
-	id    int64
 	st    uint8
 	o1    uint8
 	it    uint16
 	seq   uint32
-	owner *EntityInfo
+	owner Entity
 }
 
 func (c Component[T]) componentIdentification() {}
-
-func (c Component[T]) getEntity() Entity {
-	return c.owner.Entity()
-}
 
 func (c *Component[T]) init() {
 	c.setType(c.getComponentType())
@@ -146,12 +142,12 @@ func (c *Component[T]) getComponentType() ComponentType {
 }
 
 func (c *Component[T]) addToCollection(collection interface{}) IComponent {
-	cc, ok := collection.(*Collection[T])
+	cc, ok := collection.(*ComponentSet[T])
 	if !ok {
 		Log.Info("add to collection, collecion is nil")
 		return nil
 	}
-	ins, _ := cc.Add(c.rawInstance(), int64(c.owner.entity))
+	ins, _ := cc.Add(c.rawInstance(), int64(c.owner))
 	*c.rawInstance() = *ins
 	i := interface{}(ins).(IComponent)
 	i.setState(ComponentStateActive)
@@ -159,21 +155,21 @@ func (c *Component[T]) addToCollection(collection interface{}) IComponent {
 }
 
 func (c *Component[T]) deleteFromCollection(collection interface{}) {
-	cc, ok := collection.(*Collection[T])
+	cc, ok := collection.(*ComponentSet[T])
 	if !ok {
 		Log.Info("add to collection, collecion is nil")
 		return
 	}
 	c.setState(ComponentStateDisable)
-	cc.Remove(int64(c.owner.Entity()))
+	cc.Remove(int64(c.owner))
 	return
 }
 
-func (c *Component[T]) newCollection() ICollection {
-	return NewCollection[T]()
+func (c *Component[T]) newCollection() IComponentSet {
+	return NewComponentSet[T]()
 }
 
-func (c *Component[T]) setOwner(entity *EntityInfo) {
+func (c *Component[T]) setOwner(entity Entity) {
 	c.owner = entity
 }
 
@@ -202,6 +198,9 @@ func (c *Component[T]) setIntType(typ uint16) {
 }
 
 func (c *Component[T]) getIntType() uint16 {
+	if c.it == 0 {
+		c.it = ComponentMeta.GetComponentMetaInfo(c.Type()).it
+	}
 	return c.it
 }
 
@@ -221,14 +220,7 @@ func (c *Component[T]) active() {
 	c.setState(ComponentStateActive)
 }
 
-func (c *Component[T]) remove() {
-	if c.owner == nil {
-		return
-	}
-	c.owner.Remove(c)
-}
-
-func (c *Component[T]) Owner() *EntityInfo {
+func (c *Component[T]) Owner() Entity {
 	return c.owner
 }
 
@@ -238,6 +230,10 @@ func (c *Component[T]) Type() reflect.Type {
 
 func (c *Component[T]) getPermission() ComponentPermission {
 	return ComponentReadWrite
+}
+
+func (c *Component[T]) debugAddress() unsafe.Pointer {
+	return unsafe.Pointer(c)
 }
 
 func (c *Component[T]) ToString() string {

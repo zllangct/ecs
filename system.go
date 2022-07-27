@@ -46,10 +46,10 @@ type ISystem interface {
 	setState(state SystemState)
 	setExecuting(isExecuting bool)
 	isExecuting() bool
-	checkoutComponent(entity *EntityInfo, com IComponent) IComponent
 	baseInit(world *ecsWorld, ins ISystem)
 	eventDispatch()
 	getOptimizer() *OptimizerReporter
+	getGetterCache() map[reflect.Type]interface{}
 }
 
 type SystemObject interface {
@@ -65,6 +65,7 @@ type System[T SystemObject] struct {
 	lock              sync.Mutex
 	requirements      map[reflect.Type]IRequirement
 	events            map[CustomEventName]CustomEventHandler
+	getterCache       map[reflect.Type]interface{}
 	eventQueue        *list.List
 	order             Order
 	optimizerReporter *OptimizerReporter
@@ -146,8 +147,11 @@ func (s *System[T]) setRequirements(rqs ...IRequirement) {
 	if s.requirements == nil {
 		s.requirements = map[reflect.Type]IRequirement{}
 	}
+	var typ reflect.Type
 	for _, value := range rqs {
-		s.requirements[value.Type()] = value
+		typ = value.Type()
+		s.requirements[typ] = value
+		ComponentMeta.GetComponentMetaInfo(typ)
 	}
 }
 
@@ -223,6 +227,7 @@ func (s *System[T]) baseInit(world *ecsWorld, ins ISystem) {
 	s.requirements = map[reflect.Type]IRequirement{}
 	s.events = make(map[CustomEventName]CustomEventHandler)
 	s.eventQueue = list.New()
+	s.getterCache = map[reflect.Type]interface{}{}
 
 	if ins.Order() == OrderInvalid {
 		s.setOrder(OrderDefault)
@@ -283,20 +288,7 @@ func (s *System[T]) World() IWorld {
 	return s.world
 }
 
-func (s *System[T]) CheckoutComponent(info *EntityInfo, com IComponent) IComponent {
-	return s.checkoutComponent(info, com)
-}
-
-func (s *System[T]) checkoutComponent(entity *EntityInfo, com IComponent) IComponent {
-	_, isRequire := s.IsRequire(com)
-	if !isRequire {
-		return nil
-	}
-
-	return entity.getComponent(com)
-}
-
-func (s *System[T]) GetEntityInfo(entity Entity) *EntityInfo {
+func (s *System[T]) GetEntityInfo(entity Entity) EntityInfo {
 	return s.world.GetEntityInfo(entity)
 }
 
@@ -307,4 +299,8 @@ func (s *System[T]) getOptimizer() *OptimizerReporter {
 		s.optimizerReporter.init()
 	}
 	return s.optimizerReporter
+}
+
+func (s *System[T]) getGetterCache() map[reflect.Type]interface{} {
+	return s.getterCache
 }
