@@ -21,7 +21,7 @@ func NewDefaultRuntimeConfig() *RuntimeConfig {
 		IsMetricsPrint:  false,
 		CpuNum:          runtime.NumCPU(),
 		Logger:          NewStdLog(),
-		MaxPoolThread:   uint32(runtime.NumCPU() * 4),
-		MaxPoolJobQueue: 20,
+		MaxPoolThread:   uint32(runtime.NumCPU() * 2),
+		MaxPoolJobQueue: 10,
 	}
 }

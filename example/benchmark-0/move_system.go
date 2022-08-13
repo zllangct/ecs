@@ -10,7 +10,7 @@ type MoveSystemData struct {
 }
 
 type MoveSystem struct {
-	ecs.System[MoveSystem, *MoveSystem]
+	ecs.System[MoveSystem]
 	getter *ecs.ShapeGetter[ecs.Shape2[Movement, Position], *ecs.Shape2[Movement, Position]]
 }
 
@@ -28,7 +28,7 @@ func (m *MoveSystem) Update(event ecs.Event) {
 	_ = delta
 	//获取系统所需的单个组件
 	//方式 1:
-	//iterPos := m.GetInterested(ecs.GetType[Position]()).(*ecs.Collection[Position])
+	//iterPos := m.GetInterested(ecs.GetType[Position]()).(*ecs.UnorderedCollectionWithID[Position])
 	//方式 2:
 	//iterPos := ecs.GetInterestedComponents[Position](m)
 

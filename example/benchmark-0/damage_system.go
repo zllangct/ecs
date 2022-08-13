@@ -6,7 +6,7 @@ import (
 )
 
 type DamageSystem struct {
-	ecs.System[DamageSystem, *DamageSystem]
+	ecs.System[DamageSystem]
 	casterGetter *ecs.ShapeGetter[ecs.Shape3[Action, Position, Force],
 		*ecs.Shape3[Action, Position, Force]]
 	targetGetter *ecs.ShapeGetter[ecs.Shape2[HealthPoint, Position],
@@ -57,7 +57,7 @@ func (d *DamageSystem) Update(event ecs.Event) {
 		_, _ = casterPos, casterForce
 		count++
 		for target := targetIter.Begin(); !targetIter.End(); target = targetIter.Next() {
-			if caster.C1.Owner().Entity() == target.C1.Owner().Entity() {
+			if caster.C1.Owner() == target.C1.Owner() {
 				continue
 			}
 			targetHp := target.C1

@@ -3,7 +3,7 @@ package main
 import "github.com/zllangct/ecs"
 
 type Test1System struct {
-	ecs.System[Test1System, *Test1System]
+	ecs.System[Test1System]
 }
 
 func (t *Test1System) Init() {
@@ -20,7 +20,7 @@ func (t *Test1System) Update(event ecs.Event) {
 }
 
 type Test2System struct {
-	ecs.System[Test2System, *Test2System]
+	ecs.System[Test2System]
 }
 
 func (t *Test2System) Init() {
@@ -37,7 +37,7 @@ func (t *Test2System) Update(event ecs.Event) {
 }
 
 type Test3System struct {
-	ecs.System[Test3System, *Test3System]
+	ecs.System[Test3System]
 }
 
 func (t *Test3System) Init() {
@@ -54,7 +54,7 @@ func (t *Test3System) Update(event ecs.Event) {
 }
 
 type Test4System struct {
-	ecs.System[Test4System, *Test4System]
+	ecs.System[Test4System]
 }
 
 func (t *Test4System) Init() {
@@ -71,7 +71,7 @@ func (t *Test4System) Update(event ecs.Event) {
 }
 
 type Test5System struct {
-	ecs.System[Test5System, *Test5System]
+	ecs.System[Test5System]
 }
 
 func (t *Test5System) Init() {

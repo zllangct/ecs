@@ -27,14 +27,15 @@ type IWorld interface {
 	Run()
 	GetStatus() WorldStatus
 	GetID() int64
-	NewEntity() *EntityInfo
-	GetEntityInfo(id Entity) *EntityInfo
+	NewEntity() EntityInfo
+	GetEntityInfo(id Entity) EntityInfo
 	AddFreeComponent(component IComponent)
 	Register(system ISystem)
 	GetSystem(sys reflect.Type) (ISystem, bool)
-	Optimize(t time.Duration)
+	Optimize(t time.Duration, force bool)
 
-	getComponents(typ reflect.Type) ICollection
+	addComponent(entity Entity, component IComponent)
+	getComponents(typ reflect.Type) IComponentSet
 	registerForT(system interface{}, order ...Order)
 }
 
@@ -56,6 +57,8 @@ type ecsWorld struct {
 	components IComponentCollection
 	//all entities
 	entities *EntityCollection
+	//sibling cache
+	siblingCache *siblingCache
 	//optimizer
 	optimizer *optimizer
 
@@ -69,12 +72,13 @@ func newWorld(runtime *ecsRuntime, config *WorldConfig) *ecsWorld {
 		id:         LocalUniqueID(),
 		systemFlow: nil,
 		config:     config,
-		components: NewComponentCollection(config.HashCount),
-		entities:   NewEntityCollection(config.HashCount),
+		entities:   NewEntityCollection(),
 		status:     StatusInit,
 		wStop:      make(chan struct{}),
 	}
+	world.components = NewComponentCollection(world, config.HashCount)
 	world.optimizer = newOptimizer(world)
+	world.siblingCache = newSiblingCache(world, 1024)
 
 	if world.config.DefaultFrameInterval <= 0 {
 		world.config.DefaultFrameInterval = time.Millisecond * 33
@@ -109,8 +113,8 @@ func (w *ecsWorld) update(event Event) {
 	w.systemFlow.run(event)
 }
 
-func (w *ecsWorld) Optimize(t time.Duration) {
-	w.optimizer.optimize(t)
+func (w *ecsWorld) Optimize(t time.Duration, force bool) {
+	w.optimizer.optimize(t, force)
 }
 
 func (w *ecsWorld) run() {
@@ -198,33 +202,34 @@ func (w *ecsWorld) GetSystem(sys reflect.Type) (ISystem, bool) {
 }
 
 // AddEntity entity operate : add
-func (w *ecsWorld) addEntity(entity *EntityInfo) {
-	w.entities.add(entity)
+func (w *ecsWorld) addEntity(entity Entity) {
+	w.entities.Add(entity)
 }
 
-func (w *ecsWorld) GetEntityInfo(id Entity) *EntityInfo {
-	return w.entities.getInfo(id)
+func (w *ecsWorld) GetEntityInfo(entity Entity) EntityInfo {
+	return EntityInfo{world: w, entity: entity}
 }
 
 // deleteEntity entity operate : delete
-func (w *ecsWorld) deleteEntity(info *EntityInfo) {
-	w.entities.delete(info.entity)
+func (w *ecsWorld) deleteEntity(entity Entity) {
+	w.entities.Remove(int64(entity))
 }
 
-func (w *ecsWorld) getComponents(typ reflect.Type) ICollection {
+func (w *ecsWorld) getComponents(typ reflect.Type) IComponentSet {
 	return w.components.getCollection(typ)
 }
 
-func (w *ecsWorld) NewEntity() *EntityInfo {
-	return newEntityInfo(w)
+func (w *ecsWorld) NewEntity() EntityInfo {
+	info := EntityInfo{world: w, entity: newEntity()}
+	return info
 }
 
-func (w *ecsWorld) addComponent(info *EntityInfo, component IComponent) {
-	w.components.operate(CollectionOperateAdd, info, component)
+func (w *ecsWorld) addComponent(entity Entity, component IComponent) {
+	w.components.operate(CollectionOperateAdd, entity, component)
 }
 
-func (w *ecsWorld) deleteComponent(info *EntityInfo, component IComponent) {
-	w.components.operate(CollectionOperateDelete, info, component)
+func (w *ecsWorld) deleteComponent(entity Entity, component IComponent) {
+	w.components.operate(CollectionOperateDelete, entity, component)
 }
 
 func (w *ecsWorld) AddFreeComponent(component IComponent) {
@@ -234,5 +239,5 @@ func (w *ecsWorld) AddFreeComponent(component IComponent) {
 		Log.Errorf("component not free type, %s", component.Type().String())
 		return
 	}
-	w.addComponent(nil, component)
+	w.addComponent(0, component)
 }

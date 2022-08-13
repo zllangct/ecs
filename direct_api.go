@@ -1,9 +1,7 @@
 package ecs
 
 import (
-	"errors"
-	"fmt"
-	"unsafe"
+	"reflect"
 )
 
 // runtime api
@@ -54,7 +52,7 @@ func GetSystem[T SystemObject](w IWorld) (ISystem, bool) {
 	return w.GetSystem(TypeOf[T]())
 }
 
-func GetEntityInfo(world IWorld, entity Entity) *EntityInfo {
+func GetEntityInfo(world IWorld, entity Entity) EntityInfo {
 	return world.GetEntityInfo(entity)
 }
 
@@ -64,18 +62,17 @@ func AddFreeComponent[T FreeComponentObject, TP FreeComponentPointer[T]](world I
 
 // entity api
 
-func NewEntity(world IWorld) *EntityInfo {
-	return newEntityInfo(world.(*ecsWorld))
+func NewEntity(world IWorld) EntityInfo {
+	return world.(*ecsWorld).NewEntity()
 }
 
-func EntityDestroyByInfo(info *EntityInfo) {
-	info.Destroy()
+func Destroy(world IWorld, entity Entity) {
+	world.(*ecsWorld).deleteEntity(entity)
 }
 
-func EntityDestroy(world IWorld, entity Entity) {
-	info := world.GetEntityInfo(entity)
-	if info != nil {
-		info.Destroy()
+func AddComponent(world IWorld, entity Entity, components ...IComponent) {
+	for _, com := range components {
+		world.addComponent(entity, com)
 	}
 }
 
@@ -91,52 +88,43 @@ func NewPeripheralSystem[T PeripheralSystemObject, TP PeripheralSystemPointer[T]
 	return &ins
 }
 
-func GetInterestedComponents[T ComponentObject, TP ComponentPointer[T]](sys ISystem, outError ...*error) Iterator[T, TP] {
-	setError := func(format string, args ...interface{}) Iterator[T, TP] {
-		if len(outError) > 0 {
-			*(outError[0]) = errors.New(fmt.Sprintf(format, args...))
-		}
-		return EmptyIter[T, TP]()
-	}
+func GetInterestedComponents[T ComponentObject](sys ISystem) Iterator[T] {
 	if sys.getState() == SystemStateInvalid {
-		return setError("must init system first")
+		return EmptyIter[T]()
 	}
 	if !sys.isExecuting() {
-		return setError("must called in system")
+		return EmptyIter[T]()
 	}
 	typ := GetType[T]()
-	readOnly := false
-	if r, ok := sys.Requirements()[typ]; !ok {
-		return setError("not require, typ:", typ)
-	} else {
-		readOnly = r.getPermission() == ComponentReadOnly
+	r, ok := sys.Requirements()[typ]
+	if !ok {
+		return EmptyIter[T]()
 	}
-	if sys.World() == nil {
-		return setError("world is nil")
-	}
+
 	c := sys.World().getComponents(typ)
 	if c == nil {
-		return EmptyIter[T, TP]()
+		return EmptyIter[T]()
 	}
-	return NewIterator[T, TP](c.(*Collection[T]), readOnly)
+	return NewComponentSetIterator[T](c.(*ComponentSet[T]), r.getPermission() == ComponentReadOnly)
 }
 
-func GetRelatedComponent[T ComponentObject](sys ISystem, entity *EntityInfo) *T {
-	if entity == nil {
-		return nil
-	}
+func GetRelatedComponent[T ComponentObject](sys ISystem, entity Entity) *T {
 	typ := TypeOf[T]()
-	r, isRequire := sys.isRequire(typ)
+	_, isRequire := sys.isRequire(typ)
 	if !isRequire {
 		return nil
 	}
-	c := entity.getComponentByType(typ)
-	var ret *T
-	if r.getPermission() == ComponentReadOnly {
-		temp := *(*T)((*iface)(unsafe.Pointer(&c)).data)
-		ret = &temp
+	var cache *ComponentGetter[T]
+	cacheMap := sys.getGetterCache()
+	if v, ok := cacheMap[typ]; ok {
+		cache = v.(*ComponentGetter[T])
 	} else {
-		ret = (*T)((*iface)(unsafe.Pointer(&c)).data)
+		cacheMap[typ] = NewComponentGetter[T](sys)
 	}
-	return ret
+	return cache.Get(entity)
+}
+
+func GetIntType(typ reflect.Type) uint16 {
+	info := ComponentMeta.GetComponentMetaInfo(typ)
+	return info.it
 }

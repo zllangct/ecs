@@ -20,8 +20,8 @@ func (g *GameECS) init(config *ecs.WorldConfig) {
 
 	g.world = ecs.CreateWorld(config)
 
-	ecs.RegisterSystem[MoveSystem](g.world)
-	ecs.RegisterSystem[DamageSystem](g.world)
+	//ecs.RegisterSystem[MoveSystem](g.world)
+	//ecs.RegisterSystem[DamageSystem](g.world)
 	ecs.RegisterSystem[Test1System](g.world)
 	ecs.RegisterSystem[Test2System](g.world)
 	ecs.RegisterSystem[Test3System](g.world)
@@ -71,6 +71,7 @@ func DataGenerateECS(game *GameECS) {
 
 		e := game.world.NewEntity()
 		e.Add(p, m, h, f, t1, t2, t3, t4, t5)
+
 		game.entities = append(game.entities, e.Entity())
 	}
 }

@@ -28,7 +28,7 @@ const (
 // SystemGroupList extension of system group slice
 type SystemGroupList []*SystemGroup
 
-//system execute flow
+// system execute flow
 type systemFlow struct {
 	lock      sync.Mutex
 	world     *ecsWorld
@@ -47,7 +47,7 @@ func newSystemFlow(runtime *ecsWorld) *systemFlow {
 	return sf
 }
 
-//initialize the system flow
+// initialize the system flow
 func (p *systemFlow) init() {
 	p.stageList = []Stage{
 		StageStart,
@@ -71,21 +71,7 @@ func (p *systemFlow) reset() {
 	}
 }
 
-func (p *systemFlow) run(event Event) {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-
-	reporter := Runtime.metrics.NewReporter("system_flow_run")
-	reporter.Start()
-
-	removeList := map[int64]ISystem{}
-
-	//Log.Info("system flow # Clear Disposable #")
-	p.world.components.clearDisposable()
-
-	reporter.Sample("Clear Disposable")
-
-	//Log.Info("system flow # Temp Task Execute #")
+func (p *systemFlow) flushTempTask() {
 	tasks := p.world.components.getTempTasks()
 	p.wg.Add(len(tasks))
 	for _, task := range tasks {
@@ -97,12 +83,10 @@ func (p *systemFlow) run(event Event) {
 		})
 	}
 	p.wg.Wait()
+}
 
-	reporter.Sample("Temp Task Execute")
-
+func (p *systemFlow) eventDispatch() {
 	var sq SystemGroupList
-
-	//Log.Info("system flow # Event Dispatch #")
 	for _, period := range p.stageList {
 		sq = p.stages[period]
 		for _, sl := range sq {
@@ -123,10 +107,11 @@ func (p *systemFlow) run(event Event) {
 			}
 		}
 	}
+}
 
-	reporter.Sample("Event Dispatch")
-
-	//Log.Info("system flow # Logic #")
+func (p *systemFlow) systemUpdate(event Event) {
+	removeList := map[int64]ISystem{}
+	var sq SystemGroupList
 	for _, period := range p.stageList {
 		sq = p.stages[period]
 		for _, sl := range sq {
@@ -193,20 +178,43 @@ func (p *systemFlow) run(event Event) {
 			}
 		}
 	}
-
-	reporter.Sample("system execute")
-
 	//do something clean
 	for _, system := range removeList {
 		p.unregister(system)
 	}
+}
 
-	reporter.Sample("clean")
+func (p *systemFlow) run(event Event) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	reporter := Runtime.metrics.NewReporter("system_flow_run")
+	reporter.Start()
+
+	p.world.siblingCache.StartCollector()
+
+	//Log.Info("system flow # Clear Disposable #")
+	p.world.components.clearDisposable()
+	reporter.Sample("Clear Disposable")
+
+	//Log.Info("system flow # Temp Task Execute #")
+	p.flushTempTask()
+	reporter.Sample("Temp Task Execute")
+
+	//Log.Info("system flow # Event Dispatch #")
+	p.eventDispatch()
+	reporter.Sample("Event Dispatch")
+
+	//Log.Info("system flow # Logic #")
+	p.systemUpdate(event)
+	reporter.Sample("system execute")
+
+	ShapeCacheDispose()
 	reporter.Stop()
 	reporter.Print()
 }
 
-//register method only in world init or func init(){}
+// register method only in world init or func init(){}
 func (p *systemFlow) register(system ISystem) {
 	p.lock.Lock()
 	defer p.lock.Unlock()

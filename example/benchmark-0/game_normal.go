@@ -65,14 +65,14 @@ func (g *GameNormal) doFrame(parallel bool, frame uint64, delta time.Duration) {
 	if parallel {
 		wg := &sync.WaitGroup{}
 		wg.Add(7)
-		go func() {
-			g.DoMoveParallel(delta)
-			wg.Done()
-		}()
-		go func() {
-			g.DoDamageParallel()
-			wg.Done()
-		}()
+		//go func() {
+		//	g.DoMoveParallel(delta)
+		//	wg.Done()
+		//}()
+		//go func() {
+		//	g.DoDamageParallel()
+		//	wg.Done()
+		//}()
 		go func() {
 			g.SimuLoadParallel1()
 			wg.Done()
@@ -96,9 +96,9 @@ func (g *GameNormal) doFrame(parallel bool, frame uint64, delta time.Duration) {
 		wg.Wait()
 	} else {
 		// 移动
-		g.DoMove(delta)
+		//g.DoMove(delta)
 		// 攻击处理
-		g.DoDamage()
+		//g.DoDamage()
 		// 模拟其他负载
 		g.SimuLoad1()
 		g.SimuLoad2()

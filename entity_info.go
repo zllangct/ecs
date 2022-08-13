@@ -1,10 +1,7 @@
 package ecs
 
 import (
-	"errors"
-	"fmt"
 	"reflect"
-	"sync"
 )
 
 type TypeList []reflect.Type
@@ -48,39 +45,26 @@ func (tl *TypeList) Append(t ...reflect.Type) {
 	*tl = append(*tl, t...)
 }
 
+// 干掉entity info，没有太大的存在意义，components的icomponent会随着set中slice的扩容地址发生变化，导致错误，不能持久引用，也不能持久引用索引
+// set中删除操作会改变索引。在访问兄弟组件时，如果是内存整理完整状态，可以直接试探访问下一个元素，如果不是，则需要通过id重新通过Set的Get方法获取，
+// 访问优化应该置于迭代器中
 type EntityInfo struct {
-	world      *ecsWorld
-	mu         sync.RWMutex
-	components map[reflect.Type]IComponent
-	adding     TypeList
-	removing   TypeList
-	entity     Entity
+	world  *ecsWorld
+	entity Entity
 }
 
-func newEntityInfo(world *ecsWorld) *EntityInfo {
-	entity := &EntityInfo{
-		world:      world,
-		components: make(map[reflect.Type]IComponent),
-		adding:     newTypeList(3),
-		removing:   newTypeList(3),
-		entity:     newEntity(),
+func (e *EntityInfo) init(world *ecsWorld) *EntityInfo {
+	info := &EntityInfo{
+		world:  world,
+		entity: newEntity(),
 	}
-	world.addEntity(entity)
-	return entity
+	world.addEntity(info.entity)
+	return info
 }
 
 func (e *EntityInfo) Destroy() {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-
-	var components []IComponent = make([]IComponent, 0, len(e.components))
-	for _, c := range e.components {
-		components = append(components, c)
-	}
-	for _, c := range components {
-		e.deleteComponent(c)
-	}
-	e.world.deleteEntity(e)
+	//TODO 删除entity
+	//e.world.deleteEntity(e.entity)
 }
 
 func (e *EntityInfo) Entity() Entity {
@@ -91,149 +75,15 @@ func (e *EntityInfo) hashKey() int64 {
 	return int64(e.entity)
 }
 
-func (e *EntityInfo) HasByType(types ...reflect.Type) bool {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
-
-	return e.hasByType(types...)
-}
-
-func (e *EntityInfo) Has(components ...IComponent) bool {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
-
-	return e.has(components...)
-}
-
-func (e *EntityInfo) has(components ...IComponent) bool {
-	has := true
-	for _, c := range components {
-		_, has = e.components[c.Type()]
-		if !has {
-			return false
-		}
-	}
-	return has
-}
-
-func (e *EntityInfo) hasByType(types ...reflect.Type) bool {
-	has := true
-	for _, typ := range types {
-		_, has := e.components[typ]
-		if !has {
-			return false
-		}
-	}
-	return has
-}
-
 func (e *EntityInfo) Add(components ...IComponent) []error {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-
-	var errs []error
 	for _, c := range components {
-		if err := e.addComponent(c); err != nil {
-			errs = append(errs, err)
-		}
-	}
-	if len(errs) > 0 {
-		return errs
+		e.world.addComponent(e.entity, c)
 	}
 	return nil
 }
 
 func (e *EntityInfo) Remove(components ...IComponent) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-
 	for _, c := range components {
-		if !e.has(c) {
-			continue
-		}
-		e.deleteComponent(c)
+		e.world.deleteComponent(e.entity, c)
 	}
-}
-
-func (e *EntityInfo) addComponent(com IComponent) error {
-	ct := com.getComponentType()
-	switch ct {
-	case ComponentTypeFree, ComponentTypeFreeDisposable:
-		return errors.New("this type of component can not add to entity")
-	}
-	canAdd := true
-	typ := com.Type()
-	if e.has(com) {
-		if _, ok := e.removing.Find(typ); !ok {
-			canAdd = false
-		}
-	}
-	if !canAdd {
-		return errors.New(fmt.Sprintf("repeated component: %s", typ.Name()))
-	}
-	_, ok := e.adding.Find(typ)
-	if ok {
-		return errors.New(fmt.Sprintf("repeated component: %s", typ.Name()))
-	}
-
-	//Log.Info("add component: ", com.Type().Name())
-
-	e.adding.Append(typ)
-	com.setOwner(e)
-
-	if ct == ComponentTypeDisposable {
-		//e.deleteComponent(com)
-	}
-	e.world.addComponent(e, com)
-
-	return nil
-}
-
-func (e *EntityInfo) deleteComponent(com IComponent) {
-	//Log.Info("delete component: ", com.Type().Name())
-	e.removing.Append(com.Type())
-	e.world.deleteComponent(e, com)
-}
-
-func (e *EntityInfo) componentAdded(typ reflect.Type, com IComponent) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-
-	e.adding.Remove(typ)
-
-	e.components[typ] = com
-	if com.getComponentType() == ComponentTypeDisposable {
-		e.removing.Append(typ)
-	}
-
-	//Log.Info("component added: ", typ.Name())
-}
-
-func (e *EntityInfo) componentDeleted(typ reflect.Type, comType ComponentType) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-
-	e.removing.Remove(typ)
-
-	delete(e.components, typ)
-	//Log.Info("component removed: ", typ.Name())
-}
-
-func (e *EntityInfo) GetComponent(com IComponent) IComponent {
-	return e.getComponentByTypeInSystem(com.Type())
-}
-
-func (e *EntityInfo) getComponent(com IComponent) IComponent {
-	return e.getComponentByType(com.Type())
-}
-
-func (e *EntityInfo) getComponentByType(typ reflect.Type) IComponent {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
-
-	return e.components[typ]
-}
-
-func (e *EntityInfo) getComponentByTypeInSystem(typ reflect.Type) IComponent {
-	return e.components[typ]
 }
