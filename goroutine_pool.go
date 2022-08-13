@@ -62,7 +62,6 @@ func NewPool(size uint32, jobQueueSize uint32) *Pool {
 			stop:     make(chan struct{}),
 		}
 		pool.workers[i] = worker
-		worker.Start()
 	}
 	return pool
 }
