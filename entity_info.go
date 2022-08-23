@@ -10,8 +10,8 @@ func newTypeList(cap int) TypeList {
 	return make(TypeList, 0, cap)
 }
 
-func (tl TypeList) Contains(t reflect.Type) bool {
-	for _, t2 := range tl {
+func (tl *TypeList) Contains(t reflect.Type) bool {
+	for _, t2 := range *tl {
 		if t2 == t {
 			return true
 		}
@@ -19,8 +19,8 @@ func (tl TypeList) Contains(t reflect.Type) bool {
 	return false
 }
 
-func (tl TypeList) Find(t reflect.Type) (int, bool) {
-	for i, t2 := range tl {
+func (tl *TypeList) Find(t reflect.Type) (int, bool) {
+	for i, t2 := range *tl {
 		if t2 == t {
 			return i, true
 		}
@@ -49,8 +49,9 @@ func (tl *TypeList) Append(t ...reflect.Type) {
 // set中删除操作会改变索引。在访问兄弟组件时，如果是内存整理完整状态，可以直接试探访问下一个元素，如果不是，则需要通过id重新通过Set的Get方法获取，
 // 访问优化应该置于迭代器中
 type EntityInfo struct {
-	world  *ecsWorld
-	entity Entity
+	world    *ecsWorld
+	entity   Entity
+	compound Compound
 }
 
 func (e *EntityInfo) init(world *ecsWorld) *EntityInfo {

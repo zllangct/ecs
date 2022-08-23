@@ -7,8 +7,8 @@ import (
 
 type item struct {
 	Component[item]
-	ID  int64
-	Arr [3]int
+	ItemID int64
+	Arr    [3]int
 }
 
 func TestUnorderedCollection_Iterator(t *testing.T) {
@@ -17,8 +17,8 @@ func TestUnorderedCollection_Iterator(t *testing.T) {
 	var srcList []item
 	for i := 0; i < caseCount; i++ {
 		srcList = append(srcList, item{
-			ID:  int64(i),
-			Arr: [3]int{1, 2, 3},
+			ItemID: int64(i),
+			Arr:    [3]int{1, 2, 3},
 		})
 	}
 
@@ -54,7 +54,7 @@ func BenchmarkUnorderedCollection_SliceIter(b *testing.B) {
 	total := 100000
 	for n := 0; n < total; n++ {
 		item := &item{
-			ID: int64(n),
+			ItemID: int64(n),
 		}
 		slice = append(slice, *item)
 		id2index[n] = n
@@ -76,7 +76,7 @@ func BenchmarkUnorderedCollection_Write(b *testing.B) {
 
 	for n := 0; n < b.N; n++ {
 		item := &item{
-			ID: int64(n),
+			ItemID: int64(n),
 		}
 		ret, _ := c.Add(item)
 		_ = ret
@@ -89,7 +89,7 @@ func BenchmarkUnorderedCollection_SliceRead(b *testing.B) {
 	arr := make([]item, total)
 	for n := 0; n < total; n++ {
 		item := item{
-			ID: int64(n),
+			ItemID: int64(n),
 		}
 		_, _ = c.Add(&item)
 		arr = append(arr, item)
@@ -129,7 +129,7 @@ func BenchmarkUnorderedCollection_Read(b *testing.B) {
 	total := 100000
 	for n := 0; n < total; n++ {
 		item := &item{
-			ID: int64(n),
+			ItemID: int64(n),
 		}
 		_, _ = c.Add(item)
 		ids = append(ids, int64(n+1))
@@ -148,7 +148,7 @@ func BenchmarkUnorderedCollection_ReadUnsafe(b *testing.B) {
 	data := make([]item, total)
 	for n := 0; n < total; n++ {
 		item := item{
-			ID: int64(n),
+			ItemID: int64(n),
 		}
 		data = append(data, item)
 		ids = append(ids, int64(n+1))

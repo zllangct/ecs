@@ -4,37 +4,7 @@ import (
 	"reflect"
 )
 
-// runtime api
-
-func Configure(config *RuntimeConfig) {
-	Runtime.Configure(config)
-}
-
-func Run() {
-	Runtime.run()
-}
-
-func Stop() {
-	Runtime.stop()
-}
-
-func CreateWorld(config *WorldConfig) IWorld {
-	return Runtime.newWorld(config)
-}
-
-func DestroyWorld(world IWorld) {
-	Runtime.destroyWorld(world.(*ecsWorld))
-}
-
-func AddJob(job func(), hashKey ...uint32) {
-	Runtime.addJob(job, hashKey...)
-}
-
 // world api
-
-func WorldRun(world IWorld) {
-	world.Run()
-}
 
 func GetWorldID(world IWorld) int64 {
 	return world.GetID()

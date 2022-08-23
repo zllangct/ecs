@@ -17,6 +17,8 @@ type Logger interface {
 	Fatalf(fmt string, args ...interface{})
 }
 
+var Log Logger = NewStdLog()
+
 type StdLog struct {
 	logger *log.Logger
 }

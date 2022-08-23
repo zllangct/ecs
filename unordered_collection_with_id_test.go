@@ -10,7 +10,7 @@ func BenchmarkUnorderedCollectionWithID_Read(b *testing.B) {
 	total := 100000
 	for n := 0; n < total; n++ {
 		item := &item{
-			ID: int64(n),
+			ItemID: int64(n),
 		}
 		_, _ = c.Add(item)
 		ids = append(ids, int64(n+1))
@@ -29,7 +29,7 @@ func BenchmarkUnorderedCollectionWithID_Iter(b *testing.B) {
 	total := 100000
 	for n := 0; n < total; n++ {
 		item := &item{
-			ID: int64(n),
+			ItemID: int64(n),
 		}
 		_, _ = c.Add(item)
 		ids = append(ids, int64(n))
@@ -52,7 +52,7 @@ func BenchmarkUnorderedCollectionWithID_SliceWrite(b *testing.B) {
 
 	for n := 0; n < b.N; n++ {
 		item := &item{
-			ID: int64(n),
+			ItemID: int64(n),
 		}
 		slice = append(slice, *item)
 		id2index[n] = n
@@ -68,7 +68,7 @@ func BenchmarkUnorderedCollectionWithID_SliceRead(b *testing.B) {
 	total := 100000
 	for n := 0; n < total; n++ {
 		item := &item{
-			ID: int64(n),
+			ItemID: int64(n),
 		}
 		slice = append(slice, *item)
 		id2index[n] = n

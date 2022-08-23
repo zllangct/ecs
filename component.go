@@ -51,6 +51,7 @@ type IComponent interface {
 }
 
 type ComponentObject interface {
+	IItem
 	componentIdentification()
 }
 
@@ -128,9 +129,18 @@ type Component[T ComponentObject] struct {
 	it    uint16
 	seq   uint32
 	owner Entity
+	ref   *Ref
 }
 
 func (c Component[T]) componentIdentification() {}
+
+func (c Component[T]) Ref() *Ref {
+	return c.ref
+}
+
+func (c Component[T]) ID() int64 {
+	return int64(c.owner)
+}
 
 func (c *Component[T]) init() {
 	c.setType(c.getComponentType())

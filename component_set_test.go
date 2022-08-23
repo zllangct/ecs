@@ -14,8 +14,8 @@ func TestComponentSet_Sort(t *testing.T) {
 			Component: Component[item]{
 				seq: uint32(caseCount - i),
 			},
-			ID:  int64(i),
-			Arr: [3]int{1, 2, 3},
+			ItemID: int64(i),
+			Arr:    [3]int{1, 2, 3},
 		})
 	}
 
@@ -24,7 +24,7 @@ func TestComponentSet_Sort(t *testing.T) {
 
 	//添加数据
 	for i := 0; i < caseCount; i++ {
-		_, _ = c.Add(&srcList[i], srcList[i].ID)
+		_, _ = c.Add(&srcList[i], srcList[i].ItemID)
 	}
 
 	//排序
@@ -32,7 +32,7 @@ func TestComponentSet_Sort(t *testing.T) {
 
 	//验证
 	for i := 0; i < caseCount; i++ {
-		if c.Get(int64(i)).ID != int64(caseCount-i-1) {
+		if c.Get(int64(i)).ItemID != int64(caseCount-i-1) {
 			t.Error("sort error")
 			break
 		}
@@ -52,7 +52,7 @@ func BenchmarkComponentSet_Read(b *testing.B) {
 	total := 1000000
 	for n := 0; n < total; n++ {
 		item := &item{
-			ID: int64(n),
+			ItemID: int64(n),
 		}
 		_, _ = c.Add(item)
 		ids = append(ids, int64(n+1))

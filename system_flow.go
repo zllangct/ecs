@@ -5,11 +5,25 @@ import (
 )
 
 const (
-	StageStart Stage = iota
+	StageSyncBeforeStart Stage = iota
+	StageStart
+	StageSyncAfterStart
+
+	StageSyncBeforePreUpdate
 	StagePreUpdate
+	StageSyncAfterPreUpdate
+
+	StageSyncBeforeUpdate
 	StageUpdate
+	StageSyncAfterUpdate
+
+	StageSyncBeforePostUpdate
 	StagePostUpdate
+	StageSyncAfterPostUpdate
+
+	StageSyncBeforeDestroy
 	StageDestroy
+	StageSyncAfterDestroy
 )
 
 // Stage system execute period:start->pre_update->update->pre_destroy->destroy
@@ -50,11 +64,25 @@ func newSystemFlow(runtime *ecsWorld) *systemFlow {
 // initialize the system flow
 func (p *systemFlow) init() {
 	p.stageList = []Stage{
+		StageSyncBeforeStart,
 		StageStart,
+		StageSyncAfterStart,
+
+		StageSyncBeforePreUpdate,
 		StagePreUpdate,
+		StageSyncAfterPreUpdate,
+
+		StageSyncBeforeUpdate,
 		StageUpdate,
+		StageSyncAfterUpdate,
+
+		StageSyncBeforePostUpdate,
 		StagePostUpdate,
+		StageSyncAfterPostUpdate,
+
+		StageSyncBeforeDestroy,
 		StageDestroy,
+		StageSyncAfterDestroy,
 	}
 	p.reset()
 }
@@ -77,7 +105,7 @@ func (p *systemFlow) flushTempTask() {
 	for _, task := range tasks {
 		wg := p.wg
 		fn := task
-		Runtime.addJob(func() {
+		p.world.addJob(func() {
 			fn()
 			wg.Done()
 		})
@@ -97,7 +125,7 @@ func (p *systemFlow) eventDispatch() {
 						fn := ss[i].eventDispatch
 						p.wg.Add(1)
 						wg := p.wg
-						Runtime.addJob(func() {
+						p.world.addJob(func() {
 							defer wg.Done()
 							fn()
 						})
@@ -112,6 +140,10 @@ func (p *systemFlow) eventDispatch() {
 func (p *systemFlow) systemUpdate(event Event) {
 	removeList := map[int64]ISystem{}
 	var sq SystemGroupList
+
+	var sys ISystem
+	var imp bool = false
+	var runSync bool = false
 	for _, period := range p.stageList {
 		sq = p.stages[period]
 		for _, sl := range sq {
@@ -119,39 +151,100 @@ func (p *systemFlow) systemUpdate(event Event) {
 			for ss := sl.next(); len(ss) > 0; ss = sl.next() {
 				if systemCount := len(ss); systemCount != 0 {
 					for i := 0; i < systemCount; i++ {
-						sys := ss[i]
-						imp := false
+						sys = ss[i]
+						imp = false
+						runSync = false
 						var fn func(event Event)
 						state := ss[i].getState()
 						if state == SystemStateInit {
 							switch period {
+							case StageSyncBeforeStart:
+								system, ok := sys.(SyncBeforeStartReceiver)
+								fn = system.SyncBeforeStart
+								imp = ok
+								runSync = true
 							case StageStart:
 								system, ok := sys.(StartReceiver)
 								fn = system.Start
 								imp = ok
+								runSync = false
+							case StageSyncAfterStart:
+								system, ok := sys.(SyncAfterStartReceiver)
+								fn = system.SyncAfterStart
+								imp = ok
+								runSync = true
+
+								sys.setState(SystemStateUpdate)
 							}
-							sys.setState(SystemStateUpdate)
 						} else if state == SystemStateUpdate {
 							switch period {
+							case StageSyncBeforePreUpdate:
+								system, ok := sys.(SyncBeforePreUpdateReceiver)
+								fn = system.SyncBeforePreUpdate
+								imp = ok
+								runSync = true
 							case StagePreUpdate:
 								system, ok := sys.(PreUpdateReceiver)
 								fn = system.PreUpdate
 								imp = ok
+								runSync = true
+							case StageSyncAfterPreUpdate:
+								system, ok := sys.(SyncAfterPreUpdateReceiver)
+								fn = system.SyncAfterPreUpdate
+								imp = ok
+								runSync = true
+
+							case StageSyncBeforeUpdate:
+								system, ok := sys.(SyncBeforeUpdateReceiver)
+								fn = system.SyncBeforeUpdate
+								imp = ok
+								runSync = true
 							case StageUpdate:
 								system, ok := sys.(UpdateReceiver)
 								fn = system.Update
 								imp = ok
+								runSync = false
+							case StageSyncAfterUpdate:
+								system, ok := sys.(SyncAfterUpdateReceiver)
+								fn = system.SyncAfterUpdate
+								imp = ok
+								runSync = true
+
+							case StageSyncBeforePostUpdate:
+								system, ok := sys.(SyncBeforePostUpdateReceiver)
+								fn = system.SyncBeforePostUpdate
+								imp = ok
+								runSync = true
 							case StagePostUpdate:
 								system, ok := sys.(PostUpdateReceiver)
 								fn = system.PostUpdate
 								imp = ok
+								runSync = false
+							case StageSyncAfterPostUpdate:
+								system, ok := sys.(SyncAfterPostUpdateReceiver)
+								fn = system.SyncAfterPostUpdate
+								imp = ok
+								runSync = true
 							}
 						} else if state == SystemStateDestroy {
 							switch period {
+
+							case StageSyncBeforeDestroy:
+								system, ok := sys.(SyncBeforeDestroyReceiver)
+								fn = system.SyncBeforeDestroy
+								imp = ok
+								runSync = true
 							case StageDestroy:
 								system, ok := sys.(DestroyReceiver)
 								fn = system.Destroy
 								imp = ok
+								runSync = false
+							case StageSyncAfterDestroy:
+								system, ok := sys.(SyncAfterPostDestroyReceiver)
+								fn = system.SyncAfterDestroy
+								imp = ok
+								runSync = true
+
 								sys.setState(SystemStateDestroyed)
 								removeList[sys.ID()] = sys
 							}
@@ -160,18 +253,24 @@ func (p *systemFlow) systemUpdate(event Event) {
 						if !imp {
 							continue
 						}
-
-						p.wg.Add(1)
-						wg := p.wg
-						Runtime.addJob(func() {
-							defer func() {
-								sys.setExecuting(false)
-								wg.Done()
-							}()
-
+						if runSync {
 							sys.setExecuting(true)
+							sys.setSecurity(true)
 							fn(event)
-						})
+							sys.setSecurity(false)
+							sys.setExecuting(false)
+						} else {
+							p.wg.Add(1)
+							p.world.addJob(func() {
+								defer func() {
+									sys.setExecuting(false)
+									p.wg.Done()
+								}()
+
+								sys.setExecuting(true)
+								fn(event)
+							})
+						}
 					}
 				}
 				p.wg.Wait()
@@ -188,7 +287,7 @@ func (p *systemFlow) run(event Event) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	reporter := Runtime.metrics.NewReporter("system_flow_run")
+	reporter := p.world.metrics.NewReporter("system_flow_run")
 	reporter.Start()
 
 	p.world.siblingCache.StartCollector()
@@ -229,21 +328,8 @@ func (p *systemFlow) register(system ISystem) {
 	}
 
 	for _, period := range p.stageList {
-		imp := false
-		switch period {
-		case StageStart:
-			_, imp = system.(StartReceiver)
-		case StagePreUpdate:
-			_, imp = system.(PreUpdateReceiver)
-		case StageUpdate:
-			_, imp = system.(UpdateReceiver)
-		case StagePostUpdate:
-			_, imp = system.(PostUpdateReceiver)
-		case StageDestroy:
-			_, imp = system.(DestroyReceiver)
-		}
 
-		if !imp {
+		if !p.isImpEvent(system, period) {
 			continue
 		}
 
@@ -283,21 +369,7 @@ func (p *systemFlow) unregister(system ISystem) {
 	}
 
 	for _, period := range p.stageList {
-		imp := false
-		switch period {
-		case StageStart:
-			_, imp = system.(StartReceiver)
-		case StagePreUpdate:
-			_, imp = system.(PreUpdateReceiver)
-		case StageUpdate:
-			_, imp = system.(UpdateReceiver)
-		case StagePostUpdate:
-			_, imp = system.(PostUpdateReceiver)
-		case StageDestroy:
-			_, imp = system.(DestroyReceiver)
-		}
-
-		if !imp {
+		if !p.isImpEvent(system, period) {
 			continue
 		}
 
@@ -310,6 +382,43 @@ func (p *systemFlow) unregister(system ISystem) {
 	}
 
 	p.systems.Delete(system.Type())
+}
+
+func (p *systemFlow) isImpEvent(system ISystem, period Stage) bool {
+	imp := false
+	switch period {
+	case StageSyncBeforeStart:
+		_, imp = system.(SyncBeforeStartReceiver)
+	case StageStart:
+		_, imp = system.(StartReceiver)
+	case StageSyncAfterStart:
+		_, imp = system.(SyncAfterStartReceiver)
+	case StageSyncBeforePreUpdate:
+		_, imp = system.(SyncBeforePreUpdateReceiver)
+	case StagePreUpdate:
+		_, imp = system.(PreUpdateReceiver)
+	case StageSyncAfterPreUpdate:
+		_, imp = system.(SyncAfterPreUpdateReceiver)
+	case StageSyncBeforeUpdate:
+		_, imp = system.(SyncBeforeUpdateReceiver)
+	case StageUpdate:
+		_, imp = system.(UpdateReceiver)
+	case StageSyncAfterUpdate:
+		_, imp = system.(SyncAfterUpdateReceiver)
+	case StageSyncBeforePostUpdate:
+		_, imp = system.(SyncBeforePostUpdateReceiver)
+	case StagePostUpdate:
+		_, imp = system.(PostUpdateReceiver)
+	case StageSyncAfterPostUpdate:
+		_, imp = system.(SyncAfterPostUpdateReceiver)
+	case StageSyncBeforeDestroy:
+		_, imp = system.(SyncBeforeDestroyReceiver)
+	case StageDestroy:
+		_, imp = system.(DestroyReceiver)
+	case StageSyncAfterDestroy:
+		_, imp = system.(SyncAfterPostDestroyReceiver)
+	}
+	return imp
 }
 
 func (p *systemFlow) stop() {

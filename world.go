@@ -9,8 +9,21 @@ import (
 
 type WorldStatus int
 
+const (
+	WorldStatusInit WorldStatus = iota
+	WorldStatusRunning
+	WorldStatusPause
+	WorldStatusStop
+)
+
 type WorldConfig struct {
-	HashCount            int //容器桶数量
+	Debug                bool //Debug模式
+	IsMetrics            bool
+	IsMetricsPrint       bool
+	CpuNum               int    //使用的最大cpu数量
+	MaxPoolThread        uint32 //线程池最大线程数量
+	MaxPoolJobQueue      uint32 //线程池最大任务队列长度
+	HashCount            int    //容器桶数量
 	CollectionVersion    int
 	DefaultFrameInterval time.Duration //帧间隔
 	StopCallback         func(world *ecsWorld)
@@ -18,13 +31,19 @@ type WorldConfig struct {
 
 func NewDefaultWorldConfig() *WorldConfig {
 	return &WorldConfig{
+		Debug:                true,
+		IsMetrics:            true,
+		IsMetricsPrint:       false,
+		CpuNum:               runtime.NumCPU(),
+		MaxPoolThread:        uint32(runtime.NumCPU() * 2),
+		MaxPoolJobQueue:      10,
 		HashCount:            runtime.NumCPU() * 4,
 		DefaultFrameInterval: time.Millisecond * 33,
 	}
 }
 
 type IWorld interface {
-	Run()
+	Update()
 	GetStatus() WorldStatus
 	GetID() int64
 	NewEntity() EntityInfo
@@ -48,8 +67,6 @@ type ecsWorld struct {
 	status WorldStatus
 	//config
 	config *WorldConfig
-	//runtime
-	runtime *ecsRuntime
 	//system flow,all systems
 	systemFlow *systemFlow
 	//all components
@@ -62,20 +79,41 @@ type ecsWorld struct {
 	//optimizer
 	optimizer *optimizer
 
+	workPool *Pool
+	metrics  *Metrics
+
+	frame           uint64
+	ts              time.Time
+	delta           time.Duration
+	pureUpdateDelta time.Duration
+
 	wStop chan struct{}
 	//do some work for world cleaning
 	stopHandler func(world *ecsWorld)
 }
 
-func newWorld(runtime *ecsRuntime, config *WorldConfig) *ecsWorld {
+func NewWorld(config *WorldConfig) *ecsWorld {
 	world := &ecsWorld{
 		id:         LocalUniqueID(),
 		systemFlow: nil,
 		config:     config,
 		entities:   NewEntityCollection(),
-		status:     StatusInit,
+		status:     WorldStatusInit,
 		wStop:      make(chan struct{}),
+		ts:         time.Now(),
 	}
+
+	if world.config.MaxPoolThread <= 0 {
+		world.config.MaxPoolThread = uint32(runtime.NumCPU())
+	}
+
+	if world.config.MaxPoolJobQueue <= 0 {
+		world.config.MaxPoolJobQueue = 20
+	}
+
+	world.workPool = NewPool(config.MaxPoolThread, config.MaxPoolJobQueue)
+	world.workPool.Start()
+
 	world.components = NewComponentCollection(world, config.HashCount)
 	world.optimizer = newOptimizer(world)
 	world.siblingCache = newSiblingCache(world, 1024)
@@ -85,7 +123,7 @@ func newWorld(runtime *ecsRuntime, config *WorldConfig) *ecsWorld {
 	}
 
 	if world.config.HashCount == 0 {
-		world.config.HashCount = runtime.config.CpuNum
+		world.config.HashCount = config.CpuNum
 	}
 
 	//initialise system flow
@@ -99,78 +137,18 @@ func (w *ecsWorld) GetID() int64 {
 	return w.id
 }
 
-// Run start ecs world
-func (w *ecsWorld) Run() {
-	go w.run()
-}
-
-func doFrameForBenchmark(w IWorld, frame uint64, lastDelta time.Duration) {
-	world := w.(*ecsWorld)
-	world.update(Event{Delta: lastDelta, Frame: frame})
-}
-
-func (w *ecsWorld) update(event Event) {
-	w.systemFlow.run(event)
+func (w *ecsWorld) Update() {
+	e := Event{Delta: w.delta, Frame: w.frame}
+	now := time.Now()
+	w.systemFlow.run(e)
+	w.frame++
+	w.delta = time.Since(w.ts)
+	w.pureUpdateDelta = time.Since(now)
+	w.ts = time.Now()
 }
 
 func (w *ecsWorld) Optimize(t time.Duration, force bool) {
 	w.optimizer.optimize(t, force)
-}
-
-func (w *ecsWorld) run() {
-	if Runtime.status() != StatusRunning {
-		Log.Error("runtime is not running")
-		return
-	}
-
-	w.mutex.Lock()
-	if w.status != StatusInit {
-		Log.Error("this world is already running.")
-		return
-	}
-	frameInterval := w.config.DefaultFrameInterval
-	w.status = StatusRunning
-	w.mutex.Unlock()
-
-	Log.Info("start world success")
-
-	defer func() {
-		w.mutex.Lock()
-		w.status = StatusStop
-		w.mutex.Unlock()
-	}()
-
-	var ts time.Time
-	var delta time.Duration
-	var frame uint64
-	//main loop
-	for {
-		select {
-		case <-w.wStop:
-			w.mutex.Lock()
-			if w.stopHandler != nil {
-				w.stopHandler(w)
-			}
-			w.systemFlow.stop()
-			w.mutex.Unlock()
-			return
-		default:
-		}
-
-		ts = time.Now()
-		w.update(Event{Delta: delta, Frame: frame})
-		frame++
-		delta = time.Since(ts)
-		//w.Info(delta, frameInterval - delta)
-		if frameInterval-delta > 0 {
-			time.Sleep(frameInterval - delta)
-			delta = frameInterval
-		}
-	}
-}
-
-func (w *ecsWorld) stop() {
-	w.wStop <- struct{}{}
 }
 
 func (w *ecsWorld) GetStatus() WorldStatus {
@@ -178,6 +156,14 @@ func (w *ecsWorld) GetStatus() WorldStatus {
 	defer w.mutex.Unlock()
 
 	return w.status
+}
+
+func (w *ecsWorld) GetMetrics() *Metrics {
+	return w.metrics
+}
+
+func (w *ecsWorld) Destroy() {
+	//TODO
 }
 
 // Register register system
@@ -201,6 +187,10 @@ func (w *ecsWorld) GetSystem(sys reflect.Type) (ISystem, bool) {
 	return nil, ok
 }
 
+func (w *ecsWorld) addJob(job func(), hashKey ...uint32) {
+	w.workPool.Add(job, hashKey...)
+}
+
 // AddEntity entity operate : add
 func (w *ecsWorld) addEntity(entity Entity) {
 	w.entities.Add(entity)
@@ -212,7 +202,7 @@ func (w *ecsWorld) GetEntityInfo(entity Entity) EntityInfo {
 
 // deleteEntity entity operate : delete
 func (w *ecsWorld) deleteEntity(entity Entity) {
-	w.entities.Remove(int64(entity))
+	w.entities.Remove(entity)
 }
 
 func (w *ecsWorld) getComponents(typ reflect.Type) IComponentSet {

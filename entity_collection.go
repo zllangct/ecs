@@ -1,14 +1,20 @@
 package ecs
 
 type EntityCollection struct {
-	UnorderedCollectionWithID[Entity]
+	entities *UnorderedCollectionWithID[Entity]
+	refs     *UnorderedCollectionWithID[EntityInfo]
 }
 
 func NewEntityCollection() *EntityCollection {
 	c := NewUnorderedCollectionWithID[Entity]()
-	return &EntityCollection{*c}
+	refs := NewUnorderedCollectionWithID[EntityInfo]()
+	return &EntityCollection{entities: c, refs: refs}
 }
 
 func (c *EntityCollection) Add(entity Entity) {
-	c.UnorderedCollectionWithID.Add(&entity, int64(entity))
+	c.entities.Add(&entity, int64(entity))
+}
+
+func (c *EntityCollection) Remove(entity Entity) {
+	c.entities.Remove(int64(entity))
 }

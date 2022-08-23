@@ -39,11 +39,14 @@ type ISystem interface {
 	Resume()
 	Stop()
 
+	getPointer() unsafe.Pointer
 	isRequire(componentType reflect.Type) (IRequirement, bool)
 	setOrder(order Order)
 	setRequirements(rqs ...IRequirement)
 	getState() SystemState
 	setState(state SystemState)
+	setSecurity(isSafe bool)
+	isThreadSafe() bool
 	setExecuting(isExecuting bool)
 	isExecuting() bool
 	baseInit(world *ecsWorld, ins ISystem)
@@ -70,8 +73,10 @@ type System[T SystemObject] struct {
 	order             Order
 	optimizerReporter *OptimizerReporter
 	world             *ecsWorld
+	utility           *Utility[T]
 	realType          reflect.Type
 	state             SystemState
+	isSafe            bool
 	executing         bool
 	id                int64
 }
@@ -153,6 +158,21 @@ func (s *System[T]) setRequirements(rqs ...IRequirement) {
 		s.requirements[typ] = value
 		ComponentMeta.GetComponentMetaInfo(typ)
 	}
+}
+
+func (s *System[T]) setSecurity(isSafe bool) {
+	s.isSafe = isSafe
+}
+func (s *System[T]) isThreadSafe() bool {
+	return s.isSafe
+}
+
+func (s *System[T]) SetUtility(utility *Utility[T]) {
+	s.utility = utility
+}
+
+func (s *System[T]) GetUtility() *Utility[T] {
+	return s.utility
 }
 
 func (s *System[T]) Pause() {
@@ -263,6 +283,10 @@ func (s *System[T]) baseInit(world *ecsWorld, ins ISystem) {
 	}
 
 	s.state = SystemStateInit
+}
+
+func (s *System[T]) getPointer() unsafe.Pointer {
+	return unsafe.Pointer(s)
 }
 
 func (s *System[T]) Type() reflect.Type {

@@ -49,10 +49,8 @@ type gameECS struct {
 }
 
 func (g *gameECS) init() {
-	Configure(NewDefaultRuntimeConfig())
-	Run()
 	config := NewDefaultWorldConfig()
-	g.world = CreateWorld(config)
+	g.world = NewWorld(config)
 
 	RegisterSystem[testOptimizerSystem](g.world)
 
@@ -78,16 +76,12 @@ func BenchmarkNoOptimizer(b *testing.B) {
 
 	game := &gameECS{}
 	game.init()
-	doFrameForBenchmark(game.world, uint64(0), 0)
+	game.world.Update()
 	b.ResetTimer()
 	b.ReportAllocs()
 
-	var delta time.Duration
-	var ts time.Time
 	for i := 0; i < b.N; i++ {
-		ts = time.Now()
-		doFrameForBenchmark(game.world, uint64(i), delta)
-		delta = time.Since(ts)
+		game.world.Update()
 	}
 }
 
@@ -98,19 +92,15 @@ func BenchmarkWithOptimizer(b *testing.B) {
 
 	game := &gameECS{}
 	game.init()
-	doFrameForBenchmark(game.world, uint64(0), 0)
+	game.world.Update()
 
 	game.world.Optimize(time.Second*10, true)
 
 	b.ResetTimer()
 	b.ReportAllocs()
 
-	var delta time.Duration
-	var ts time.Time
 	for i := 0; i < b.N; i++ {
-		ts = time.Now()
-		doFrameForBenchmark(game.world, uint64(i+1), delta)
-		delta = time.Since(ts)
+		game.world.Update()
 	}
 }
 
