@@ -24,7 +24,7 @@ func TestComponentSet_Sort(t *testing.T) {
 
 	//添加数据
 	for i := 0; i < caseCount; i++ {
-		_, _ = c.Add(&srcList[i], srcList[i].ItemID)
+		_ = c.Add(&srcList[i], Entity(srcList[i].ItemID))
 	}
 
 	//排序
@@ -54,7 +54,7 @@ func BenchmarkComponentSet_Read(b *testing.B) {
 		item := &item{
 			ItemID: int64(n),
 		}
-		_, _ = c.Add(item)
+		_ = c.Add(item, Entity(n))
 		ids = append(ids, int64(n+1))
 	}
 

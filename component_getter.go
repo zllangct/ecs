@@ -23,10 +23,10 @@ func NewComponentGetter[T ComponentObject](sys ISystem) *ComponentGetter[T] {
 func (c *ComponentGetter[T]) Get(entity Entity) *T {
 	var ret *T
 	if c.permission == ComponentReadOnly {
-		temp := *c.set.getByID(int64(entity))
+		temp := *c.set.getByEntity(entity)
 		ret = &temp
 	} else {
-		ret = c.set.getByID(int64(entity))
+		ret = c.set.getByEntity(entity)
 	}
 	return ret
 }

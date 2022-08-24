@@ -6,23 +6,99 @@ import (
 )
 
 type IComponentSet interface {
-	ICollectionWithID
+	ICollection
+	GetByEntity(entity Entity) any
 	GetElementMeta() ComponentMetaInfo
 	GetComponent(entity Entity) IComponent
 	Sort()
 }
 
 type ComponentSet[T ComponentObject] struct {
-	UnorderedCollectionWithID[T]
-	meta ComponentMetaInfo
+	UnorderedCollection[T]
+	indices []int64
+	meta    ComponentMetaInfo
 }
 
-func NewComponentSet[T ComponentObject]() *ComponentSet[T] {
+func NewComponentSet[T ComponentObject](initSize ...int) *ComponentSet[T] {
 	typ := TypeOf[T]()
-	return &ComponentSet[T]{
-		UnorderedCollectionWithID: *NewUnorderedCollectionWithID[T](),
-		meta:                      ComponentMeta.GetComponentMetaInfo(typ),
+	eleSize := typ.Size()
+	size := InitMaxSize / eleSize
+	if len(initSize) > 0 {
+		size = uintptr(initSize[0]) / eleSize
 	}
+	c := &ComponentSet[T]{
+		UnorderedCollection: UnorderedCollection[T]{
+			data:    make([]T, 0, size),
+			eleSize: eleSize,
+		},
+	}
+	if size == 0 {
+		c.indices = make([]int64, 1)
+	}
+	return c
+}
+
+func (c *ComponentSet[T]) Add(element *T, entity Entity) *T {
+	_, idx := c.UnorderedCollection.Add(element)
+
+	realID := entity.ToRealID()
+
+	length := len(c.indices)
+	if realID.index >= int32(length) {
+		m := int32(0)
+		if length == 0 {
+			m = realID.index + 1
+		} else if length < 1024 {
+			m = realID.index * 2
+		} else {
+			m = realID.index * 5 / 4
+		}
+		newIndices := make([]int64, m)
+		count := copy(newIndices, c.indices)
+		if count != length {
+			panic("copy failed")
+		}
+		c.indices = newIndices
+	}
+
+	c.indices[realID.index] = idx
+
+	return &c.data[idx]
+}
+
+func (c *ComponentSet[T]) remove(entity Entity) *T {
+	realID := entity.ToRealID()
+	if realID.index >= int32(len(c.indices)) {
+		return nil
+	}
+	idx := c.indices[realID.index]
+	removed, oldIndex, newIndex := c.UnorderedCollection.Remove(idx)
+	oldRealID := c.data[oldIndex].OwnerEntity().ToRealID()
+	c.indices[oldRealID.index] = newIndex
+	c.indices[realID.index] = -1
+
+	return removed
+}
+
+func (c *ComponentSet[T]) Remove(entity Entity) {
+	c.remove(entity)
+}
+
+func (c *ComponentSet[T]) RemoveAndReturn(entity Entity) *T {
+	cpy := *c.remove(entity)
+	return &cpy
+}
+
+func (c *ComponentSet[T]) getByEntity(entity Entity) *T {
+	idx := c.indices[entity]
+	if idx < 0 {
+		return nil
+	}
+	return c.UnorderedCollection.Get(idx)
+}
+
+func (c *ComponentSet[T]) GetByEntity(entity Entity) any {
+	return c.getByEntity(entity)
 }
 
 func (c *ComponentSet[T]) Sort() {
@@ -38,24 +114,20 @@ func (c *ComponentSet[T]) Sort() {
 			zeroSeq--
 			cp.seq = zeroSeq
 		}
-		seq2id[cp.seq] = c.idx2id[i]
+		seq2id[cp.seq] = cp.owner.ToInt64()
 	}
 	sort.Slice(c.data, func(i, j int) bool {
 		return (*Component[T])(unsafe.Pointer(&(c.data[i]))).seq < (*Component[T])(unsafe.Pointer(&(c.data[j]))).seq
 	})
-	var id int64
-	var seq uint32
 	for i := int64(0); i < int64(c.Len()); i++ {
-		seq = (*Component[T])(unsafe.Pointer(&(c.data[i]))).seq
-		id = seq2id[seq]
-		c.ids[id] = i
-		c.idx2id[i] = id
+		cp = (*Component[T])(unsafe.Pointer(&(c.data[i])))
+		c.indices[cp.owner.ToRealID().index] = i
 	}
 	c.ChangeReset()
 }
 
 func (c *ComponentSet[T]) GetComponent(entity Entity) IComponent {
-	return c.UnorderedCollectionWithID.GetByID(int64(entity)).(IComponent)
+	return c.GetByEntity(entity).(IComponent)
 }
 
 func (c *ComponentSet[T]) GetElementMeta() ComponentMetaInfo {

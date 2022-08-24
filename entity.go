@@ -15,6 +15,10 @@ func (e Entity) ToInt64() int64 {
 	return int64(e)
 }
 
+func (e Entity) ToRealID() RealID {
+	return *(*RealID)(unsafe.Pointer(&e))
+}
+
 type RealID struct {
 	index int32
 	reuse int32
@@ -22,6 +26,10 @@ type RealID struct {
 
 func (r *RealID) ToInt64() int64 {
 	return *(*int64)(unsafe.Pointer(r))
+}
+
+func (r *RealID) ToEntity() Entity {
+	return *(*Entity)(unsafe.Pointer(r))
 }
 
 type EntityIDGenerator struct {

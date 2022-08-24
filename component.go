@@ -51,8 +51,8 @@ type IComponent interface {
 }
 
 type ComponentObject interface {
-	IItem
 	componentIdentification()
+	OwnerEntity() Entity
 }
 
 type FreeComponentObject interface {
@@ -129,17 +129,12 @@ type Component[T ComponentObject] struct {
 	it    uint16
 	seq   uint32
 	owner Entity
-	ref   *Ref
 }
 
 func (c Component[T]) componentIdentification() {}
 
-func (c Component[T]) Ref() *Ref {
-	return c.ref
-}
-
-func (c Component[T]) ID() int64 {
-	return int64(c.owner)
+func (c Component[T]) OwnerEntity() Entity {
+	return c.owner
 }
 
 func (c *Component[T]) init() {
@@ -157,7 +152,7 @@ func (c *Component[T]) addToCollection(collection interface{}) IComponent {
 		Log.Info("add to collection, collecion is nil")
 		return nil
 	}
-	ins, _ := cc.Add(c.rawInstance(), int64(c.owner))
+	ins := cc.Add(c.rawInstance(), c.owner)
 	*c.rawInstance() = *ins
 	i := interface{}(ins).(IComponent)
 	i.setState(ComponentStateActive)
@@ -171,7 +166,7 @@ func (c *Component[T]) deleteFromCollection(collection interface{}) {
 		return
 	}
 	c.setState(ComponentStateDisable)
-	cc.Remove(int64(c.owner))
+	cc.Remove(c.owner)
 	return
 }
 
