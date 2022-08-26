@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/zllangct/ecs"
-	"time"
 	_ "unsafe"
 )
 
@@ -11,14 +10,8 @@ type GameECS struct {
 	entities []ecs.Entity
 }
 
-//go:linkname doFrame github.com/zllangct/ecs.doFrameForBenchmark
-func doFrame(w ecs.IWorld, frame uint64, lastDelta time.Duration)
-
 func (g *GameECS) init(config *ecs.WorldConfig) {
-	ecs.Configure(ecs.NewDefaultRuntimeConfig())
-	ecs.Run()
-
-	g.world = ecs.CreateWorld(config)
+	g.world = ecs.NewWorld(config)
 
 	//ecs.RegisterSystem[MoveSystem](g.world)
 	//ecs.RegisterSystem[DamageSystem](g.world)

@@ -42,4 +42,5 @@ type TestUtility struct {
 }
 
 func (t *TestUtility) Hello() {
+
 }

@@ -33,6 +33,9 @@ func (t *testOptimizerSystem) Update(event Event) {
 	iter := GetInterestedComponents[testOptimizerComponent1](t)
 	for c := iter.Begin(); !iter.End(); c = iter.Next() {
 		c2 := GetRelatedComponent[testOptimizerComponent2](t, c.owner)
+		if c2 == nil {
+			continue
+		}
 		for i := 0; i < testOptimizerDummyMaxFor; i++ {
 			c.Test1 += i
 		}
@@ -49,6 +52,7 @@ type gameECS struct {
 }
 
 func (g *gameECS) init() {
+	println("init")
 	config := NewDefaultWorldConfig()
 	g.world = NewWorld(config)
 
@@ -73,10 +77,11 @@ func BenchmarkNoOptimizer(b *testing.B) {
 	//go func() {
 	//	http.ListenAndServe(":6060", nil)
 	//}()
-
+	println("start")
 	game := &gameECS{}
 	game.init()
 	game.world.Update()
+
 	b.ResetTimer()
 	b.ReportAllocs()
 

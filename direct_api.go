@@ -2,6 +2,7 @@ package ecs
 
 import (
 	"reflect"
+	"unsafe"
 )
 
 // world api
@@ -86,10 +87,12 @@ func GetRelatedComponent[T ComponentObject](sys ISystem, entity Entity) *T {
 	}
 	var cache *ComponentGetter[T]
 	cacheMap := sys.getGetterCache()
-	if v, ok := cacheMap[typ]; ok {
-		cache = v.(*ComponentGetter[T])
+	c := cacheMap.Get(typ)
+	if c != nil {
+		cache = (*ComponentGetter[T])(c)
 	} else {
-		cacheMap[typ] = NewComponentGetter[T](sys)
+		cache = NewComponentGetter[T](sys)
+		cacheMap.Add(typ, unsafe.Pointer(cache))
 	}
 	return cache.Get(entity)
 }

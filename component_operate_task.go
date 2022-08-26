@@ -19,10 +19,9 @@ func (o *opTask) Reset() {
 }
 
 type opTaskList struct {
-	comType ComponentType
-	len     int
-	head    *opTask
-	tail    *opTask
+	len  int
+	head *opTask
+	tail *opTask
 }
 
 func (o *opTaskList) Len() int {

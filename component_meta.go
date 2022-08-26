@@ -10,6 +10,10 @@ var ComponentMeta = &componentMeta{
 	types: map[reflect.Type]uint16{},
 }
 
+func GetComponentMeta[T ComponentObject]() ComponentMetaInfo {
+	return ComponentMeta.GetComponentMetaInfo(TypeOf[T]())
+}
+
 type ComponentMetaInfo struct {
 	it uint16
 }
@@ -29,14 +33,15 @@ func (c *componentMeta) GetComponentMetaInfo(typ reflect.Type) ComponentMetaInfo
 	} else {
 		c.mu.RUnlock()
 		c.mu.Lock()
-		c.seq++
 		if v, ok = c.types[typ]; ok {
 			it = v
 		} else {
+			c.seq++
 			it = c.seq
 		}
 		c.mu.Unlock()
 	}
+
 	return ComponentMetaInfo{
 		it: it,
 	}

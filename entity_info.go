@@ -63,6 +63,8 @@ func (e *EntityInfo) init(world *ecsWorld) *EntityInfo {
 	return info
 }
 
+func (e *EntityInfo) Spawn() {}
+
 func (e *EntityInfo) Destroy() {
 	//TODO 删除entity
 	//e.world.deleteEntity(e.entity)

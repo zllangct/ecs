@@ -1,5 +1,59 @@
 package ecs
 
+import (
+	"reflect"
+	"unsafe"
+)
+
+// reflect.Type is not comparable, so we need to implement our own
+// to replace by SparseArray[K, V] when reflect.Type is comparable
+type GetterCache struct {
+	indices []reflect.Type
+	values  []unsafe.Pointer
+}
+
+func NewGetterCache(initCap ...int) *GetterCache {
+	cap := 0
+	if len(initCap) > 0 {
+		cap = initCap[0]
+	}
+	return &GetterCache{
+		indices: make([]reflect.Type, 0, cap),
+		values:  make([]unsafe.Pointer, 0, cap),
+	}
+}
+
+func (g *GetterCache) Add(key reflect.Type, value unsafe.Pointer) {
+	g.indices = append(g.indices, key)
+	g.values = append(g.values, value)
+}
+
+func (g *GetterCache) Remove(key reflect.Type) {
+	idx := -1
+	for i, t := range g.indices {
+		if t == key {
+			idx = i
+			break
+		}
+	}
+	if idx == -1 {
+		return
+	}
+	// remove from indices
+	g.indices = append(g.indices[:idx], g.indices[idx+1:]...)
+	// remove from values
+	g.values = append(g.values[:idx], g.values[idx+1:]...)
+}
+
+func (g *GetterCache) Get(key reflect.Type) unsafe.Pointer {
+	for i, t := range g.indices {
+		if t == key {
+			return g.values[i]
+		}
+	}
+	return nil
+}
+
 type ComponentGetter[T ComponentObject] struct {
 	permission ComponentPermission
 	set        *ComponentSet[T]
@@ -14,19 +68,13 @@ func NewComponentGetter[T ComponentObject](sys ISystem) *ComponentGetter[T] {
 	getter := &ComponentGetter[T]{}
 	getter.set = sys.World().getComponents(typ).(*ComponentSet[T])
 	getter.permission = r.getPermission()
-	if sys.getGetterCache()[typ] == nil {
-		sys.getGetterCache()[typ] = getter
-	}
 	return getter
 }
 
 func (c *ComponentGetter[T]) Get(entity Entity) *T {
-	var ret *T
 	if c.permission == ComponentReadOnly {
-		temp := *c.set.getByEntity(entity)
-		ret = &temp
+		return &(*c.set.getByEntity(entity))
 	} else {
-		ret = c.set.getByEntity(entity)
+		return c.set.getByEntity(entity)
 	}
-	return ret
 }

@@ -11,6 +11,8 @@ type IComponentSet interface {
 	GetElementMeta() ComponentMetaInfo
 	GetComponent(entity Entity) IComponent
 	Sort()
+
+	pointer() unsafe.Pointer
 }
 
 type ComponentSet[T ComponentObject] struct {
@@ -31,6 +33,7 @@ func NewComponentSet[T ComponentObject](initSize ...int) *ComponentSet[T] {
 			data:    make([]T, 0, size),
 			eleSize: eleSize,
 		},
+		meta: ComponentMeta.GetComponentMetaInfo(typ),
 	}
 	if size == 0 {
 		c.indices = make([]int64, 1)
@@ -90,7 +93,7 @@ func (c *ComponentSet[T]) RemoveAndReturn(entity Entity) *T {
 }
 
 func (c *ComponentSet[T]) getByEntity(entity Entity) *T {
-	idx := c.indices[entity]
+	idx := c.indices[entity.ToRealID().index]
 	if idx < 0 {
 		return nil
 	}
@@ -99,6 +102,10 @@ func (c *ComponentSet[T]) getByEntity(entity Entity) *T {
 
 func (c *ComponentSet[T]) GetByEntity(entity Entity) any {
 	return c.getByEntity(entity)
+}
+
+func (c *ComponentSet[T]) pointer() unsafe.Pointer {
+	return unsafe.Pointer(c)
 }
 
 func (c *ComponentSet[T]) Sort() {

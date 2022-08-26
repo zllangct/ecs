@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"reflect"
 	"testing"
 )
 
@@ -122,7 +121,7 @@ func TestCompound_insertIndex(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.c.insertIndex(tt.args.it); got != tt.want {
+			if got := tt.c.InsertIndex(tt.args.it); got != tt.want {
 				t.Errorf("insertIndex() = %v, want %v", got, tt.want)
 			}
 		})
@@ -148,8 +147,8 @@ func TestCompound_Add(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.c.Add(tt.args.it); (err != nil) != tt.wantErr {
-				t.Errorf("Add() error = %v, wantErr %v", err, tt.wantErr)
+			if ok := tt.c.Add(tt.args.it); (ok != true) != tt.wantErr {
+				t.Errorf("Add() error = %v, wantErr %v", ok, tt.wantErr)
 			}
 		})
 	}
@@ -173,27 +172,6 @@ func TestCompound_Remove(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.c.Remove(tt.args.it)
-		})
-	}
-}
-
-func TestCompound_Type(t *testing.T) {
-	tests := []struct {
-		name string
-		c    Compound
-		want interface{}
-	}{
-		{
-			name: "1",
-			c:    Compound{1, 2, 3, 4, 5, 6},
-			want: interface{}([6]uint16{1, 2, 3, 4, 5, 6}),
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.c.Type(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Type() = %v, want %v", got, tt.want)
-			}
 		})
 	}
 }

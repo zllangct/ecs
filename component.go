@@ -44,7 +44,7 @@ type IComponent interface {
 	getSeq() uint32
 
 	newCollection() IComponentSet
-	addToCollection(collection interface{}) IComponent
+	addToCollection(p unsafe.Pointer)
 	deleteFromCollection(collection interface{})
 
 	debugAddress() unsafe.Pointer
@@ -146,17 +146,10 @@ func (c *Component[T]) getComponentType() ComponentType {
 	return ComponentTypeNormal
 }
 
-func (c *Component[T]) addToCollection(collection interface{}) IComponent {
-	cc, ok := collection.(*ComponentSet[T])
-	if !ok {
-		Log.Info("add to collection, collecion is nil")
-		return nil
-	}
+func (c *Component[T]) addToCollection(p unsafe.Pointer) {
+	cc := (*ComponentSet[T])(p)
 	ins := cc.Add(c.rawInstance(), c.owner)
-	*c.rawInstance() = *ins
-	i := interface{}(ins).(IComponent)
-	i.setState(ComponentStateActive)
-	return i
+	(*Component[T])(unsafe.Pointer(ins)).setState(ComponentStateActive)
 }
 
 func (c *Component[T]) deleteFromCollection(collection interface{}) {

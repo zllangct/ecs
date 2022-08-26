@@ -19,11 +19,56 @@ type IComponentCollection interface {
 	getTempTasks() []func()
 	clearDisposable()
 	getCollection(typ reflect.Type) IComponentSet
-	getCollections() map[reflect.Type]IComponentSet
+	getCollections() *SparseComponentCollection
+}
+
+type SparseComponentCollection struct {
+	m       map[reflect.Type]int
+	indices []int
+	sets    []IComponentSet
+}
+
+func NewSparseComponentCollection() *SparseComponentCollection {
+	return &SparseComponentCollection{
+		m:       make(map[reflect.Type]int),
+		indices: make([]int, 0),
+		sets:    make([]IComponentSet, 0),
+	}
+}
+
+func (s *SparseComponentCollection) Add(intType uint16, componentSet IComponentSet) {
+	if intType >= uint16(len(s.indices)) {
+		newIndices := make([]int, intType+1)
+		copy(newIndices, s.indices)
+		s.indices = newIndices
+	}
+	index := len(s.sets)
+	s.m[componentSet.ElementType()] = index
+	s.indices[intType] = index
+	s.sets = append(s.sets, componentSet)
+}
+
+func (s *SparseComponentCollection) Get(intType uint16) IComponentSet {
+	if intType >= uint16(len(s.indices)) {
+		return nil
+	}
+	index := s.indices[intType]
+	if index == -1 {
+		return nil
+	}
+	return s.sets[index]
+}
+
+func (s *SparseComponentCollection) GetByType(typ reflect.Type) IComponentSet {
+	index, ok := s.m[typ]
+	if !ok {
+		return nil
+	}
+	return s.sets[index]
 }
 
 type ComponentCollection struct {
-	collections map[reflect.Type]IComponentSet
+	collections *SparseComponentCollection
 	world       *ecsWorld
 	bucket      int64
 	locks       []sync.RWMutex
@@ -34,7 +79,7 @@ type ComponentCollection struct {
 func NewComponentCollection(world *ecsWorld, k int) *ComponentCollection {
 	cc := &ComponentCollection{
 		world:       world,
-		collections: map[reflect.Type]IComponentSet{},
+		collections: NewSparseComponentCollection(),
 	}
 
 	for i := 1; ; i++ {
@@ -154,16 +199,17 @@ func (c *ComponentCollection) getTempTasks() []func() {
 
 	var tasks []func()
 	for typ, list := range combination {
-		typTemp := typ
 		taskList := list
-		collection, ok := c.collections[typTemp]
-		if !ok {
-			c.collections[typTemp] = taskList.head.com.newCollection()
-			collection = c.collections[typTemp]
+		set := c.collections.GetByType(typ)
+		if set == nil {
+			newSet := taskList.head.com.newCollection()
+			c.collections.Add(newSet.GetElementMeta().it, newSet)
+			set = c.collections.Get(newSet.GetElementMeta().it)
 		}
 
+		// 是否可以避免func封装？
 		fn := func() {
-			c.opExecute(taskList, collection)
+			c.opExecute(taskList, set)
 		}
 		tasks = append(tasks, fn)
 	}
@@ -176,22 +222,23 @@ func (c *ComponentCollection) opExecute(taskList *opTaskList, collection ICompon
 	world := c.world
 	for task := taskList.head; task != nil; task = task.next {
 		task.com.setIntType(meta.it)
+		task.com.setOwner(task.target)
 		t = task.com.Type()
 		switch task.op {
 		case CollectionOperateAdd:
-			ret := task.com.addToCollection(collection)
+			task.com.addToCollection(collection.pointer())
 			switch task.com.getComponentType() {
 			case ComponentTypeNormal:
 				//task.target.componentAdded(t, ret)
-				world.siblingCache.ch <- cacheOpPool.Get().(*CacheOp).Set(task.target, meta.it, uint8(1))
+				//TODO channel并行block时间长
+				//world.siblingCache.ch <- cacheOpPool.Get().(*CacheOp).Set(task.target, meta.it, uint8(1))
 			case ComponentTypeDisposable:
 				c.disposableTemp(task.com, t)
 				//task.target.componentAdded(t, ret)
-				world.siblingCache.ch <- cacheOpPool.Get().(*CacheOp).Set(task.target, meta.it, uint8(1))
+				//world.siblingCache.ch <- cacheOpPool.Get().(*CacheOp).Set(task.target, meta.it, uint8(1))
 			case ComponentTypeFreeDisposable:
 				c.disposableTemp(task.com, t)
 			}
-			task.com = ret
 		case CollectionOperateDelete:
 			task.com.deleteFromCollection(collection)
 			switch task.com.getComponentType() {
@@ -211,13 +258,17 @@ func (c *ComponentCollection) opExecute(taskList *opTaskList, collection ICompon
 }
 
 func (c *ComponentCollection) getCollection(typ reflect.Type) IComponentSet {
-	return c.collections[typ]
+	return c.collections.GetByType(typ)
 }
 
-func (c *ComponentCollection) getCollections() map[reflect.Type]IComponentSet {
+func (c *ComponentCollection) getCollections() *SparseComponentCollection {
 	return c.collections
 }
 
 func (c *ComponentCollection) removeAllByType(typ reflect.Type) {
-	delete(c.collections, typ)
+	set := c.collections.GetByType(typ)
+	if set == nil {
+		return
+	}
+	set.Clear()
 }

@@ -144,6 +144,7 @@ func (p *systemFlow) systemUpdate(event Event) {
 	var sys ISystem
 	var imp bool = false
 	var runSync bool = false
+	var fn func(event Event)
 	for _, period := range p.stageList {
 		sq = p.stages[period]
 		for _, sl := range sq {
@@ -154,9 +155,19 @@ func (p *systemFlow) systemUpdate(event Event) {
 						sys = ss[i]
 						imp = false
 						runSync = false
-						var fn func(event Event)
 						state := ss[i].getState()
-						if state == SystemStateInit {
+
+						if period > StageSyncAfterStart {
+							if state == SystemStateStart {
+								state = SystemStateUpdate
+								sys.setState(SystemStateUpdate)
+							}
+						}
+
+						if state == SystemStateStart {
+							if period > StageSyncAfterStart {
+								continue
+							}
 							switch period {
 							case StageSyncBeforeStart:
 								system, ok := sys.(SyncBeforeStartReceiver)
@@ -173,10 +184,11 @@ func (p *systemFlow) systemUpdate(event Event) {
 								fn = system.SyncAfterStart
 								imp = ok
 								runSync = true
-
-								sys.setState(SystemStateUpdate)
 							}
 						} else if state == SystemStateUpdate {
+							if period < StageSyncBeforePreUpdate || period > StageSyncAfterPostUpdate {
+								continue
+							}
 							switch period {
 							case StageSyncBeforePreUpdate:
 								system, ok := sys.(SyncBeforePreUpdateReceiver)
@@ -227,8 +239,10 @@ func (p *systemFlow) systemUpdate(event Event) {
 								runSync = true
 							}
 						} else if state == SystemStateDestroy {
+							if period < StageSyncBeforeDestroy {
+								continue
+							}
 							switch period {
-
 							case StageSyncBeforeDestroy:
 								system, ok := sys.(SyncBeforeDestroyReceiver)
 								fn = system.SyncBeforeDestroy

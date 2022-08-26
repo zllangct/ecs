@@ -14,28 +14,30 @@ const (
 type ICollection interface {
 	Len() int
 	Range(func(v any) bool)
+	Clear()
 	ChangeCount() int64
 	ChangeReset()
 	ElementType() reflect.Type
 }
 
 type UnorderedCollection[T any] struct {
-	eleSize uintptr
-	len     int64
-	change  int64
-	data    []T
+	eleSize  uintptr
+	len      int64
+	change   int64
+	initSize int64
+	data     []T
 }
 
 func NewUnorderedCollection[T any](initSize ...int) *UnorderedCollection[T] {
 	typ := TypeOf[T]()
 	eleSize := typ.Size()
 	size := InitMaxSize / eleSize
-	if len(initSize) > 0 {
-		eleSize = uintptr(initSize[0]) / eleSize
-	}
 	c := &UnorderedCollection[T]{
-		data:    make([]T, 0, size),
-		eleSize: eleSize,
+		data: make([]T, 0, size),
+	}
+	if len(initSize) > 0 {
+		c.initSize = int64(initSize[0])
+		c.eleSize = uintptr(initSize[0]) / eleSize
 	}
 	return c
 }
@@ -66,7 +68,8 @@ func (c *UnorderedCollection[T]) Remove(idx int64) (*T, int64, int64) {
 	c.shrink()
 	c.len--
 	c.change++
-	return &c.data[lastIdx], lastIdx, idx
+	removed := c.data[lastIdx]
+	return &removed, lastIdx, idx
 }
 
 func (c *UnorderedCollection[T]) Len() int {
@@ -107,6 +110,12 @@ func (c *UnorderedCollection[T]) ChangeCount() int64 {
 
 func (c *UnorderedCollection[T]) ChangeReset() {
 	c.change = 0
+}
+
+func (c *UnorderedCollection[T]) Clear() {
+	c.data = make([]T, 0, c.initSize)
+	c.change = 0
+	c.len = 0
 }
 
 func (c *UnorderedCollection[T]) ElementType() reflect.Type {

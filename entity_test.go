@@ -22,7 +22,7 @@ func TestEntityIDGenerator_NewID(t *testing.T) {
 		e.FreeID(id4)
 		e.FreeID(id3)
 
-		var m []int64
+		var m []Entity
 		for i := 0; i < 11; i++ {
 			newID := e.NewID()
 			m = append(m, newID)
@@ -39,7 +39,7 @@ type _EntityTest struct {
 	freeList map[RealID]struct{}
 }
 
-func (e *_EntityTest) NewID() int64 {
+func (e *_EntityTest) NewID() Entity {
 	id := RealID{}
 	if len(e.freeList) > 0 {
 		for i, _ := range e.freeList {
@@ -50,19 +50,19 @@ func (e *_EntityTest) NewID() int64 {
 		id = RealID{index: e.seq, reuse: 0}
 		e.seq++
 	}
-	return id.ToInt64()
+	return id.ToEntity()
 }
 
-func (e *_EntityTest) FreeID(id int64) {
+func (e *_EntityTest) FreeID(id Entity) {
 	real := *(*RealID)(unsafe.Pointer(&id))
 	e.freeList[real] = struct{}{}
 }
 
 func BenchmarkEntityIDGenerator_New(b *testing.B) {
 	e := NewEntityIDGenerator(1024, 10)
-	idmap := map[int64]struct{}{}
+	idmap := map[Entity]struct{}{}
 	e2 := &_EntityTest{freeList: map[RealID]struct{}{}}
-	idmap2 := map[int64]struct{}{}
+	idmap2 := map[Entity]struct{}{}
 
 	for i := 0; i < 10000; i++ {
 		id := e.NewID()
@@ -87,14 +87,14 @@ func BenchmarkEntityIDGenerator_New(b *testing.B) {
 func TestEntityIDGenerator_Free(t *testing.T) {
 	size := 100000
 	e := NewEntityIDGenerator(1024, 100)
-	idmap := map[int64]struct{}{}
+	idmap := map[Entity]struct{}{}
 	for i := 0; i < size; i++ {
 		id := e.NewID()
 		idmap[id] = struct{}{}
 	}
 
 	e2 := &_EntityTest{freeList: map[RealID]struct{}{}}
-	idmap2 := map[int64]struct{}{}
+	idmap2 := map[Entity]struct{}{}
 	for i := 0; i < size; i++ {
 		id := e2.NewID()
 		idmap2[id] = struct{}{}
@@ -119,9 +119,9 @@ func TestEntityIDGenerator_Free(t *testing.T) {
 func BenchmarkEntityIDGenerator_NewFreeRandom(b *testing.B) {
 
 	e := NewEntityIDGenerator(1024, 100)
-	idmap := map[int64]struct{}{}
+	idmap := map[Entity]struct{}{}
 	e2 := &_EntityTest{freeList: map[RealID]struct{}{}}
-	idmap2 := map[int64]struct{}{}
+	idmap2 := map[Entity]struct{}{}
 
 	for i := 0; i < 1000000; i++ {
 		id := e.NewID()

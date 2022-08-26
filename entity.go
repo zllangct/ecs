@@ -49,7 +49,7 @@ func NewEntityIDGenerator(initSize int, delayCap int) *EntityIDGenerator {
 	for i := 0; i < len(g.ids); i++ {
 		g.ids[i].index = int32(i + 1)
 	}
-	g.free = 0
+	g.free = 1
 	g.pending = int32(initSize)
 	g.len = 0
 	g.removeDelay = make([]RealID, delayCap)
@@ -58,7 +58,7 @@ func NewEntityIDGenerator(initSize int, delayCap int) *EntityIDGenerator {
 	return g
 }
 
-func (e *EntityIDGenerator) NewID() int64 {
+func (e *EntityIDGenerator) NewID() Entity {
 	id := RealID{}
 	if e.free == e.pending {
 		e.ids = append(e.ids, RealID{index: e.free, reuse: 0})
@@ -72,13 +72,13 @@ func (e *EntityIDGenerator) NewID() int64 {
 		e.free = next
 	}
 	e.len++
-	return id.ToInt64()
+	return id.ToEntity()
 }
 
-func (e *EntityIDGenerator) FreeID(id int64) {
+func (e *EntityIDGenerator) FreeID(entity Entity) {
 	e.len--
 
-	real := *(*RealID)(unsafe.Pointer(&id))
+	real := entity.ToRealID()
 	e.ids[real.index].index = -1
 
 	e.removeDelay[e.delayFree] = real

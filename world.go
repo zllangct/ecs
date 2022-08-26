@@ -70,14 +70,15 @@ type ecsWorld struct {
 	//system flow,all systems
 	systemFlow *systemFlow
 	//all components
-	//components *ComponentCollection
 	components IComponentCollection
 	//all entities
-	entities *EntityCollection
+	entities *EntitySet
 	//sibling cache
 	siblingCache *siblingCache
 	//optimizer
 	optimizer *optimizer
+	//entity id generator
+	idGenerator *EntityIDGenerator
 
 	workPool *Pool
 	metrics  *Metrics
@@ -113,6 +114,10 @@ func NewWorld(config *WorldConfig) *ecsWorld {
 
 	world.workPool = NewPool(config.MaxPoolThread, config.MaxPoolJobQueue)
 	world.workPool.Start()
+
+	world.idGenerator = NewEntityIDGenerator(1024, 10)
+
+	world.metrics = NewMetrics(world.config.IsMetrics, world.config.IsMetricsPrint)
 
 	world.components = NewComponentCollection(world, config.HashCount)
 	world.optimizer = newOptimizer(world)
@@ -193,7 +198,7 @@ func (w *ecsWorld) addJob(job func(), hashKey ...uint32) {
 
 // AddEntity entity operate : add
 func (w *ecsWorld) addEntity(entity Entity) {
-	w.entities.Add(entity)
+	w.entities.Add(entity, nil)
 }
 
 func (w *ecsWorld) GetEntityInfo(entity Entity) EntityInfo {
@@ -210,7 +215,7 @@ func (w *ecsWorld) getComponents(typ reflect.Type) IComponentSet {
 }
 
 func (w *ecsWorld) NewEntity() EntityInfo {
-	info := EntityInfo{world: w, entity: newEntity()}
+	info := EntityInfo{world: w, entity: w.idGenerator.NewID()}
 	return info
 }
 

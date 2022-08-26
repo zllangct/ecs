@@ -52,7 +52,7 @@ type ISystem interface {
 	baseInit(world *ecsWorld, ins ISystem)
 	eventDispatch()
 	getOptimizer() *OptimizerReporter
-	getGetterCache() map[reflect.Type]interface{}
+	getGetterCache() *GetterCache
 }
 
 type SystemObject interface {
@@ -68,7 +68,7 @@ type System[T SystemObject] struct {
 	lock              sync.Mutex
 	requirements      map[reflect.Type]IRequirement
 	events            map[CustomEventName]CustomEventHandler
-	getterCache       map[reflect.Type]interface{}
+	getterCache       *GetterCache
 	eventQueue        *list.List
 	order             Order
 	optimizerReporter *OptimizerReporter
@@ -247,7 +247,7 @@ func (s *System[T]) baseInit(world *ecsWorld, ins ISystem) {
 	s.requirements = map[reflect.Type]IRequirement{}
 	s.events = make(map[CustomEventName]CustomEventHandler)
 	s.eventQueue = list.New()
-	s.getterCache = map[reflect.Type]interface{}{}
+	s.getterCache = NewGetterCache(len(s.requirements))
 
 	if ins.Order() == OrderInvalid {
 		s.setOrder(OrderDefault)
@@ -282,7 +282,7 @@ func (s *System[T]) baseInit(world *ecsWorld, ins ISystem) {
 		}
 	}
 
-	s.state = SystemStateInit
+	s.state = SystemStateStart
 }
 
 func (s *System[T]) getPointer() unsafe.Pointer {
@@ -325,6 +325,6 @@ func (s *System[T]) getOptimizer() *OptimizerReporter {
 	return s.optimizerReporter
 }
 
-func (s *System[T]) getGetterCache() map[reflect.Type]interface{} {
+func (s *System[T]) getGetterCache() *GetterCache {
 	return s.getterCache
 }
