@@ -9,40 +9,40 @@ const (
 	__worldTest_Entity_Count int = 3
 )
 
-type __worldTest_Com1 struct {
-	Component[__worldTest_Com1]
+type __world_Test_C_1 struct {
+	Component[__world_Test_C_1]
 
 	Field1 int
 	Field2 int
 }
 
-type __worldTest_Com2 struct {
-	Component[__worldTest_Com2]
+type __world_Test_C_2 struct {
+	Component[__world_Test_C_2]
 
 	Field1 int
 	Field2 int
 }
 
-type __worldTest_Com3 struct {
-	Component[__worldTest_Com3]
+type __world_Test_C_3 struct {
+	Component[__world_Test_C_3]
 
 	Name string
 }
 
-type __worldTest_System1 struct {
-	System[__worldTest_System1]
+type __world_Test_S_1 struct {
+	System[__world_Test_S_1]
 }
 
-func (w *__worldTest_System1) Init() {
-	w.SetRequirements(&__worldTest_Com1{}, &__worldTest_Com2{}, &__worldTest_Com3{})
-	w.SetUtility(&__worldTest_U_Input{})
+func (w *__world_Test_S_1) Init() {
+	w.SetRequirements(&__world_Test_C_1{}, &__world_Test_C_2{}, &__world_Test_C_3{})
+	w.SetUtility(&__world_Test_U_Input{})
 }
 
-func (w *__worldTest_System1) Update(event Event) {
+func (w *__world_Test_S_1) Update(event Event) {
 	Log.Infof("Update: %d", event.Frame)
-	iter := GetInterestedComponents[__worldTest_Com1](w)
+	iter := GetInterestedComponents[__world_Test_C_1](w)
 	for c := iter.Begin(); !iter.End(); c = iter.Next() {
-		c2 := GetRelatedComponent[__worldTest_Com2](w, c.owner)
+		c2 := GetRelatedComponent[__world_Test_C_2](w, c.owner)
 		if c2 == nil {
 			continue
 		}
@@ -58,13 +58,13 @@ func (w *__worldTest_System1) Update(event Event) {
 	}
 }
 
-type __worldTest_U_Input struct {
-	Utility[__worldTest_System1]
+type __world_Test_U_Input struct {
+	Utility[__world_Test_S_1]
 }
 
-func (u *__worldTest_U_Input) ChangeName(entity Entity, name string) {
+func (u *__world_Test_U_Input) ChangeName(entity Entity, name string) {
 	sys := u.GetSystem()
-	c := GetInterestedComponent[__worldTest_Com3](sys, entity)
+	c := GetInterestedComponent[__world_Test_C_3](sys, entity)
 	if c == nil {
 		return
 	}
@@ -77,46 +77,53 @@ func Test_ecsWorld_World(t *testing.T) {
 	config := NewDefaultWorldConfig()
 	world := NewWorld(config)
 
-	RegisterSystem[__worldTest_System1](world)
+	RegisterSystem[__world_Test_S_1](world)
+
+	launcher := NewSyncWorldLauncher(world)
 
 	entities := make([]Entity, __worldTest_Entity_Count)
 
 	for i := 0; i < __worldTest_Entity_Count; i++ {
 		e1 := world.NewEntity()
-		e1.Add(&__worldTest_Com1{}, &__worldTest_Com2{}, &__worldTest_Com3{})
+		e1.Add(&__world_Test_C_1{}, &__world_Test_C_2{}, &__world_Test_C_3{})
 		entities[i] = e1.Entity()
 	}
 
-	world.Update()
+	world.update()
+
+	u, ok := GetUtility[__world_Test_S_1, __world_Test_U_Input](launcher)
+	if ok {
+		u.ChangeName(entities[0], "name0")
+	}
 
 	for {
-		world.Update()
+		launcher.Update()
 		time.Sleep(time.Second)
 	}
 }
 
-type __worldTest_Gate struct {
-	Gate[__worldTest_Gate]
+type __world_Test_Gate struct {
+	Gate[__world_Test_Gate]
 }
 
-func (g *__worldTest_Gate) Init(initializer GateInitializer) {
+func (g *__world_Test_Gate) Init(initializer GateInitializer) {
 	initializer.EventRegister("CustomEvent1", g.CustomEvent1)
 }
 
-func (g *__worldTest_Gate) CustomEvent1(api *GateApi, args []interface{}) {
+func (g *__world_Test_Gate) CustomEvent1(api *GateApi, args []interface{}) {
 	Log.Infof("CustomEvent1: %+v", args)
 	entity := args[0].(Entity)
 	name := args[1].(string)
-	u, ok := GetUtilityByGate[__worldTest_System1, __worldTest_U_Input](api)
+	u, ok := GetUtility[__world_Test_S_1, __world_Test_U_Input](api)
 	if !ok {
 		return
 	}
 	u.ChangeName(entity, name)
 }
 
-func (g *__worldTest_Gate) input1(entity Entity, name string) {
+func (g *__world_Test_Gate) input1(entity Entity, name string) {
 	g.Sync(func(api *GateApi) {
-		u, ok := GetUtilityByGate[__worldTest_System1, __worldTest_U_Input](api)
+		u, ok := GetUtility[__world_Test_S_1, __world_Test_U_Input](api)
 		if !ok {
 			return
 		}
@@ -130,19 +137,19 @@ func Test_ecsWorld_World_launcher(t *testing.T) {
 
 	world := NewWorld(config)
 
-	RegisterSystem[__worldTest_System1](world)
+	RegisterSystem[__world_Test_S_1](world)
 
 	entities := make([]Entity, __worldTest_Entity_Count)
 
 	for i := 0; i < __worldTest_Entity_Count; i++ {
 		e1 := world.NewEntity()
-		e1.Add(&__worldTest_Com1{}, &__worldTest_Com2{}, &__worldTest_Com3{})
+		e1.Add(&__world_Test_C_1{}, &__world_Test_C_2{}, &__world_Test_C_3{})
 		entities[i] = e1.Entity()
 	}
 
 	launcher := NewAsyncWorldLauncher(world)
-	iGate := launcher.SetGate(&__worldTest_Gate{})
-	gate := iGate.(*__worldTest_Gate)
+	iGate := launcher.SetGate(&__world_Test_Gate{})
+	gate := iGate.(*__world_Test_Gate)
 
 	go launcher.Run()
 

@@ -9,6 +9,10 @@ type GateObject interface {
 	__GateIdentification()
 }
 
+type IUtilityGetter interface {
+	getWorld() IWorld
+}
+
 type GatePointer[T GateObject] interface {
 	IGate
 	*T
@@ -126,8 +130,12 @@ func (p *Gate[T]) Sync(fn func(api *GateApi)) {
 	p.syncQueue = append(p.syncQueue, fn)
 }
 
-func GetUtilityByGate[T SystemObject, U UtilityObject](g *GateApi) (*U, bool) {
-	sys, ok := g.getWorld().GetSystem(TypeOf[T]())
+func GetUtility[T SystemObject, U UtilityObject](getter IUtilityGetter) (*U, bool) {
+	w := getter.getWorld()
+	if w == nil {
+		return nil, false
+	}
+	sys, ok := w.GetSystem(TypeOf[T]())
 	if !ok {
 		return nil, false
 	}

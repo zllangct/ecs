@@ -42,7 +42,6 @@ func NewDefaultWorldConfig() *WorldConfig {
 }
 
 type IWorld interface {
-	Update()
 	GetStatus() WorldStatus
 	GetID() int64
 	NewEntity() EntityInfo
@@ -52,6 +51,7 @@ type IWorld interface {
 	GetSystem(sys reflect.Type) (ISystem, bool)
 	Optimize(t time.Duration, force bool)
 
+	update()
 	setStatus(status WorldStatus)
 	addComponent(entity Entity, component IComponent)
 	getComponents(typ reflect.Type) IComponentSet
@@ -137,7 +137,7 @@ func (w *ecsWorld) GetID() int64 {
 	return w.id
 }
 
-func (w *ecsWorld) Update() {
+func (w *ecsWorld) update() {
 	if w.status != WorldStatusRunning {
 		w.status = WorldStatusRunning
 	}
@@ -227,16 +227,4 @@ func (w *ecsWorld) AddFreeComponent(component IComponent) {
 		return
 	}
 	w.addComponent(0, component)
-}
-
-func GetUtilityByWorld[T SystemObject, U UtilityObject](world IWorld) (*U, bool) {
-	sys, ok := world.GetSystem(TypeOf[T]())
-	if !ok {
-		return nil, false
-	}
-	u := (*U)(sys.GetUtility().getPointer())
-	if u == nil {
-		return nil, false
-	}
-	return u, true
 }

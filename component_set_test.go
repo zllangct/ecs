@@ -8,10 +8,10 @@ import (
 func TestComponentSet_Sort(t *testing.T) {
 	//准备数据
 	caseCount := 50
-	var srcList []item
+	var srcList []__unorderedCollection_Test_item
 	for i := 0; i < caseCount; i++ {
-		srcList = append(srcList, item{
-			Component: Component[item]{
+		srcList = append(srcList, __unorderedCollection_Test_item{
+			Component: Component[__unorderedCollection_Test_item]{
 				seq: uint32(caseCount - i),
 			},
 			ItemID: int64(i),
@@ -20,7 +20,7 @@ func TestComponentSet_Sort(t *testing.T) {
 	}
 
 	//创建容器(无序数据集)
-	c := NewComponentSet[item]()
+	c := NewComponentSet[__unorderedCollection_Test_item]()
 
 	//添加数据
 	for i := 0; i < caseCount; i++ {
@@ -40,18 +40,18 @@ func TestComponentSet_Sort(t *testing.T) {
 }
 
 func TestNewComponentSet(t *testing.T) {
-	cs := NewComponentSet[item]()
+	cs := NewComponentSet[__unorderedCollection_Test_item]()
 	if cs.GetElementMeta().it == 0 {
 		t.Error("element meta error")
 	}
 }
 
 func BenchmarkComponentSet_Read(b *testing.B) {
-	c := NewComponentSet[item]()
+	c := NewComponentSet[__unorderedCollection_Test_item]()
 	var ids []int64
 	total := 1000000
 	for n := 0; n < total; n++ {
-		item := &item{
+		item := &__unorderedCollection_Test_item{
 			ItemID: int64(n),
 		}
 		_ = c.Add(item, Entity(n))

@@ -5,8 +5,8 @@ import (
 	"unsafe"
 )
 
-type item struct {
-	Component[item]
+type __unorderedCollection_Test_item struct {
+	Component[__unorderedCollection_Test_item]
 	ItemID int64
 	Arr    [3]int
 }
@@ -14,16 +14,16 @@ type item struct {
 func TestUnorderedCollection_Iterator(t *testing.T) {
 	//准备数据
 	caseCount := 50
-	var srcList []item
+	var srcList []__unorderedCollection_Test_item
 	for i := 0; i < caseCount; i++ {
-		srcList = append(srcList, item{
+		srcList = append(srcList, __unorderedCollection_Test_item{
 			ItemID: int64(i),
 			Arr:    [3]int{1, 2, 3},
 		})
 	}
 
 	//创建容器(无序数据集)
-	c := NewUnorderedCollection[item]()
+	c := NewUnorderedCollection[__unorderedCollection_Test_item]()
 
 	//添加数据
 	for i := 0; i < caseCount; i++ {
@@ -46,14 +46,14 @@ func TestUnorderedCollection_Iterator(t *testing.T) {
 }
 
 func BenchmarkUnorderedCollection_SliceIter(b *testing.B) {
-	var slice []item
+	var slice []__unorderedCollection_Test_item
 	// collection 有ID生成，此处用通常方式模拟
 	var id2index = map[int]int{}
 
 	var ids []int64
 	total := 100000
 	for n := 0; n < total; n++ {
-		item := &item{
+		item := &__unorderedCollection_Test_item{
 			ItemID: int64(n),
 		}
 		slice = append(slice, *item)
@@ -71,11 +71,11 @@ func BenchmarkUnorderedCollection_SliceIter(b *testing.B) {
 }
 
 func BenchmarkUnorderedCollection_Write(b *testing.B) {
-	c := NewUnorderedCollection[item]()
+	c := NewUnorderedCollection[__unorderedCollection_Test_item]()
 	b.ResetTimer()
 
 	for n := 0; n < b.N; n++ {
-		item := &item{
+		item := &__unorderedCollection_Test_item{
 			ItemID: int64(n),
 		}
 		ret, _ := c.Add(item)
@@ -85,17 +85,17 @@ func BenchmarkUnorderedCollection_Write(b *testing.B) {
 
 func BenchmarkUnorderedCollection_SliceRead(b *testing.B) {
 	total := 100000
-	c := NewUnorderedCollection[item]()
-	arr := make([]item, total)
+	c := NewUnorderedCollection[__unorderedCollection_Test_item]()
+	arr := make([]__unorderedCollection_Test_item, total)
 	for n := 0; n < total; n++ {
-		item := item{
+		item := __unorderedCollection_Test_item{
 			ItemID: int64(n),
 		}
 		_, _ = c.Add(&item)
 		arr = append(arr, item)
 	}
 
-	fn := func(idx int64) *item {
+	fn := func(idx int64) *__unorderedCollection_Test_item {
 		return nil
 	}
 
@@ -113,7 +113,7 @@ func BenchmarkUnorderedCollection_SliceRead(b *testing.B) {
 	})
 	b.Run("unordered collection 2", func(b *testing.B) {
 		for n := 0; n < b.N; n++ {
-			_ = (*item)(unsafe.Pointer(uintptr(unsafe.Pointer(&c.data[0])) + uintptr(n%total)*c.eleSize))
+			_ = (*__unorderedCollection_Test_item)(unsafe.Pointer(uintptr(unsafe.Pointer(&c.data[0])) + uintptr(n%total)*c.eleSize))
 		}
 	})
 	b.Run("unordered collection empty func", func(b *testing.B) {
@@ -124,11 +124,11 @@ func BenchmarkUnorderedCollection_SliceRead(b *testing.B) {
 }
 
 func BenchmarkUnorderedCollection_Read(b *testing.B) {
-	c := NewUnorderedCollection[item]()
+	c := NewUnorderedCollection[__unorderedCollection_Test_item]()
 	var ids []int64
 	total := 100000
 	for n := 0; n < total; n++ {
-		item := &item{
+		item := &__unorderedCollection_Test_item{
 			ItemID: int64(n),
 		}
 		_, _ = c.Add(item)
@@ -145,15 +145,15 @@ func BenchmarkUnorderedCollection_Read(b *testing.B) {
 func BenchmarkUnorderedCollection_ReadUnsafe(b *testing.B) {
 	var ids []int64
 	total := 100000
-	data := make([]item, total)
+	data := make([]__unorderedCollection_Test_item, total)
 	for n := 0; n < total; n++ {
-		item := item{
+		item := __unorderedCollection_Test_item{
 			ItemID: int64(n),
 		}
 		data = append(data, item)
 		ids = append(ids, int64(n+1))
 	}
-	eleSize := unsafe.Sizeof(item{})
+	eleSize := unsafe.Sizeof(__unorderedCollection_Test_item{})
 
 	b.ResetTimer()
 	b.Run("direct", func(b *testing.B) {
@@ -164,7 +164,7 @@ func BenchmarkUnorderedCollection_ReadUnsafe(b *testing.B) {
 
 	b.Run("unsafe", func(b *testing.B) {
 		for n := 0; n < b.N; n++ {
-			_ = (*item)(unsafe.Pointer(uintptr(unsafe.Pointer(&data[0])) + uintptr(int64((n+1)%total))*eleSize))
+			_ = (*__unorderedCollection_Test_item)(unsafe.Pointer(uintptr(unsafe.Pointer(&data[0])) + uintptr(int64((n+1)%total))*eleSize))
 		}
 	})
 }

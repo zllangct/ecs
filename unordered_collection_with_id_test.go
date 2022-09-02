@@ -5,11 +5,11 @@ import (
 )
 
 func BenchmarkUnorderedCollectionWithID_Read(b *testing.B) {
-	c := NewUnorderedCollectionWithID[item]()
+	c := NewUnorderedCollectionWithID[__unorderedCollection_Test_item]()
 	var ids []int64
 	total := 100000
 	for n := 0; n < total; n++ {
-		item := &item{
+		item := &__unorderedCollection_Test_item{
 			ItemID: int64(n),
 		}
 		_, _ = c.Add(item)
@@ -24,11 +24,11 @@ func BenchmarkUnorderedCollectionWithID_Read(b *testing.B) {
 }
 
 func BenchmarkUnorderedCollectionWithID_Iter(b *testing.B) {
-	c := NewUnorderedCollectionWithID[item]()
+	c := NewUnorderedCollectionWithID[__unorderedCollection_Test_item]()
 	var ids []int64
 	total := 100000
 	for n := 0; n < total; n++ {
-		item := &item{
+		item := &__unorderedCollection_Test_item{
 			ItemID: int64(n),
 		}
 		_, _ = c.Add(item)
@@ -47,11 +47,11 @@ func BenchmarkUnorderedCollectionWithID_Iter(b *testing.B) {
 }
 
 func BenchmarkUnorderedCollectionWithID_SliceWrite(b *testing.B) {
-	var slice []item
+	var slice []__unorderedCollection_Test_item
 	var id2index = map[int]int{}
 
 	for n := 0; n < b.N; n++ {
-		item := &item{
+		item := &__unorderedCollection_Test_item{
 			ItemID: int64(n),
 		}
 		slice = append(slice, *item)
@@ -60,14 +60,14 @@ func BenchmarkUnorderedCollectionWithID_SliceWrite(b *testing.B) {
 }
 
 func BenchmarkUnorderedCollectionWithID_SliceRead(b *testing.B) {
-	var slice []item
+	var slice []__unorderedCollection_Test_item
 	// collection 有ID生成，此处用通常方式模拟
 	var id2index = map[int]int{}
 
 	var ids []int64
 	total := 100000
 	for n := 0; n < total; n++ {
-		item := &item{
+		item := &__unorderedCollection_Test_item{
 			ItemID: int64(n),
 		}
 		slice = append(slice, *item)
