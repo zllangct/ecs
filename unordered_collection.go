@@ -100,7 +100,10 @@ func (c *UnorderedCollection[T]) shrink() {
 		threshold = int64(float64(c.len) * 1.25)
 	}
 	if int64(len(c.data)) > threshold {
-		c.data = c.data[:threshold]
+		//c.data = c.data[:threshold]
+		newData := make([]T, threshold)
+		copy(newData, c.data)
+		c.data = newData
 	}
 }
 

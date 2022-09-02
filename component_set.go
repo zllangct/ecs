@@ -10,15 +10,18 @@ type IComponentSet interface {
 	GetByEntity(entity Entity) any
 	GetElementMeta() ComponentMetaInfo
 	GetComponent(entity Entity) IComponent
+
 	Sort()
+	Shrink()
 
 	pointer() unsafe.Pointer
 }
 
 type ComponentSet[T ComponentObject] struct {
 	UnorderedCollection[T]
-	indices []int64
-	meta    ComponentMetaInfo
+	indexMax int32
+	indices  []int32
+	meta     ComponentMetaInfo
 }
 
 func NewComponentSet[T ComponentObject](initSize ...int) *ComponentSet[T] {
@@ -36,16 +39,14 @@ func NewComponentSet[T ComponentObject](initSize ...int) *ComponentSet[T] {
 		meta: ComponentMeta.GetComponentMetaInfo(typ),
 	}
 	if size == 0 {
-		c.indices = make([]int64, 1)
+		c.indices = make([]int32, 1)
 	}
 	return c
 }
 
 func (c *ComponentSet[T]) Add(element *T, entity Entity) *T {
-	_, idx := c.UnorderedCollection.Add(element)
-
 	realID := entity.ToRealID()
-
+	_, idx := c.UnorderedCollection.Add(element)
 	length := len(c.indices)
 	if realID.index >= int32(length) {
 		m := int32(0)
@@ -56,7 +57,7 @@ func (c *ComponentSet[T]) Add(element *T, entity Entity) *T {
 		} else {
 			m = realID.index * 5 / 4
 		}
-		newIndices := make([]int64, m)
+		newIndices := make([]int32, m)
 		count := copy(newIndices, c.indices)
 		if count != length {
 			panic("copy failed")
@@ -64,7 +65,7 @@ func (c *ComponentSet[T]) Add(element *T, entity Entity) *T {
 		c.indices = newIndices
 	}
 
-	c.indices[realID.index] = idx
+	c.indices[realID.index] = int32(idx)
 
 	return &c.data[idx]
 }
@@ -75,9 +76,9 @@ func (c *ComponentSet[T]) remove(entity Entity) *T {
 		return nil
 	}
 	idx := c.indices[realID.index]
-	removed, oldIndex, newIndex := c.UnorderedCollection.Remove(idx)
+	removed, oldIndex, newIndex := c.UnorderedCollection.Remove(int64(idx))
 	oldRealID := c.data[oldIndex].OwnerEntity().ToRealID()
-	c.indices[oldRealID.index] = newIndex
+	c.indices[oldRealID.index] = int32(newIndex)
 	c.indices[realID.index] = -1
 
 	return removed
@@ -97,7 +98,7 @@ func (c *ComponentSet[T]) getByEntity(entity Entity) *T {
 	if idx < 0 {
 		return nil
 	}
-	return c.UnorderedCollection.Get(idx)
+	return c.UnorderedCollection.Get(int64(idx))
 }
 
 func (c *ComponentSet[T]) GetByEntity(entity Entity) any {
@@ -106,6 +107,10 @@ func (c *ComponentSet[T]) GetByEntity(entity Entity) any {
 
 func (c *ComponentSet[T]) pointer() unsafe.Pointer {
 	return unsafe.Pointer(c)
+}
+
+func (c *ComponentSet[T]) Shrink() {
+	// TODO indices缩容
 }
 
 func (c *ComponentSet[T]) Sort() {
@@ -126,7 +131,7 @@ func (c *ComponentSet[T]) Sort() {
 	sort.Slice(c.data, func(i, j int) bool {
 		return (*Component[T])(unsafe.Pointer(&(c.data[i]))).seq < (*Component[T])(unsafe.Pointer(&(c.data[j]))).seq
 	})
-	for i := int64(0); i < int64(c.Len()); i++ {
+	for i := int32(0); i < int32(c.Len()); i++ {
 		cp = (*Component[T])(unsafe.Pointer(&(c.data[i])))
 		c.indices[cp.owner.ToRealID().index] = i
 	}

@@ -1,6 +1,7 @@
 package ecs
 
 import (
+	"reflect"
 	"sync"
 )
 
@@ -44,18 +45,18 @@ type SystemGroupList []*SystemGroup
 
 // system execute flow
 type systemFlow struct {
-	lock      sync.Mutex
 	world     *ecsWorld
 	stages    map[Stage]SystemGroupList
 	stageList []Stage
-	systems   sync.Map
+	systems   map[reflect.Type]ISystem
 	wg        *sync.WaitGroup
 }
 
 func newSystemFlow(runtime *ecsWorld) *systemFlow {
 	sf := &systemFlow{
-		world: runtime,
-		wg:    &sync.WaitGroup{},
+		world:   runtime,
+		systems: map[reflect.Type]ISystem{},
+		wg:      &sync.WaitGroup{},
 	}
 	sf.init()
 	return sf
@@ -122,7 +123,7 @@ func (p *systemFlow) eventDispatch() {
 			for ss := sl.next(); len(ss) > 0; ss = sl.next() {
 				if systemCount := len(ss); systemCount != 0 {
 					for i := 0; i < systemCount; i++ {
-						fn := ss[i].eventDispatch
+						fn := ss[i].eventsAsyncExecute
 						p.wg.Add(1)
 						wg := p.wg
 						p.world.addJob(func() {
@@ -135,10 +136,23 @@ func (p *systemFlow) eventDispatch() {
 			}
 		}
 	}
+	for _, period := range p.stageList {
+		sq = p.stages[period]
+		for _, sl := range sq {
+			sl.reset()
+			for ss := sl.next(); len(ss) > 0; ss = sl.next() {
+				if systemCount := len(ss); systemCount != 0 {
+					for i := 0; i < systemCount; i++ {
+						fn := ss[i].eventsAsyncExecute
+						fn()
+					}
+				}
+			}
+		}
+	}
 }
 
 func (p *systemFlow) systemUpdate(event Event) {
-	removeList := map[int64]ISystem{}
 	var sq SystemGroupList
 
 	var sys ISystem
@@ -260,7 +274,6 @@ func (p *systemFlow) systemUpdate(event Event) {
 								runSync = true
 
 								sys.setState(SystemStateDestroyed)
-								removeList[sys.ID()] = sys
 							}
 						}
 
@@ -291,16 +304,9 @@ func (p *systemFlow) systemUpdate(event Event) {
 			}
 		}
 	}
-	//do something clean
-	for _, system := range removeList {
-		p.unregister(system)
-	}
 }
 
 func (p *systemFlow) run(event Event) {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-
 	reporter := p.world.metrics.NewReporter("system_flow_run")
 	reporter.Start()
 
@@ -318,6 +324,9 @@ func (p *systemFlow) run(event Event) {
 	p.eventDispatch()
 	reporter.Sample("Event Dispatch")
 
+	p.flushTempTask()
+	reporter.Sample("Temp Task Execute")
+
 	//Log.Info("system flow # Logic #")
 	p.systemUpdate(event)
 	reporter.Sample("system execute")
@@ -329,8 +338,9 @@ func (p *systemFlow) run(event Event) {
 
 // register method only in world init or func init(){}
 func (p *systemFlow) register(system ISystem) {
-	p.lock.Lock()
-	defer p.lock.Unlock()
+	if p.world.GetStatus() != WorldStatusInit {
+		panic("system register only in world init")
+	}
 
 	//init function call
 	system.baseInit(p.world, system)
@@ -369,33 +379,7 @@ func (p *systemFlow) register(system ISystem) {
 		}
 	}
 
-	p.systems.Store(system.Type(), system)
-}
-
-func (p *systemFlow) unregister(system ISystem) {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-
-	order := system.Order()
-	if order > OrderAppend {
-		Log.Errorf("system order must less then %d, reset order to %d", OrderAppend+1, OrderAppend)
-		order = OrderAppend
-	}
-
-	for _, period := range p.stageList {
-		if !p.isImpEvent(system, period) {
-			continue
-		}
-
-		sl := p.stages[period]
-		for _, group := range sl {
-			if group.has(system) {
-				group.remove(system)
-			}
-		}
-	}
-
-	p.systems.Delete(system.Type())
+	p.systems[system.Type()] = system
 }
 
 func (p *systemFlow) isImpEvent(system ISystem, period Stage) bool {
@@ -436,8 +420,5 @@ func (p *systemFlow) isImpEvent(system ISystem, period Stage) bool {
 }
 
 func (p *systemFlow) stop() {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-
 	p.reset()
 }

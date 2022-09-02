@@ -1,8 +1,6 @@
 package ecs
 
 import (
-	"container/list"
-	"errors"
 	"reflect"
 	"sync"
 	"unsafe"
@@ -32,13 +30,20 @@ type ISystem interface {
 	Order() Order
 	World() IWorld
 	Requirements() map[reflect.Type]IRequirement
-	Emit(event CustomEventName, args ...interface{})
 	IsRequire(component IComponent) (IRequirement, bool)
 	ID() int64
 	Pause()
 	Resume()
 	Stop()
 
+	GetUtility() IUtility
+	pause()
+	resume()
+	stop()
+	doSync(func(api *SystemApi))
+	doAsync(func(api *SystemApi))
+	eventsSyncExecute()
+	eventsAsyncExecute()
 	getPointer() unsafe.Pointer
 	isRequire(componentType reflect.Type) (IRequirement, bool)
 	setOrder(order Order)
@@ -50,13 +55,12 @@ type ISystem interface {
 	setExecuting(isExecuting bool)
 	isExecuting() bool
 	baseInit(world *ecsWorld, ins ISystem)
-	eventDispatch()
 	getOptimizer() *OptimizerReporter
 	getGetterCache() *GetterCache
 }
 
 type SystemObject interface {
-	systemIdentification()
+	__SystemIdentification()
 }
 
 type SystemPointer[T SystemObject] interface {
@@ -67,13 +71,13 @@ type SystemPointer[T SystemObject] interface {
 type System[T SystemObject] struct {
 	lock              sync.Mutex
 	requirements      map[reflect.Type]IRequirement
-	events            map[CustomEventName]CustomEventHandler
+	eventsSync        []func(api *SystemApi)
+	eventsAsync       []func(api *SystemApi)
 	getterCache       *GetterCache
-	eventQueue        *list.List
 	order             Order
 	optimizerReporter *OptimizerReporter
 	world             *ecsWorld
-	utility           *Utility[T]
+	utility           IUtility
 	realType          reflect.Type
 	state             SystemState
 	isSafe            bool
@@ -81,7 +85,7 @@ type System[T SystemObject] struct {
 	id                int64
 }
 
-func (s System[T]) systemIdentification() {}
+func (s System[T]) __SystemIdentification() {}
 
 func (s *System[T]) instance() (sys ISystem) {
 	(*iface)(unsafe.Pointer(&sys)).data = unsafe.Pointer(s)
@@ -99,42 +103,38 @@ func (s *System[T]) ID() int64 {
 	return s.id
 }
 
-func (s *System[T]) EventRegister(event CustomEventName, fn CustomEventHandler) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	s.events[event] = fn
+func (s *System[T]) doSync(fn func(api *SystemApi)) {
+	s.eventsSync = append(s.eventsSync, fn)
 }
 
-func (s *System[T]) Emit(event CustomEventName, args ...interface{}) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	s.eventQueue.PushBack(CustomEvent{
-		Event: event,
-		Args:  args,
-	})
+func (s *System[T]) doAsync(fn func(api *SystemApi)) {
+	s.eventsAsync = append(s.eventsAsync, fn)
 }
 
-func (s *System[T]) eventDispatch() {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+func (s *System[T]) eventsSyncExecute() {
+	api := &SystemApi{sys: s}
+	events := s.eventsSync
+	s.eventsSync = make([]func(api *SystemApi), 0)
+	for _, f := range events {
+		f(api)
+	}
+	api.sys = nil
+}
 
-	for i := s.eventQueue.Front(); i != nil; i = i.Next() {
-		e := i.Value.(CustomEvent)
-		if fn, ok := s.events[e.Event]; ok {
-			err := TryAndReport(func() {
-				fn(e.Args)
-			})
-			if err != nil {
-				Log.Error(err)
-			}
-		} else {
-			Log.Errorf("event not found: %s", e.Event)
+func (s *System[T]) eventsAsyncExecute() {
+	api := &SystemApi{sys: s}
+	events := s.eventsAsync
+	s.eventsAsync = make([]func(api *SystemApi), 0)
+	var err error
+	for _, f := range events {
+		err = TryAndReport(func() {
+			f(api)
+		})
+		if err != nil {
+			Log.Error(err)
 		}
 	}
-
-	s.eventQueue.Init()
+	api.sys = nil
 }
 
 func (s *System[T]) SetRequirements(rqs ...IRequirement) {
@@ -167,51 +167,50 @@ func (s *System[T]) isThreadSafe() bool {
 	return s.isSafe
 }
 
-func (s *System[T]) SetUtility(utility *Utility[T]) {
+func (s *System[T]) SetUtility(utility IUtility) {
 	s.utility = utility
+	s.utility.setSystem(s)
+	s.utility.setWorld(s.world)
 }
 
-func (s *System[T]) GetUtility() *Utility[T] {
+func (s *System[T]) GetUtility() IUtility {
 	return s.utility
 }
 
 func (s *System[T]) Pause() {
-	s.Emit(SystemCustomEventPause, nil)
+	s.doAsync(func(api *SystemApi) {
+		api.Pause()
+	})
 }
 
 func (s *System[T]) Resume() {
-	s.Emit(SystemCustomEventResume, nil)
+	s.doAsync(func(api *SystemApi) {
+		api.Resume()
+	})
 }
 
 func (s *System[T]) Stop() {
-	s.Emit(SystemCustomEventStop, nil)
+	s.doAsync(func(api *SystemApi) {
+		api.Stop()
+	})
 }
 
-func (s *System[T]) pause(e []interface{}) error {
+func (s *System[T]) pause() {
 	if s.getState() == SystemStateUpdate {
 		s.setState(SystemStatePause)
-	} else {
-		return errors.New("system not running")
 	}
-	return nil
 }
 
-func (s *System[T]) resume(e []interface{}) error {
+func (s *System[T]) resume() {
 	if s.getState() == SystemStatePause {
 		s.setState(SystemStateUpdate)
-	} else {
-		return errors.New("system not pausing")
 	}
-	return nil
 }
 
-func (s *System[T]) stop(e []interface{}) error {
-	if s.getState() == SystemStatePause {
-		s.setState(SystemStateUpdate)
-	} else {
-		return errors.New("system not pausing")
+func (s *System[T]) stop() {
+	if s.getState() < SystemStateDestroy {
+		s.setState(SystemStateDestroy)
 	}
-	return nil
 }
 
 func (s *System[T]) getState() SystemState {
@@ -245,33 +244,14 @@ func (s *System[T]) isRequire(typ reflect.Type) (IRequirement, bool) {
 
 func (s *System[T]) baseInit(world *ecsWorld, ins ISystem) {
 	s.requirements = map[reflect.Type]IRequirement{}
-	s.events = make(map[CustomEventName]CustomEventHandler)
-	s.eventQueue = list.New()
+	s.eventsSync = make([]func(api *SystemApi), 0)
+	s.eventsAsync = make([]func(api *SystemApi), 0)
 	s.getterCache = NewGetterCache(len(s.requirements))
 
 	if ins.Order() == OrderInvalid {
 		s.setOrder(OrderDefault)
 	}
 	s.world = world
-
-	s.EventRegister(SystemCustomEventPause, func(i []interface{}) {
-		err := s.pause(i)
-		if err != nil {
-			Log.Error(err)
-		}
-	})
-	s.EventRegister(SystemCustomEventResume, func(i []interface{}) {
-		err := s.resume(i)
-		if err != nil {
-			Log.Error(err)
-		}
-	})
-	s.EventRegister(SystemCustomEventStop, func(i []interface{}) {
-		err := s.stop(i)
-		if err != nil {
-			Log.Error(err)
-		}
-	})
 
 	if i, ok := ins.(InitReceiver); ok {
 		err := TryAndReport(func() {

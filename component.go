@@ -51,24 +51,24 @@ type IComponent interface {
 }
 
 type ComponentObject interface {
-	componentIdentification()
+	__ComponentIdentification()
 	OwnerEntity() Entity
 }
 
 type FreeComponentObject interface {
 	ComponentObject
-	freeComponentIdentification()
+	__FreeComponentIdentification()
 }
 
 type DisposableComponentObject interface {
 	ComponentObject
-	disposableComponentIdentification()
+	__DisposableComponentIdentification()
 }
 
 type FreeDisposableComponentObject interface {
 	ComponentObject
-	freeComponentIdentification()
-	disposableComponentIdentification()
+	__FreeComponentIdentification()
+	__DisposableComponentIdentification()
 }
 
 type ComponentPointer[T ComponentObject] interface {
@@ -99,7 +99,7 @@ func (f *FreeComponent[T]) getComponentType() ComponentType {
 	return ComponentTypeFree
 }
 
-func (f FreeComponent[T]) freeComponentIdentification() {}
+func (f FreeComponent[T]) __FreeComponentIdentification() {}
 
 type DisposableComponent[T DisposableComponentObject] struct {
 	Component[T]
@@ -109,7 +109,7 @@ func (f *DisposableComponent[T]) getComponentType() ComponentType {
 	return ComponentTypeDisposable
 }
 
-func (f DisposableComponent[T]) disposableComponentIdentification() {}
+func (f DisposableComponent[T]) __DisposableComponentIdentification() {}
 
 type FreeDisposableComponent[T FreeDisposableComponentObject] struct {
 	Component[T]
@@ -119,9 +119,9 @@ func (f *FreeDisposableComponent[T]) getComponentType() ComponentType {
 	return ComponentTypeFreeDisposable
 }
 
-func (f FreeDisposableComponent[T]) freeComponentIdentification() {}
+func (f FreeDisposableComponent[T]) __FreeComponentIdentification() {}
 
-func (f FreeDisposableComponent[T]) disposableComponentIdentification() {}
+func (f FreeDisposableComponent[T]) __DisposableComponentIdentification() {}
 
 type Component[T ComponentObject] struct {
 	st    uint8
@@ -131,7 +131,7 @@ type Component[T ComponentObject] struct {
 	owner Entity
 }
 
-func (c Component[T]) componentIdentification() {}
+func (c Component[T]) __ComponentIdentification() {}
 
 func (c Component[T]) OwnerEntity() Entity {
 	return c.owner

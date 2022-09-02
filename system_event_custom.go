@@ -1,7 +1,7 @@
 package ecs
 
 type CustomEventName string
-type CustomEventHandler func([]interface{})
+type CustomEventHandler func(*GateApi, []interface{})
 
 type CustomEvent struct {
 	Event CustomEventName

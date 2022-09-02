@@ -49,14 +49,8 @@ func AddComponent(world IWorld, entity Entity, components ...IComponent) {
 
 // system api
 
-func NewPeripheralSystem[T PeripheralSystemObject, TP PeripheralSystemPointer[T]]() *T {
-	var ins T
-	psys := IPeripheralSystem(TP(&ins))
-	psys.init()
-	if i, ok := psys.(InitReceiver); ok {
-		i.Init()
-	}
-	return &ins
+func GetInterestedComponent[T ComponentObject](sys ISystem, entity Entity) *T {
+	return GetRelatedComponent[T](sys, entity)
 }
 
 func GetInterestedComponents[T ComponentObject](sys ISystem) Iterator[T] {
@@ -67,7 +61,7 @@ func GetInterestedComponents[T ComponentObject](sys ISystem) Iterator[T] {
 		return EmptyIter[T]()
 	}
 	typ := GetType[T]()
-	r, ok := sys.Requirements()[typ]
+	r, ok := sys.isRequire(typ)
 	if !ok {
 		return EmptyIter[T]()
 	}

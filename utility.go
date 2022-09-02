@@ -1,6 +1,19 @@
 package ecs
 
-type IUtility[T SystemObject] interface {
+import (
+	"reflect"
+	"unsafe"
+)
+
+type UtilityObject interface {
+	__UtilityIdentification()
+}
+
+type IUtility interface {
+	Do(fn func(*SystemApi))
+	getPointer() unsafe.Pointer
+	setSystem(sys ISystem)
+	setWorld(world IWorld)
 }
 
 type Utility[T SystemObject] struct {
@@ -8,7 +21,17 @@ type Utility[T SystemObject] struct {
 	sys ISystem
 }
 
-func (u *Utility[T]) getSystem() ISystem {
+func (u *Utility[T]) setWorld(w IWorld) {
+	u.w = w
+}
+
+func (u *Utility[T]) setSystem(sys ISystem) {
+	u.sys = sys
+}
+
+func (u Utility[T]) __UtilityIdentification() {}
+
+func (u *Utility[T]) GetSystem() ISystem {
 	if u.sys == nil {
 		s, ok := u.w.GetSystem(TypeOf[T]())
 		if ok {
@@ -18,29 +41,30 @@ func (u *Utility[T]) getSystem() ISystem {
 	return u.sys
 }
 
-func (u *Utility[T]) Emit(event CustomEventName, args ...interface{}) {
-	sys := u.getSystem()
-	sys.Emit(event, args...)
+func (u *Utility[T]) Do(fn func(*SystemApi)) {
+	u.sys.doSync(fn)
 }
 
-func GetUtility[T SystemObject](w IWorld) (IUtility[T], bool) {
-	sys, ok := w.GetSystem(TypeOf[T]())
-	if !ok {
-		return nil, false
-	}
-	return (*System[T])(sys.getPointer()).GetUtility(), ok
+func (u *Utility[T]) getPointer() unsafe.Pointer {
+	return unsafe.Pointer(u)
 }
 
-// Test code
-
-type TestUtilitySystem struct {
-	System[TestUtilitySystem]
+type SystemApi struct {
+	sys ISystem
 }
 
-type TestUtility struct {
-	Utility[TestUtilitySystem]
+func (s *SystemApi) GetRequirements() map[reflect.Type]IRequirement {
+	return s.sys.Requirements()
 }
 
-func (t *TestUtility) Hello() {
+func (s *SystemApi) Pause() {
+
+}
+
+func (s *SystemApi) Resume() {
+
+}
+
+func (s *SystemApi) Stop() {
 
 }

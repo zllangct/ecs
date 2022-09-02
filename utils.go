@@ -15,6 +15,8 @@ var Empty struct{} = struct{}{}
 var seq uint32
 var timestamp int64
 
+var DebugTry = true
+
 func init() {
 	rand.Seed(time.Now().UnixNano())
 }
@@ -39,6 +41,9 @@ func LocalUniqueID() int64 {
 
 func Try(task func(), catch ...func(error)) {
 	defer (func() {
+		if DebugTry {
+			return
+		}
 		if r := recover(); r != nil {
 			var str string
 			switch r.(type) {
@@ -58,6 +63,9 @@ func Try(task func(), catch ...func(error)) {
 
 func TryAndReport(task func()) (err error) {
 	defer func() {
+		if DebugTry {
+			return
+		}
 		r := recover()
 		switch typ := r.(type) {
 		case error:

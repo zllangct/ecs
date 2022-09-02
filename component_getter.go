@@ -66,7 +66,11 @@ func NewComponentGetter[T ComponentObject](sys ISystem) *ComponentGetter[T] {
 		return nil
 	}
 	getter := &ComponentGetter[T]{}
-	getter.set = sys.World().getComponents(typ).(*ComponentSet[T])
+	seti := sys.World().getComponents(typ)
+	if seti == nil {
+		return nil
+	}
+	getter.set = seti.(*ComponentSet[T])
 	getter.permission = r.getPermission()
 	return getter
 }

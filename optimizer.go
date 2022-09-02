@@ -37,16 +37,15 @@ func newOptimizer(world *ecsWorld) *optimizer {
 func (o *optimizer) collect() {
 	start := time.Now()
 	var opts []*OptimizerReporter
-	o.world.systemFlow.systems.Range(func(key, value interface{}) bool {
+	for _, value := range o.world.systemFlow.systems {
 		system, ok := value.(ISystem)
 		if !ok {
-			return true
+			continue
 		}
 		if system != nil {
 			opts = append(opts, system.getOptimizer())
 		}
-		return true
-	})
+	}
 	//all shapes
 	var shapeRef = map[reflect.Type]*ShapeInfo{}
 	for _, opt := range opts {
