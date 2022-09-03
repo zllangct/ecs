@@ -61,12 +61,13 @@ type ComponentGetter[T ComponentObject] struct {
 
 func NewComponentGetter[T ComponentObject](sys ISystem) *ComponentGetter[T] {
 	typ := TypeOf[T]()
-	r, isRequire := sys.isRequire(typ)
+
+	r, isRequire := sys.GetRequirements()[typ]
 	if !isRequire {
 		return nil
 	}
 	getter := &ComponentGetter[T]{}
-	seti := sys.World().getComponents(typ)
+	seti := sys.World().getComponentSet(typ)
 	if seti == nil {
 		return nil
 	}

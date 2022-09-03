@@ -25,8 +25,8 @@ type __optimizer_Bench_S_1 struct {
 	System[__optimizer_Bench_S_1]
 }
 
-func (t *__optimizer_Bench_S_1) Init() {
-	t.SetRequirements(&__optimizer_Bench_C_1{}, &__optimizer_Bench_C_2{})
+func (t *__optimizer_Bench_S_1) Init(initializer *SystemInitializer) {
+	t.SetRequirements(initializer, &__optimizer_Bench_C_1{}, &__optimizer_Bench_C_2{})
 }
 
 func (t *__optimizer_Bench_S_1) Update(event Event) {

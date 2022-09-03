@@ -18,8 +18,10 @@ type IComponentCollection interface {
 	operate(op CollectionOperate, entity Entity, component IComponent)
 	getTempTasks() []func()
 	clearDisposable()
-	getCollection(typ reflect.Type) IComponentSet
+	getComponentSet(typ reflect.Type) IComponentSet
+	getComponentSetByIntType(typ uint16) IComponentSet
 	getCollections() *SparseComponentCollection
+	checkSet(com IComponent) IComponentSet
 }
 
 type SparseComponentCollection struct {
@@ -202,9 +204,7 @@ func (c *ComponentCollection) getTempTasks() []func() {
 		taskList := list
 		set := c.collections.GetByType(typ)
 		if set == nil {
-			newSet := taskList.head.com.newCollection()
-			c.collections.Add(newSet.GetElementMeta().it, newSet)
-			set = c.collections.Get(newSet.GetElementMeta().it)
+			set = c.checkSet(taskList.head.com)
 		}
 
 		// 是否可以避免func封装？
@@ -219,7 +219,7 @@ func (c *ComponentCollection) getTempTasks() []func() {
 func (c *ComponentCollection) opExecute(taskList *opTaskList, collection IComponentSet) {
 	var t reflect.Type
 	meta := collection.GetElementMeta()
-	world := c.world
+	//world := c.world
 	for task := taskList.head; task != nil; task = task.next {
 		task.com.setIntType(meta.it)
 		task.com.setOwner(task.target)
@@ -231,11 +231,9 @@ func (c *ComponentCollection) opExecute(taskList *opTaskList, collection ICompon
 			case ComponentTypeNormal:
 				//task.target.componentAdded(t, ret)
 				//TODO channel并行block时间长
-				//world.siblingCache.ch <- cacheOpPool.Get().(*CacheOp).Set(task.target, meta.it, uint8(1))
 			case ComponentTypeDisposable:
 				c.disposableTemp(task.com, t)
 				//task.target.componentAdded(t, ret)
-				//world.siblingCache.ch <- cacheOpPool.Get().(*CacheOp).Set(task.target, meta.it, uint8(1))
 			case ComponentTypeFreeDisposable:
 				c.disposableTemp(task.com, t)
 			}
@@ -244,7 +242,6 @@ func (c *ComponentCollection) opExecute(taskList *opTaskList, collection ICompon
 			switch task.com.getComponentType() {
 			case ComponentTypeNormal, ComponentTypeDisposable:
 				//task.target.componentDeleted(t, task.com.getComponentType())
-				world.siblingCache.ch <- cacheOpPool.Get().(*CacheOp).Set(task.target, meta.it, uint8(2))
 			}
 		}
 	}
@@ -257,12 +254,25 @@ func (c *ComponentCollection) opExecute(taskList *opTaskList, collection ICompon
 	taskList.Reset()
 }
 
-func (c *ComponentCollection) getCollection(typ reflect.Type) IComponentSet {
+func (c *ComponentCollection) getComponentSet(typ reflect.Type) IComponentSet {
 	return c.collections.GetByType(typ)
+}
+
+func (c *ComponentCollection) getComponentSetByIntType(it uint16) IComponentSet {
+	return c.collections.Get(it)
 }
 
 func (c *ComponentCollection) getCollections() *SparseComponentCollection {
 	return c.collections
+}
+
+func (c *ComponentCollection) checkSet(com IComponent) IComponentSet {
+	set := c.collections.GetByType(com.Type())
+	if set == nil {
+		set = com.newCollection()
+		c.collections.Add(set.GetElementMeta().it, set)
+	}
+	return set
 }
 
 func (c *ComponentCollection) removeAllByType(typ reflect.Type) {

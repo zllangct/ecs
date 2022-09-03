@@ -6,14 +6,14 @@ type SyncWorldLauncher struct {
 	world *ecsWorld
 }
 
-func NewSyncWorldLauncher(w *ecsWorld) *SyncWorldLauncher {
+func newSyncWorldLauncher(w *ecsWorld) *SyncWorldLauncher {
 	return &SyncWorldLauncher{
 		world: w,
 	}
 }
 
-func (s *SyncWorldLauncher) getWorld() IWorld {
-	return s.world
+func (s *SyncWorldLauncher) GetUtilityGetter() UtilityGetter {
+	return UtilityGetter{s.world}
 }
 
 func (s *SyncWorldLauncher) Update() {
@@ -27,7 +27,7 @@ type AsyncWorldLauncher struct {
 	stopHandler func(world *ecsWorld)
 }
 
-func NewAsyncWorldLauncher(w *ecsWorld) *AsyncWorldLauncher {
+func newAsyncWorldLauncher(w *ecsWorld) *AsyncWorldLauncher {
 	return &AsyncWorldLauncher{
 		world: w,
 		wStop: make(chan struct{}),

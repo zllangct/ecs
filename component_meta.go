@@ -6,8 +6,9 @@ import (
 )
 
 var ComponentMeta = &componentMeta{
-	seq:   0,
-	types: map[reflect.Type]uint16{},
+	seq:     0,
+	types:   map[reflect.Type]uint16{},
+	it2Type: map[uint16]reflect.Type{},
 }
 
 func GetComponentMeta[T ComponentObject]() ComponentMetaInfo {
@@ -19,9 +20,16 @@ type ComponentMetaInfo struct {
 }
 
 type componentMeta struct {
-	mu    sync.RWMutex
-	seq   uint16
-	types map[reflect.Type]uint16
+	mu      sync.RWMutex
+	seq     uint16
+	types   map[reflect.Type]uint16
+	it2Type map[uint16]reflect.Type
+}
+
+func (c *componentMeta) ConvertToType(it uint16) reflect.Type {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.it2Type[it]
 }
 
 func (c *componentMeta) GetComponentMetaInfo(typ reflect.Type) ComponentMetaInfo {
@@ -38,6 +46,8 @@ func (c *componentMeta) GetComponentMetaInfo(typ reflect.Type) ComponentMetaInfo
 		} else {
 			c.seq++
 			it = c.seq
+			c.types[typ] = it
+			c.it2Type[it] = typ
 		}
 		c.mu.Unlock()
 	}

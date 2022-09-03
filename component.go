@@ -29,6 +29,10 @@ const (
 	ComponentTypeFreeDisposable
 )
 
+type EmptyComponent struct {
+	Component[EmptyComponent]
+}
+
 type IComponent interface {
 	Owner() Entity
 	Type() reflect.Type
@@ -41,8 +45,8 @@ type IComponent interface {
 	getIntType() uint16
 	getComponentType() ComponentType
 	getPermission() ComponentPermission
+	checkSet(initializer *SystemInitializer) IComponentSet
 	getSeq() uint32
-
 	newCollection() IComponentSet
 	addToCollection(p unsafe.Pointer)
 	deleteFromCollection(collection interface{})
@@ -228,6 +232,10 @@ func (c *Component[T]) Type() reflect.Type {
 
 func (c *Component[T]) getPermission() ComponentPermission {
 	return ComponentReadWrite
+}
+
+func (c *Component[T]) checkSet(initializer *SystemInitializer) IComponentSet {
+	return initializer.sys.World().getComponentCollection().checkSet(c)
 }
 
 func (c *Component[T]) debugAddress() unsafe.Pointer {

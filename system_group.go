@@ -16,8 +16,8 @@ type Node struct {
 }
 
 func (p *Node) isFriend(node *Node) bool {
-	for com, r := range p.val.Requirements() {
-		for comTarget, rTarget := range node.val.Requirements() {
+	for com, r := range p.val.GetRequirements() {
+		for comTarget, rTarget := range node.val.GetRequirements() {
 			if comTarget == com {
 				if r.getPermission() == ComponentReadOnly && rTarget.getPermission() == ComponentReadOnly {
 					continue
@@ -80,8 +80,8 @@ func (p *SystemGroup) reset() {
 	//need resort
 	if !p.ordered {
 		sort.Slice(p.systems, func(i, j int) bool {
-			return p.refCount(p.systems[i].val.Requirements()) >
-				p.refCount(p.systems[j].val.Requirements())
+			return p.refCount(p.systems[i].val.GetRequirements()) >
+				p.refCount(p.systems[j].val.GetRequirements())
 		})
 		if p.root == nil {
 			p.root = &Node{
@@ -138,7 +138,7 @@ func (p *SystemGroup) insert(sys ISystem) {
 	//set cluster no ordered
 	p.ordered = false
 	//get system's required components
-	rqs := sys.Requirements()
+	rqs := sys.GetRequirements()
 	if len(rqs) == 0 {
 		//panic("invalid system")
 	}
@@ -171,7 +171,7 @@ func (p *SystemGroup) has(sys ISystem) bool {
 // remove system
 func (p *SystemGroup) remove(sys ISystem) {
 	//get system's required components
-	rqs := sys.Requirements()
+	rqs := sys.GetRequirements()
 	if len(rqs) == 0 {
 		//panic("invalid system")
 	}

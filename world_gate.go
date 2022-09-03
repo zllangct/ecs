@@ -9,10 +9,6 @@ type GateObject interface {
 	__GateIdentification()
 }
 
-type IUtilityGetter interface {
-	getWorld() IWorld
-}
-
 type GatePointer[T GateObject] interface {
 	IGate
 	*T
@@ -30,14 +26,6 @@ type IGateInitializer interface {
 	Init(initializer GateInitializer)
 }
 
-type GateApi struct {
-	world *ecsWorld
-}
-
-func (g *GateApi) getWorld() IWorld {
-	return g.world
-}
-
 type IGate interface {
 	baseInit(w *ecsWorld)
 	dispatch()
@@ -52,7 +40,7 @@ type Gate[T GateObject] struct {
 	world         *ecsWorld
 	events        map[CustomEventName]CustomEventHandler
 	eventQueue    []CustomEvent
-	syncQueue     []func(*GateApi)
+	syncQueue     []func(*UtilityGetter)
 	isInitialized bool
 }
 
@@ -62,7 +50,7 @@ func (p *Gate[T]) baseInit(w *ecsWorld) {
 	p.world = w
 	p.events = make(map[CustomEventName]CustomEventHandler)
 	p.eventQueue = make([]CustomEvent, 0)
-	p.syncQueue = make([]func(*GateApi), 0)
+	p.syncQueue = make([]func(*UtilityGetter), 0)
 	ins := (*T)(unsafe.Pointer(p))
 	if i, ok := any(ins).(IGateInitializer); ok {
 		i.Init(GateInitializer{
@@ -100,11 +88,11 @@ func (p *Gate[T]) dispatch() {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	api := &GateApi{world: p.world}
+	getter := &UtilityGetter{world: p.world}
 	for _, e := range p.eventQueue {
 		if fn, ok := p.events[e.Event]; ok {
 			err := TryAndReport(func() {
-				fn(api, e.Args)
+				fn(getter, e.Args)
 			})
 			if err != nil {
 				Log.Error(err)
@@ -116,14 +104,14 @@ func (p *Gate[T]) dispatch() {
 	p.eventQueue = make([]CustomEvent, 0)
 
 	for _, fn := range p.syncQueue {
-		fn(api)
+		fn(getter)
 	}
-	p.syncQueue = make([]func(*GateApi), 0)
+	p.syncQueue = make([]func(*UtilityGetter), 0)
 
-	api.world = nil
+	getter.world = nil
 }
 
-func (p *Gate[T]) Sync(fn func(api *GateApi)) {
+func (p *Gate[T]) Sync(fn func(getter *UtilityGetter)) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -135,7 +123,7 @@ func GetUtility[T SystemObject, U UtilityObject](getter IUtilityGetter) (*U, boo
 	if w == nil {
 		return nil, false
 	}
-	sys, ok := w.GetSystem(TypeOf[T]())
+	sys, ok := w.getSystem(TypeOf[T]())
 	if !ok {
 		return nil, false
 	}

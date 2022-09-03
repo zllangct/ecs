@@ -310,8 +310,6 @@ func (p *systemFlow) run(event Event) {
 	reporter := p.world.metrics.NewReporter("system_flow_run")
 	reporter.Start()
 
-	p.world.siblingCache.StartCollector()
-
 	//Log.Info("system flow # Clear Disposable #")
 	p.world.components.clearDisposable()
 	reporter.Sample("Clear Disposable")
@@ -331,7 +329,6 @@ func (p *systemFlow) run(event Event) {
 	p.systemUpdate(event)
 	reporter.Sample("system execute")
 
-	ShapeCacheDispose()
 	reporter.Stop()
 	reporter.Print()
 }

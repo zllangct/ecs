@@ -13,8 +13,8 @@ type IComponentSet interface {
 
 	Sort()
 	Shrink()
-
 	pointer() unsafe.Pointer
+	getPointerByEntity(entity Entity) unsafe.Pointer
 }
 
 type ComponentSet[T ComponentObject] struct {
@@ -99,6 +99,14 @@ func (c *ComponentSet[T]) getByEntity(entity Entity) *T {
 		return nil
 	}
 	return c.UnorderedCollection.Get(int64(idx))
+}
+
+func (c *ComponentSet[T]) getPointerByEntity(entity Entity) unsafe.Pointer {
+	idx := c.indices[entity.ToRealID().index]
+	if idx < 0 {
+		return nil
+	}
+	return c.UnorderedCollection.getPointer(int64(idx))
 }
 
 func (c *ComponentSet[T]) GetByEntity(entity Entity) any {

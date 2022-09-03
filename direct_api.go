@@ -20,7 +20,7 @@ func RegisterSystem[T SystemObject](world IWorld, order ...Order) {
 }
 
 func GetSystem[T SystemObject](w IWorld) (ISystem, bool) {
-	return w.GetSystem(TypeOf[T]())
+	return w.getSystem(TypeOf[T]())
 }
 
 func GetEntityInfo(world IWorld, entity Entity) EntityInfo {
@@ -61,12 +61,12 @@ func GetInterestedComponents[T ComponentObject](sys ISystem) Iterator[T] {
 		return EmptyIter[T]()
 	}
 	typ := GetType[T]()
-	r, ok := sys.isRequire(typ)
+	r, ok := sys.GetRequirements()[typ]
 	if !ok {
 		return EmptyIter[T]()
 	}
 
-	c := sys.World().getComponents(typ)
+	c := sys.World().getComponentSet(typ)
 	if c == nil {
 		return EmptyIter[T]()
 	}
@@ -75,7 +75,7 @@ func GetInterestedComponents[T ComponentObject](sys ISystem) Iterator[T] {
 
 func GetRelatedComponent[T ComponentObject](sys ISystem, entity Entity) *T {
 	typ := TypeOf[T]()
-	_, isRequire := sys.isRequire(typ)
+	isRequire := sys.isRequire(typ)
 	if !isRequire {
 		return nil
 	}
@@ -94,4 +94,12 @@ func GetRelatedComponent[T ComponentObject](sys ISystem, entity Entity) *T {
 func GetIntType(typ reflect.Type) uint16 {
 	info := ComponentMeta.GetComponentMetaInfo(typ)
 	return info.it
+}
+
+func IntTypeToType(it uint16) reflect.Type {
+	t := ComponentMeta.ConvertToType(it)
+	if t == nil {
+		panic("invalid int type")
+	}
+	return t
 }

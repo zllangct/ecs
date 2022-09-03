@@ -13,8 +13,9 @@ type DamageSystem struct {
 		*ecs.Shape2[HealthPoint, Position]]
 }
 
-func (d *DamageSystem) Init() {
+func (d *DamageSystem) Init(initializer *ecs.SystemInitializer) {
 	d.SetRequirements(
+		initializer,
 		&ecs.ReadOnly[Position]{},
 		&ecs.ReadOnly[Force]{},
 		&ecs.ReadOnly[Action]{},

@@ -5,6 +5,18 @@ import (
 	"unsafe"
 )
 
+type IUtilityGetter interface {
+	getWorld() IWorld
+}
+
+type UtilityGetter struct {
+	world *ecsWorld
+}
+
+func (g *UtilityGetter) getWorld() IWorld {
+	return g.world
+}
+
 type UtilityObject interface {
 	__UtilityIdentification()
 }
@@ -33,7 +45,7 @@ func (u Utility[T]) __UtilityIdentification() {}
 
 func (u *Utility[T]) GetSystem() ISystem {
 	if u.sys == nil {
-		s, ok := u.w.GetSystem(TypeOf[T]())
+		s, ok := u.w.getSystem(TypeOf[T]())
 		if ok {
 			u.sys = s
 		}
@@ -54,7 +66,7 @@ type SystemApi struct {
 }
 
 func (s *SystemApi) GetRequirements() map[reflect.Type]IRequirement {
-	return s.sys.Requirements()
+	return s.sys.GetRequirements()
 }
 
 func (s *SystemApi) Pause() {

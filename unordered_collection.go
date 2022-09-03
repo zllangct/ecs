@@ -18,6 +18,8 @@ type ICollection interface {
 	ChangeCount() int64
 	ChangeReset()
 	ElementType() reflect.Type
+
+	getPointer(idx int64) unsafe.Pointer
 }
 
 type UnorderedCollection[T any] struct {
@@ -44,6 +46,10 @@ func NewUnorderedCollection[T any](initSize ...int) *UnorderedCollection[T] {
 
 func (c *UnorderedCollection[T]) Get(idx int64) *T {
 	return (*T)(unsafe.Pointer(uintptr(unsafe.Pointer(&c.data[0])) + uintptr(idx)*c.eleSize))
+}
+
+func (c *UnorderedCollection[T]) getPointer(idx int64) unsafe.Pointer {
+	return unsafe.Pointer(uintptr(unsafe.Pointer(&c.data[0])) + uintptr(idx)*c.eleSize)
 }
 
 func (c *UnorderedCollection[T]) Add(element *T) (*T, int64) {

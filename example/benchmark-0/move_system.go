@@ -14,8 +14,8 @@ type MoveSystem struct {
 	getter *ecs.ShapeGetter[ecs.Shape2[Movement, Position], *ecs.Shape2[Movement, Position]]
 }
 
-func (m *MoveSystem) Init() {
-	m.SetRequirements(&Position{}, &ecs.ReadOnly[Movement]{})
+func (m *MoveSystem) Init(initializer *ecs.SystemInitializer) {
+	m.SetRequirements(initializer, &Position{}, &ecs.ReadOnly[Movement]{})
 	getter, err := ecs.NewShapeGetter[ecs.Shape2[Movement, Position]](m)
 	if err != nil {
 		ecs.Log.Error(err)

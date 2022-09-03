@@ -48,13 +48,17 @@ type IWorld interface {
 	GetEntityInfo(id Entity) EntityInfo
 	AddFreeComponent(component IComponent)
 	RegisterSystem(system ISystem)
-	GetSystem(sys reflect.Type) (ISystem, bool)
-	Optimize(t time.Duration, force bool)
+	GetSyncLauncher() *SyncWorldLauncher
+	GetAsyncLauncher() *AsyncWorldLauncher
+	Optimize(t time.Duration, force bool) // TODO move to launcher
 
+	getSystem(sys reflect.Type) (ISystem, bool)
 	update()
 	setStatus(status WorldStatus)
 	addComponent(entity Entity, component IComponent)
-	getComponents(typ reflect.Type) IComponentSet
+	getComponentSet(typ reflect.Type) IComponentSet
+	getComponentSetByIntType(typ uint16) IComponentSet
+	getComponentCollection() IComponentCollection
 	registerForT(system interface{}, order ...Order)
 }
 
@@ -71,8 +75,6 @@ type ecsWorld struct {
 	components IComponentCollection
 	//all entities
 	entities *EntitySet
-	//sibling cache
-	siblingCache *siblingCache
 	//optimizer
 	optimizer *optimizer
 	//entity id generator
@@ -116,7 +118,6 @@ func NewWorld(config *WorldConfig) *ecsWorld {
 
 	world.components = NewComponentCollection(world, config.HashCount)
 	world.optimizer = newOptimizer(world)
-	world.siblingCache = newSiblingCache(world, 1024)
 
 	if world.config.FrameInterval <= 0 {
 		world.config.FrameInterval = time.Millisecond * 33
@@ -150,6 +151,14 @@ func (w *ecsWorld) update() {
 	w.ts = time.Now()
 }
 
+func (w *ecsWorld) GetSyncLauncher() *SyncWorldLauncher {
+	return newSyncWorldLauncher(w)
+}
+
+func (w *ecsWorld) GetAsyncLauncher() *AsyncWorldLauncher {
+	return newAsyncWorldLauncher(w)
+}
+
 func (w *ecsWorld) Optimize(t time.Duration, force bool) {
 	w.optimizer.optimize(t, force)
 }
@@ -178,7 +187,7 @@ func (w *ecsWorld) registerForT(system interface{}, order ...Order) {
 	w.RegisterSystem(system.(ISystem))
 }
 
-func (w *ecsWorld) GetSystem(sys reflect.Type) (ISystem, bool) {
+func (w *ecsWorld) getSystem(sys reflect.Type) (ISystem, bool) {
 	s, ok := w.systemFlow.systems[sys]
 	if ok {
 		return s.(ISystem), ok
@@ -202,8 +211,16 @@ func (w *ecsWorld) deleteEntity(entity Entity) {
 	w.entities.Remove(entity)
 }
 
-func (w *ecsWorld) getComponents(typ reflect.Type) IComponentSet {
-	return w.components.getCollection(typ)
+func (w *ecsWorld) getComponentSet(typ reflect.Type) IComponentSet {
+	return w.components.getComponentSet(typ)
+}
+
+func (w *ecsWorld) getComponentSetByIntType(typ uint16) IComponentSet {
+	return w.components.getComponentSetByIntType(typ)
+}
+
+func (w *ecsWorld) getComponentCollection() IComponentCollection {
+	return w.components
 }
 
 func (w *ecsWorld) NewEntity() EntityInfo {
@@ -227,4 +244,12 @@ func (w *ecsWorld) AddFreeComponent(component IComponent) {
 		return
 	}
 	w.addComponent(0, component)
+}
+
+func IGateToInstance[T GateObject](gate any) *T {
+	g, ok := gate.(*T)
+	if ok {
+		return nil
+	}
+	return g
 }

@@ -131,7 +131,7 @@ func (o *optimizer) memTidy(force bool) {
 	//		seq++
 	//		for _, component := range info.components {
 	//			component.setSeq(seq)
-	//			c := o.world.components.getCollection(component.Type()).GetByEntity(int64(component.Owner().Entity()))
+	//			c := o.world.components.getComponentSet(component.Type()).GetByEntity(int64(component.Owner().Entity()))
 	//			verify := c.(IComponent)
 	//			println(component.debugAddress(), verify.debugAddress())
 	//			if verify.getSeq() != component.getSeq() {

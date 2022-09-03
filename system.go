@@ -25,12 +25,16 @@ const (
 	SystemCustomEventStop                    = "__internal__Stop"
 )
 
+type SystemInitializer struct {
+	sys ISystem
+}
+
 type ISystem interface {
 	Type() reflect.Type
 	Order() Order
 	World() IWorld
-	Requirements() map[reflect.Type]IRequirement
-	IsRequire(component IComponent) (IRequirement, bool)
+	GetRequirements() map[reflect.Type]IRequirement
+	IsRequire(component IComponent) bool
 	ID() int64
 	Pause()
 	Resume()
@@ -45,9 +49,9 @@ type ISystem interface {
 	eventsSyncExecute()
 	eventsAsyncExecute()
 	getPointer() unsafe.Pointer
-	isRequire(componentType reflect.Type) (IRequirement, bool)
+	isRequire(componentType reflect.Type) bool
 	setOrder(order Order)
-	setRequirements(rqs ...IRequirement)
+	setRequirements(initializer *SystemInitializer, rqs ...IRequirement)
 	getState() SystemState
 	setState(state SystemState)
 	setSecurity(isSafe bool)
@@ -137,23 +141,33 @@ func (s *System[T]) eventsAsyncExecute() {
 	api.sys = nil
 }
 
-func (s *System[T]) SetRequirements(rqs ...IRequirement) {
-	s.setRequirements(rqs...)
+func (s *System[T]) SetRequirements(initializer *SystemInitializer, rqs ...IRequirement) {
+	s.setRequirements(initializer, rqs...)
+}
+
+func (s *System[T]) setRequirementsInternal(rqs ...IRequirement) {
+	if s.requirements == nil {
+		s.requirements = map[reflect.Type]IRequirement{}
+	}
+	var typ reflect.Type
+	for _, value := range rqs {
+		typ = value.Type()
+		s.requirements[typ] = value
+		ComponentMeta.GetComponentMetaInfo(typ)
+	}
 }
 
 func (s *System[T]) isInitialized() bool {
 	return s.state >= SystemStateInit
 }
 
-func (s *System[T]) setRequirements(rqs ...IRequirement) {
-	if s.isInitialized() {
-		return
-	}
+func (s *System[T]) setRequirements(initializer *SystemInitializer, rqs ...IRequirement) {
 	if s.requirements == nil {
 		s.requirements = map[reflect.Type]IRequirement{}
 	}
 	var typ reflect.Type
 	for _, value := range rqs {
+		value.checkSet(initializer)
 		typ = value.Type()
 		s.requirements[typ] = value
 		ComponentMeta.GetComponentMetaInfo(typ)
@@ -229,17 +243,17 @@ func (s *System[T]) isExecuting() bool {
 	return s.executing
 }
 
-func (s *System[T]) Requirements() map[reflect.Type]IRequirement {
+func (s *System[T]) GetRequirements() map[reflect.Type]IRequirement {
 	return s.requirements
 }
 
-func (s *System[T]) IsRequire(com IComponent) (IRequirement, bool) {
+func (s *System[T]) IsRequire(com IComponent) bool {
 	return s.isRequire(com.Type())
 }
 
-func (s *System[T]) isRequire(typ reflect.Type) (IRequirement, bool) {
-	r, ok := s.requirements[typ]
-	return r, ok
+func (s *System[T]) isRequire(typ reflect.Type) bool {
+	_, ok := s.requirements[typ]
+	return ok
 }
 
 func (s *System[T]) baseInit(world *ecsWorld, ins ISystem) {
@@ -253,14 +267,16 @@ func (s *System[T]) baseInit(world *ecsWorld, ins ISystem) {
 	}
 	s.world = world
 
+	initialzer := &SystemInitializer{sys: s}
 	if i, ok := ins.(InitReceiver); ok {
 		err := TryAndReport(func() {
-			i.Init()
+			i.Init(initialzer)
 		})
 		if err != nil {
 			Log.Error(err)
 		}
 	}
+	initialzer.sys = nil
 
 	s.state = SystemStateStart
 }

@@ -15,8 +15,8 @@ type InputSystem2 struct {
 	ecs.System[InputSystem2]
 }
 
-func (is *InputSystem2) Init() {
-	is.SetRequirements(&Movement{}, &MoveChange{})
+func (is *InputSystem2) Init(initializer *ecs.SystemInitializer) {
+	is.SetRequirements(initializer, &Movement{}, &MoveChange{})
 }
 
 func (is *InputSystem2) PreUpdate(event ecs.Event) {

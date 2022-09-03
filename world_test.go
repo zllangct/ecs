@@ -33,8 +33,8 @@ type __world_Test_S_1 struct {
 	System[__world_Test_S_1]
 }
 
-func (w *__world_Test_S_1) Init() {
-	w.SetRequirements(&__world_Test_C_1{}, &__world_Test_C_2{}, &__world_Test_C_3{})
+func (w *__world_Test_S_1) Init(initializer *SystemInitializer) {
+	w.SetRequirements(initializer, &__world_Test_C_1{}, &__world_Test_C_2{}, &__world_Test_C_3{})
 	w.SetUtility(&__world_Test_U_Input{})
 }
 
@@ -79,7 +79,7 @@ func Test_ecsWorld_World(t *testing.T) {
 
 	RegisterSystem[__world_Test_S_1](world)
 
-	launcher := NewSyncWorldLauncher(world)
+	launcher := world.GetSyncLauncher()
 
 	entities := make([]Entity, __worldTest_Entity_Count)
 
@@ -91,7 +91,8 @@ func Test_ecsWorld_World(t *testing.T) {
 
 	world.update()
 
-	u, ok := GetUtility[__world_Test_S_1, __world_Test_U_Input](launcher)
+	getter := launcher.GetUtilityGetter()
+	u, ok := GetUtility[__world_Test_S_1, __world_Test_U_Input](&getter)
 	if ok {
 		u.ChangeName(entities[0], "name0")
 	}
@@ -110,11 +111,11 @@ func (g *__world_Test_Gate) Init(initializer GateInitializer) {
 	initializer.EventRegister("CustomEvent1", g.CustomEvent1)
 }
 
-func (g *__world_Test_Gate) CustomEvent1(api *GateApi, args []interface{}) {
+func (g *__world_Test_Gate) CustomEvent1(getter *UtilityGetter, args []interface{}) {
 	Log.Infof("CustomEvent1: %+v", args)
 	entity := args[0].(Entity)
 	name := args[1].(string)
-	u, ok := GetUtility[__world_Test_S_1, __world_Test_U_Input](api)
+	u, ok := GetUtility[__world_Test_S_1, __world_Test_U_Input](getter)
 	if !ok {
 		return
 	}
@@ -122,8 +123,8 @@ func (g *__world_Test_Gate) CustomEvent1(api *GateApi, args []interface{}) {
 }
 
 func (g *__world_Test_Gate) input1(entity Entity, name string) {
-	g.Sync(func(api *GateApi) {
-		u, ok := GetUtility[__world_Test_S_1, __world_Test_U_Input](api)
+	g.Sync(func(getter *UtilityGetter) {
+		u, ok := GetUtility[__world_Test_S_1, __world_Test_U_Input](getter)
 		if !ok {
 			return
 		}
@@ -147,9 +148,13 @@ func Test_ecsWorld_World_launcher(t *testing.T) {
 		entities[i] = e1.Entity()
 	}
 
-	launcher := NewAsyncWorldLauncher(world)
+	launcher := world.GetAsyncLauncher()
+
 	iGate := launcher.SetGate(&__world_Test_Gate{})
-	gate := iGate.(*__world_Test_Gate)
+	gate := IGateToInstance[__world_Test_Gate](iGate)
+	if gate == nil {
+		t.Fatal("gate is nil")
+	}
 
 	go launcher.Run()
 
@@ -160,9 +165,7 @@ func Test_ecsWorld_World_launcher(t *testing.T) {
 
 	// input by gate method
 	gate.input1(entities[0], "name1")
-
 	time.Sleep(time.Second * 2)
-
 	gate.input1(entities[0], "name2")
 
 	for {

@@ -43,7 +43,7 @@ type __systemGroup_Test_S_1 struct {
 
 func NewTestSystem(ID int, rqs ...IRequirement) *__systemGroup_Test_S_1 {
 	s := &__systemGroup_Test_S_1{Name: ID}
-	s.SetRequirements(rqs...)
+	s.setRequirementsInternal(rqs...)
 	return s
 }
 
@@ -53,10 +53,6 @@ func (p *__systemGroup_Test_S_1) Call(label int) interface{} {
 		println(p.Name)
 	}
 	return nil
-}
-
-func (p *__systemGroup_Test_S_1) Filter(component IComponent, op CollectionOperate) {
-
 }
 
 func TestNewSystemGroup(t *testing.T) {
