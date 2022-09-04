@@ -65,7 +65,7 @@ func NewShapeGetter[T any](initializer *SystemInitializer) (*ShapeGetter[T], err
 		if !field.Type.Implements(reflect.TypeOf((*IComponent)(nil)).Elem()) || !sys.isRequire(field.Type.Elem()) {
 			continue
 		}
-		intType := GetIntType(field.Type.Elem())
+		intType := GetIntType(initializer.sys.World(), field.Type.Elem())
 		getter.subTypes = append(getter.subTypes, intType)
 		getter.subOffset = append(getter.subOffset, field.Offset)
 		getter.containers = append(getter.containers, sys.World().getComponentSetByIntType(intType))

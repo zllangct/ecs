@@ -153,7 +153,7 @@ func (s *System[T]) setRequirementsInternal(rqs ...IRequirement) {
 	for _, value := range rqs {
 		typ = value.Type()
 		s.requirements[typ] = value
-		ComponentMeta.GetComponentMetaInfo(typ)
+		s.World().GetComponentMetaInfo(typ)
 	}
 }
 
@@ -170,7 +170,7 @@ func (s *System[T]) setRequirements(initializer *SystemInitializer, rqs ...IRequ
 		value.checkSet(initializer)
 		typ = value.Type()
 		s.requirements[typ] = value
-		ComponentMeta.GetComponentMetaInfo(typ)
+		s.World().GetComponentMetaInfo(typ)
 	}
 }
 

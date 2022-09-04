@@ -47,7 +47,7 @@ type IComponent interface {
 	getPermission() ComponentPermission
 	checkSet(initializer *SystemInitializer) IComponentSet
 	getSeq() uint32
-	newCollection() IComponentSet
+	newCollection(meta ComponentMetaInfo) IComponentSet
 	addToCollection(p unsafe.Pointer)
 	deleteFromCollection(collection interface{})
 
@@ -167,8 +167,8 @@ func (c *Component[T]) deleteFromCollection(collection interface{}) {
 	return
 }
 
-func (c *Component[T]) newCollection() IComponentSet {
-	return NewComponentSet[T]()
+func (c *Component[T]) newCollection(meta ComponentMetaInfo) IComponentSet {
+	return NewComponentSet[T](meta)
 }
 
 func (c *Component[T]) setOwner(entity Entity) {
@@ -200,9 +200,6 @@ func (c *Component[T]) setIntType(typ uint16) {
 }
 
 func (c *Component[T]) getIntType() uint16 {
-	if c.it == 0 {
-		c.it = ComponentMeta.GetComponentMetaInfo(c.Type()).it
-	}
 	return c.it
 }
 

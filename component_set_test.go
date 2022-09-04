@@ -20,7 +20,7 @@ func TestComponentSet_Sort(t *testing.T) {
 	}
 
 	//创建容器(无序数据集)
-	c := NewComponentSet[__unorderedCollection_Test_item]()
+	c := NewComponentSet[__unorderedCollection_Test_item](ComponentMetaInfo{})
 
 	//添加数据
 	for i := 0; i < caseCount; i++ {
@@ -40,14 +40,14 @@ func TestComponentSet_Sort(t *testing.T) {
 }
 
 func TestNewComponentSet(t *testing.T) {
-	cs := NewComponentSet[__unorderedCollection_Test_item]()
+	cs := NewComponentSet[__unorderedCollection_Test_item](ComponentMetaInfo{})
 	if cs.GetElementMeta().it == 0 {
 		t.Error("element meta error")
 	}
 }
 
 func BenchmarkComponentSet_Read(b *testing.B) {
-	c := NewComponentSet[__unorderedCollection_Test_item]()
+	c := NewComponentSet[__unorderedCollection_Test_item](ComponentMetaInfo{})
 	var ids []int64
 	total := 1000000
 	for n := 0; n < total; n++ {

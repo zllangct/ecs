@@ -50,6 +50,8 @@ type IWorld interface {
 	RegisterSystem(system ISystem)
 	GetSyncLauncher() *SyncWorldLauncher
 	GetAsyncLauncher() *AsyncWorldLauncher
+	GetComponentMetaInfo(typ reflect.Type) ComponentMetaInfo
+	ConvertToType(it uint16) reflect.Type
 	Optimize(t time.Duration, force bool) // TODO move to launcher
 
 	getSystem(sys reflect.Type) (ISystem, bool)
@@ -80,7 +82,7 @@ type ecsWorld struct {
 	//entity id generator
 	idGenerator *EntityIDGenerator
 
-	gate IGate
+	componentMeta *componentMeta
 
 	workPool *Pool
 	metrics  *Metrics
@@ -113,6 +115,12 @@ func NewWorld(config *WorldConfig) *ecsWorld {
 	world.workPool.Start()
 
 	world.idGenerator = NewEntityIDGenerator(1024, 10)
+
+	world.componentMeta = &componentMeta{
+		seq:     0,
+		types:   map[reflect.Type]uint16{},
+		it2Type: map[uint16]reflect.Type{},
+	}
 
 	world.metrics = NewMetrics(world.config.IsMetrics, world.config.IsMetricsPrint)
 
@@ -217,6 +225,14 @@ func (w *ecsWorld) getComponentSet(typ reflect.Type) IComponentSet {
 
 func (w *ecsWorld) getComponentSetByIntType(typ uint16) IComponentSet {
 	return w.components.getComponentSetByIntType(typ)
+}
+
+func (w *ecsWorld) GetComponentMetaInfo(typ reflect.Type) ComponentMetaInfo {
+	return w.componentMeta.GetComponentMetaInfo(typ)
+}
+
+func (w *ecsWorld) ConvertToType(it uint16) reflect.Type {
+	return w.componentMeta.ConvertToType(it)
 }
 
 func (w *ecsWorld) getComponentCollection() IComponentCollection {

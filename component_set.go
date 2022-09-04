@@ -24,7 +24,7 @@ type ComponentSet[T ComponentObject] struct {
 	meta     ComponentMetaInfo
 }
 
-func NewComponentSet[T ComponentObject](initSize ...int) *ComponentSet[T] {
+func NewComponentSet[T ComponentObject](meta ComponentMetaInfo, initSize ...int) *ComponentSet[T] {
 	typ := TypeOf[T]()
 	eleSize := typ.Size()
 	size := InitMaxSize / eleSize
@@ -36,7 +36,7 @@ func NewComponentSet[T ComponentObject](initSize ...int) *ComponentSet[T] {
 			data:    make([]T, 0, size),
 			eleSize: eleSize,
 		},
-		meta: ComponentMeta.GetComponentMetaInfo(typ),
+		meta: meta,
 	}
 	if size == 0 {
 		c.indices = make([]int32, 1)

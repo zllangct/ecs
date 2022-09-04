@@ -5,14 +5,8 @@ import (
 	"sync"
 )
 
-var ComponentMeta = &componentMeta{
-	seq:     0,
-	types:   map[reflect.Type]uint16{},
-	it2Type: map[uint16]reflect.Type{},
-}
-
-func GetComponentMeta[T ComponentObject]() ComponentMetaInfo {
-	return ComponentMeta.GetComponentMetaInfo(TypeOf[T]())
+func GetComponentMeta[T ComponentObject](world IWorld) ComponentMetaInfo {
+	return world.GetComponentMetaInfo(TypeOf[T]())
 }
 
 type ComponentMetaInfo struct {

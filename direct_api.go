@@ -91,13 +91,13 @@ func GetRelatedComponent[T ComponentObject](sys ISystem, entity Entity) *T {
 	return cache.Get(entity)
 }
 
-func GetIntType(typ reflect.Type) uint16 {
-	info := ComponentMeta.GetComponentMetaInfo(typ)
+func GetIntType(world IWorld, typ reflect.Type) uint16 {
+	info := world.GetComponentMetaInfo(typ)
 	return info.it
 }
 
-func IntTypeToType(it uint16) reflect.Type {
-	t := ComponentMeta.ConvertToType(it)
+func IntTypeToType(world IWorld, it uint16) reflect.Type {
+	t := world.ConvertToType(it)
 	if t == nil {
 		panic("invalid int type")
 	}

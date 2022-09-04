@@ -267,9 +267,10 @@ func (c *ComponentCollection) getCollections() *SparseComponentCollection {
 }
 
 func (c *ComponentCollection) checkSet(com IComponent) IComponentSet {
-	set := c.collections.GetByType(com.Type())
+	typ := com.Type()
+	set := c.collections.GetByType(typ)
 	if set == nil {
-		set = com.newCollection()
+		set = com.newCollection(c.world.GetComponentMetaInfo(typ))
 		c.collections.Add(set.GetElementMeta().it, set)
 	}
 	return set
