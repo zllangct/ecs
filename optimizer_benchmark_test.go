@@ -99,7 +99,7 @@ func BenchmarkWithOptimizer(b *testing.B) {
 	game.init()
 	game.world.update()
 
-	game.world.Optimize(time.Second*10, true)
+	game.world.optimize(time.Second*10, true)
 
 	b.ResetTimer()
 	b.ReportAllocs()

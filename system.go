@@ -167,8 +167,8 @@ func (s *System[T]) setRequirements(initializer *SystemInitializer, rqs ...IRequ
 	}
 	var typ reflect.Type
 	for _, value := range rqs {
-		value.checkSet(initializer)
 		typ = value.Type()
+		value.check(initializer)
 		s.requirements[typ] = value
 		s.World().GetComponentMetaInfo(typ)
 	}
@@ -308,7 +308,7 @@ func (s *System[T]) World() IWorld {
 	return s.world
 }
 
-func (s *System[T]) GetEntityInfo(entity Entity) EntityInfo {
+func (s *System[T]) GetEntityInfo(entity Entity) (*EntityInfo, bool) {
 	return s.world.GetEntityInfo(entity)
 }
 

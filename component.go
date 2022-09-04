@@ -45,9 +45,9 @@ type IComponent interface {
 	getIntType() uint16
 	getComponentType() ComponentType
 	getPermission() ComponentPermission
-	checkSet(initializer *SystemInitializer) IComponentSet
+	check(initializer *SystemInitializer)
 	getSeq() uint32
-	newCollection(meta ComponentMetaInfo) IComponentSet
+	newCollection(meta *ComponentMetaInfo) IComponentSet
 	addToCollection(p unsafe.Pointer)
 	deleteFromCollection(collection interface{})
 
@@ -142,6 +142,7 @@ func (c Component[T]) OwnerEntity() Entity {
 }
 
 func (c *Component[T]) init() {
+
 	c.setType(c.getComponentType())
 	c.setState(ComponentStateInvalid)
 }
@@ -167,7 +168,7 @@ func (c *Component[T]) deleteFromCollection(collection interface{}) {
 	return
 }
 
-func (c *Component[T]) newCollection(meta ComponentMetaInfo) IComponentSet {
+func (c *Component[T]) newCollection(meta *ComponentMetaInfo) IComponentSet {
 	return NewComponentSet[T](meta)
 }
 
@@ -177,6 +178,10 @@ func (c *Component[T]) setOwner(entity Entity) {
 
 func (c *Component[T]) rawInstance() *T {
 	return (*T)(unsafe.Pointer(c))
+}
+
+func (c *Component[T]) instance() IComponent {
+	return any((*T)(unsafe.Pointer(c))).(IComponent)
 }
 
 func (c *Component[T]) setState(state ComponentState) {
@@ -231,8 +236,14 @@ func (c *Component[T]) getPermission() ComponentPermission {
 	return ComponentReadWrite
 }
 
-func (c *Component[T]) checkSet(initializer *SystemInitializer) IComponentSet {
-	return initializer.sys.World().getComponentCollection().checkSet(c)
+func (c *Component[T]) check(initializer *SystemInitializer) {
+	ins := c.instance()
+	typ := ins.Type()
+	meta := initializer.sys.World().getComponentMeta()
+	if !meta.Exist(typ) {
+		meta.CreateComponentMetaInfo(typ, ins.getComponentType())
+	}
+	initializer.sys.World().getComponentCollection().checkSet(ins)
 }
 
 func (c *Component[T]) debugAddress() unsafe.Pointer {

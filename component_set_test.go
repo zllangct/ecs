@@ -20,7 +20,7 @@ func TestComponentSet_Sort(t *testing.T) {
 	}
 
 	//创建容器(无序数据集)
-	c := NewComponentSet[__unorderedCollection_Test_item](ComponentMetaInfo{})
+	c := NewComponentSet[__unorderedCollection_Test_item](&ComponentMetaInfo{})
 
 	//添加数据
 	for i := 0; i < caseCount; i++ {
@@ -32,7 +32,7 @@ func TestComponentSet_Sort(t *testing.T) {
 
 	//验证
 	for i := 0; i < caseCount; i++ {
-		if c.Get(int64(i)).ItemID != int64(caseCount-i-1) {
+		if c.Get(int32(i)).ItemID != int64(caseCount-i-1) {
 			t.Error("sort error")
 			break
 		}
@@ -40,14 +40,14 @@ func TestComponentSet_Sort(t *testing.T) {
 }
 
 func TestNewComponentSet(t *testing.T) {
-	cs := NewComponentSet[__unorderedCollection_Test_item](ComponentMetaInfo{})
+	cs := NewComponentSet[__unorderedCollection_Test_item](&ComponentMetaInfo{})
 	if cs.GetElementMeta().it == 0 {
 		t.Error("element meta error")
 	}
 }
 
 func BenchmarkComponentSet_Read(b *testing.B) {
-	c := NewComponentSet[__unorderedCollection_Test_item](ComponentMetaInfo{})
+	c := NewComponentSet[__unorderedCollection_Test_item](&ComponentMetaInfo{})
 	var ids []int64
 	total := 1000000
 	for n := 0; n < total; n++ {
@@ -73,12 +73,12 @@ func BenchmarkComponentSet_Read(b *testing.B) {
 
 	b.Run("sequence", func(b *testing.B) {
 		for n := 0; n < b.N; n++ {
-			_ = c.Get(int64(seq[n%total]))
+			_ = c.Get(int32(seq[n%total]))
 		}
 	})
 	b.Run("random", func(b *testing.B) {
 		for n := 0; n < b.N; n++ {
-			_ = c.Get(int64(r[n%total]))
+			_ = c.Get(int32(r[n%total]))
 		}
 	})
 }

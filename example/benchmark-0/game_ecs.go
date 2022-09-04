@@ -29,7 +29,7 @@ func (g *GameECS) attack() {
 		ActionType: 1,
 	}
 	for _, entity := range g.entities {
-		info := ecs.GetEntityInfo(g.world, entity)
+		info, _ := ecs.GetEntityInfo(g.world, entity)
 		err := info.Add(act)
 		if err != nil {
 			ecs.Log.Infof("%+v", err)

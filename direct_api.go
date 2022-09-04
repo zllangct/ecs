@@ -23,7 +23,7 @@ func GetSystem[T SystemObject](w IWorld) (ISystem, bool) {
 	return w.getSystem(TypeOf[T]())
 }
 
-func GetEntityInfo(world IWorld, entity Entity) EntityInfo {
+func GetEntityInfo(world IWorld, entity Entity) (*EntityInfo, bool) {
 	return world.GetEntityInfo(entity)
 }
 
@@ -33,7 +33,7 @@ func AddFreeComponent[T FreeComponentObject, TP FreeComponentPointer[T]](world I
 
 // entity api
 
-func NewEntity(world IWorld) EntityInfo {
+func NewEntity(world IWorld) *EntityInfo {
 	return world.(*ecsWorld).NewEntity()
 }
 
@@ -94,12 +94,4 @@ func GetRelatedComponent[T ComponentObject](sys ISystem, entity Entity) *T {
 func GetIntType(world IWorld, typ reflect.Type) uint16 {
 	info := world.GetComponentMetaInfo(typ)
 	return info.it
-}
-
-func IntTypeToType(world IWorld, it uint16) reflect.Type {
-	t := world.ConvertToType(it)
-	if t == nil {
-		panic("invalid int type")
-	}
-	return t
 }

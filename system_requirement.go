@@ -1,6 +1,9 @@
 package ecs
 
-import "reflect"
+import (
+	"reflect"
+	"unsafe"
+)
 
 const (
 	ComponentReadWrite ComponentPermission = 0
@@ -12,7 +15,7 @@ type ComponentPermission uint8
 type IRequirement interface {
 	Type() reflect.Type
 	getPermission() ComponentPermission
-	checkSet(initializer *SystemInitializer) IComponentSet
+	check(initializer *SystemInitializer)
 }
 
 type ReadOnly[T ComponentObject] struct{}
@@ -25,7 +28,12 @@ func (r *ReadOnly[T]) getPermission() ComponentPermission {
 	return ComponentReadOnly
 }
 
-func (r *ReadOnly[T]) checkSet(initializer *SystemInitializer) IComponentSet {
-	ins := new(Component[T])
-	return initializer.sys.World().getComponentCollection().checkSet(ins)
+func (r *ReadOnly[T]) check(initializer *SystemInitializer) {
+	ins := any((*T)(unsafe.Pointer(r))).(IComponent)
+	typ := ins.Type()
+	initializer.sys.World().getComponentCollection().checkSet(ins)
+	meta := initializer.sys.World().getComponentMeta()
+	if !meta.Exist(typ) {
+		meta.CreateComponentMetaInfo(typ, ins.getComponentType())
+	}
 }

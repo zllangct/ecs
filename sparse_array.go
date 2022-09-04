@@ -1,49 +1,128 @@
 package ecs
 
-type SparseArray[K comparable, V any] struct {
-	indices []K
-	values  []V
+type SparseArray[K Integer, V any] struct {
+	UnorderedCollection[V]
+	indices         []int32
+	idx2Key         map[int32]int32
+	maxKey          K
+	shrinkThreshold int32
 }
 
-func NewSparseArray[K comparable, V any](initCap ...int) *SparseArray[K, V] {
-	cap := 0
-	if len(initCap) > 0 {
-		cap = initCap[0]
+func NewSparseArray[K Integer, V any](initSize ...int) *SparseArray[K, V] {
+	typ := TypeOf[V]()
+	eleSize := typ.Size()
+	size := InitMaxSize / eleSize
+	if len(initSize) > 0 {
+		size = uintptr(initSize[0]) / eleSize
 	}
-	return &SparseArray[K, V]{
-		indices: make([]K, 0, cap),
-		values:  make([]V, 0, cap),
+	c := &SparseArray[K, V]{
+		UnorderedCollection: UnorderedCollection[V]{
+			data:    make([]V, 0, size),
+			eleSize: eleSize,
+		},
+		idx2Key: map[int32]int32{},
 	}
+	switch any(*new(K)).(type) {
+	case int8, uint8:
+		c.shrinkThreshold = 127
+	case uint16:
+		c.shrinkThreshold = 255
+	default:
+		c.shrinkThreshold = 1024
+	}
+
+	if size == 0 {
+		c.indices = make([]int32, 1)
+	}
+	return c
 }
 
-func (g *SparseArray[K, V]) Add(key K, value V) {
-	g.indices = append(g.indices, key)
-	g.values = append(g.values, value)
+func (g *SparseArray[K, V]) Add(key K, value *V) *V {
+	_, idx := g.UnorderedCollection.Add(value)
+	length := len(g.indices)
+	if key >= K(length) {
+		m := K(0)
+		if length == 0 {
+			m = key + 1
+		} else if length < int(g.shrinkThreshold) {
+			m = key * 2
+		} else {
+			m = key * 5 / 4
+		}
+		newIndices := make([]int32, m)
+		count := copy(newIndices, g.indices)
+		if count != length {
+			panic("copy failed")
+		}
+		g.indices = newIndices
+	}
+
+	g.idx2Key[int32(idx)] = int32(key)
+	g.indices[key] = int32(idx + 1)
+	if key > g.maxKey {
+		g.maxKey = key
+	}
+
+	return &g.data[idx]
 }
 
-func (g *SparseArray[K, V]) Remove(key K) {
-	idx := -1
-	for i, t := range g.indices {
-		if t == key {
-			idx = i
+func (g *SparseArray[K, V]) Remove(key K) *V {
+	if key > g.maxKey {
+		return nil
+	}
+	idx := g.indices[key]
+	removed, oldIndex, newIndex := g.UnorderedCollection.Remove(int64(idx))
+
+	delete(g.idx2Key, idx)
+	g.indices[g.idx2Key[int32(oldIndex)]] = int32(newIndex + 1)
+	g.indices[key] = 0
+
+	g.shrink(key)
+
+	return removed
+}
+
+func (g *SparseArray[K, V]) Exist(key K) bool {
+	if key > g.maxKey {
+		return false
+	}
+	return !(g.indices[key] == 0)
+}
+
+func (g *SparseArray[K, V]) Get(key K) *V {
+	if key > g.maxKey {
+		return nil
+	}
+	idx := g.indices[key] - 1
+	if idx < 0 {
+		return nil
+	}
+	return g.UnorderedCollection.Get(int64(idx))
+}
+
+func (g *SparseArray[K, V]) shrink(key K) {
+	if key < g.maxKey {
+		return
+	}
+
+	g.maxKey = 0
+	for i := key; i > 0; i-- {
+		if g.indices[i] != 0 {
+			g.maxKey = i
 			break
 		}
 	}
-	if idx == -1 {
-		return
-	}
-	// remove from indices
-	g.indices = append(g.indices[:idx], g.indices[idx+1:]...)
-	// remove from values
-	g.values = append(g.values[:idx], g.values[idx+1:]...)
-}
 
-func (g *SparseArray[K, V]) Get(key K) (V, bool) {
-	for i, t := range g.indices {
-		if t == key {
-			return g.values[i], true
+	if int32(g.maxKey) < g.shrinkThreshold {
+		g.maxKey = K(g.shrinkThreshold)
+	}
+
+	if len(g.indices) > 1024 && int(g.maxKey) < len(g.indices)/2 {
+		m := (g.maxKey + 1) * 5 / 4
+		newIndices := make([]int32, m)
+		count := copy(newIndices, g.indices[:m])
+		if count != int(m) {
+			panic("copy failed")
 		}
 	}
-	v := new(V)
-	return *v, false
 }

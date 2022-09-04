@@ -16,11 +16,7 @@ func (is *InputSystem) PreUpdate(event ecs.Event) {
 	iterMC := ecs.GetInterestedComponents[MoveChange](is)
 	var mov *Movement
 	for mc := iterMC.Begin(); !iterMC.End(); mc = iterMC.Next() {
-		info := ecs.GetEntityInfo(is.World(), mc.Entity)
-		if info == nil {
-			continue
-		}
-		mov = ecs.GetRelatedComponent[Movement](is, info)
+		mov = ecs.GetRelatedComponent[Movement](is, mc.Entity)
 		if mov != nil {
 			ecs.Log.Infof("move changed: old: %+v, new: %+v", mov, mc)
 			mov.V = mc.V

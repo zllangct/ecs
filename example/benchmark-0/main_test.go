@@ -43,7 +43,7 @@ func TestEcsOptimizer(t *testing.T) {
 		delta = time.Since(ts)
 		ecs.Log.Info("===== Frame:", i, "=====", delta)
 		if frameInterval-delta != 0 {
-			game.world.Optimize(frameInterval-delta, true)
+			game.world.optimize(frameInterval-delta, true)
 			time.Sleep(frameInterval - delta)
 			delta = frameInterval
 		}

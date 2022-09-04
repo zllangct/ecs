@@ -44,16 +44,15 @@ func NewDefaultWorldConfig() *WorldConfig {
 type IWorld interface {
 	GetStatus() WorldStatus
 	GetID() int64
-	NewEntity() EntityInfo
-	GetEntityInfo(id Entity) EntityInfo
+	NewEntity() *EntityInfo
+	GetEntityInfo(id Entity) (*EntityInfo, bool)
 	AddFreeComponent(component IComponent)
 	RegisterSystem(system ISystem)
 	GetSyncLauncher() *SyncWorldLauncher
 	GetAsyncLauncher() *AsyncWorldLauncher
-	GetComponentMetaInfo(typ reflect.Type) ComponentMetaInfo
-	ConvertToType(it uint16) reflect.Type
-	Optimize(t time.Duration, force bool) // TODO move to launcher
+	GetComponentMetaInfo(typ reflect.Type) *ComponentMetaInfo
 
+	optimize(t time.Duration, force bool)
 	getSystem(sys reflect.Type) (ISystem, bool)
 	update()
 	setStatus(status WorldStatus)
@@ -61,6 +60,7 @@ type IWorld interface {
 	getComponentSet(typ reflect.Type) IComponentSet
 	getComponentSetByIntType(typ uint16) IComponentSet
 	getComponentCollection() IComponentCollection
+	getComponentMeta() *componentMeta
 	registerForT(system interface{}, order ...Order)
 }
 
@@ -116,11 +116,7 @@ func NewWorld(config *WorldConfig) *ecsWorld {
 
 	world.idGenerator = NewEntityIDGenerator(1024, 10)
 
-	world.componentMeta = &componentMeta{
-		seq:     0,
-		types:   map[reflect.Type]uint16{},
-		it2Type: map[uint16]reflect.Type{},
-	}
+	world.componentMeta = NewComponentMeta()
 
 	world.metrics = NewMetrics(world.config.IsMetrics, world.config.IsMetricsPrint)
 
@@ -167,7 +163,7 @@ func (w *ecsWorld) GetAsyncLauncher() *AsyncWorldLauncher {
 	return newAsyncWorldLauncher(w)
 }
 
-func (w *ecsWorld) Optimize(t time.Duration, force bool) {
+func (w *ecsWorld) optimize(t time.Duration, force bool) {
 	w.optimizer.optimize(t, force)
 }
 
@@ -207,12 +203,12 @@ func (w *ecsWorld) addJob(job func(), hashKey ...uint32) {
 	w.workPool.Add(job, hashKey...)
 }
 
-func (w *ecsWorld) addEntity(entity Entity) {
-	w.entities.Add(entity, nil)
+func (w *ecsWorld) addEntity(info EntityInfo) *EntityInfo {
+	return w.entities.Add(info)
 }
 
-func (w *ecsWorld) GetEntityInfo(entity Entity) EntityInfo {
-	return EntityInfo{world: w, entity: entity}
+func (w *ecsWorld) GetEntityInfo(entity Entity) (*EntityInfo, bool) {
+	return w.entities.GetEntityInfo(entity)
 }
 
 func (w *ecsWorld) deleteEntity(entity Entity) {
@@ -227,29 +223,37 @@ func (w *ecsWorld) getComponentSetByIntType(typ uint16) IComponentSet {
 	return w.components.getComponentSetByIntType(typ)
 }
 
-func (w *ecsWorld) GetComponentMetaInfo(typ reflect.Type) ComponentMetaInfo {
-	return w.componentMeta.GetComponentMetaInfo(typ)
-}
-
-func (w *ecsWorld) ConvertToType(it uint16) reflect.Type {
-	return w.componentMeta.ConvertToType(it)
+func (w *ecsWorld) GetComponentMetaInfo(typ reflect.Type) *ComponentMetaInfo {
+	return w.componentMeta.GetComponentMetaInfoByType(typ)
 }
 
 func (w *ecsWorld) getComponentCollection() IComponentCollection {
 	return w.components
 }
 
-func (w *ecsWorld) NewEntity() EntityInfo {
+func (w *ecsWorld) getComponentMeta() *componentMeta {
+	return w.componentMeta
+}
+
+func (w *ecsWorld) NewEntity() *EntityInfo {
 	info := EntityInfo{world: w, entity: w.idGenerator.NewID()}
-	return info
+	return w.addEntity(info)
 }
 
 func (w *ecsWorld) addComponent(entity Entity, component IComponent) {
+	typ := component.Type()
+	if !w.componentMeta.Exist(typ) {
+		w.componentMeta.CreateComponentMetaInfo(component.Type(), component.getComponentType())
+	}
 	w.components.operate(CollectionOperateAdd, entity, component)
 }
 
 func (w *ecsWorld) deleteComponent(entity Entity, component IComponent) {
 	w.components.operate(CollectionOperateDelete, entity, component)
+}
+
+func (w *ecsWorld) deleteComponentByIntType(entity Entity, it uint16) {
+	w.components.deleteOperate(entity, it)
 }
 
 func (w *ecsWorld) AddFreeComponent(component IComponent) {
