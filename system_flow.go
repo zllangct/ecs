@@ -167,6 +167,11 @@ func (p *systemFlow) systemUpdate(event Event) {
 				if systemCount := len(ss); systemCount != 0 {
 					for i := 0; i < systemCount; i++ {
 						sys = ss[i]
+
+						if !sys.isValid() {
+							continue
+						}
+
 						imp = false
 						runSync = false
 						state := ss[i].getState()
@@ -287,16 +292,18 @@ func (p *systemFlow) systemUpdate(event Event) {
 							sys.setSecurity(false)
 							sys.setExecuting(false)
 						} else {
-							p.wg.Add(1)
-							p.world.addJob(func() {
-								defer func() {
-									sys.setExecuting(false)
-									p.wg.Done()
-								}()
-
+							wrapper := func(fn func(event2 Event), e Event) func() {
 								sys.setExecuting(true)
-								fn(event)
-							})
+								return func() {
+									defer func() {
+										sys.setExecuting(false)
+										p.wg.Done()
+									}()
+									fn(e)
+								}
+							}
+							p.wg.Add(1)
+							p.world.addJob(wrapper(fn, event))
 						}
 					}
 				}
@@ -335,7 +342,7 @@ func (p *systemFlow) run(event Event) {
 
 // register method only in world init or func init(){}
 func (p *systemFlow) register(system ISystem) {
-	if p.world.GetStatus() != WorldStatusInit {
+	if p.world.GetStatus() != WorldStatusInitialized {
 		panic("system register only in world init")
 	}
 

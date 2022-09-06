@@ -2,80 +2,113 @@ package ecs
 
 import "time"
 
-type SyncWorldLauncher struct {
-	world *ecsWorld
+type IWorld interface {
+	iWorldBase
+	Startup()
+	Update()
+	Optimize(t time.Duration, force bool)
 }
 
-func newSyncWorldLauncher(w *ecsWorld) *SyncWorldLauncher {
-	return &SyncWorldLauncher{
-		world: w,
-	}
+type WorldBase struct {
+	ecsWorld
 }
 
-func (s *SyncWorldLauncher) GetUtilityGetter() UtilityGetter {
-	return UtilityGetter{s.world}
+func (w *WorldBase) Init(config *WorldConfig) {
+	w.ecsWorld.init(config)
 }
 
-func (s *SyncWorldLauncher) Update() {
-	s.world.update()
+func (w *WorldBase) Startup() {
+	w.startup()
 }
 
-type AsyncWorldLauncher struct {
-	world       *ecsWorld
+func (w *WorldBase) Update() {
+	w.update()
+}
+
+func (w *WorldBase) Optimize(t time.Duration, force bool) {}
+
+type AsyncWorld struct {
+	ecsWorld
 	wStop       chan struct{}
 	gate        IGate
-	stopHandler func(world *ecsWorld)
+	stopHandler func(world *AsyncWorld)
 }
 
-func newAsyncWorldLauncher(w *ecsWorld) *AsyncWorldLauncher {
-	return &AsyncWorldLauncher{
-		world: w,
+func NewAsyncWorld(config *WorldConfig) *AsyncWorld {
+	w := &AsyncWorld{
 		wStop: make(chan struct{}),
 	}
+	w.ecsWorld.init(config)
+	return w
 }
 
-func (w *AsyncWorldLauncher) SetGate(gate IGate) IGate {
-	w.gate = gate
-	gate.resetData(&w.gate)
-	w.gate.baseInit(w.world)
-	return w.gate
-}
+func (w *AsyncWorld) Startup() {
+	w.startup()
 
-func (w *AsyncWorldLauncher) GetGate() IGate {
-	return w.gate
-}
-
-func (w *AsyncWorldLauncher) Run() {
-	if w.world.GetStatus() != WorldStatusInit {
-		panic("this world is already running.")
-	}
-	frameInterval := w.world.config.FrameInterval
-	w.world.setStatus(WorldStatusRunning)
+	frameInterval := w.config.FrameInterval
+	w.setStatus(WorldStatusRunning)
 	Log.Info("start world success")
 
 	//main loop
 	for {
 		select {
 		case <-w.wStop:
-			w.world.setStatus(WorldStatusStop)
+			w.setStatus(WorldStatusStop)
 			if w.stopHandler != nil {
-				w.stopHandler(w.world)
+				w.stopHandler(w)
 			}
-			w.world.systemFlow.stop()
+			w.systemFlow.stop()
 			return
 		default:
 		}
 		if w.gate != nil {
 			w.gate.dispatch()
 		}
-		w.world.update()
+		w.update()
 		//world.Info(delta, frameInterval - delta)
-		if d := frameInterval - w.world.delta; d > 0 {
+		if d := frameInterval - w.delta; d > 0 {
 			time.Sleep(d)
 		}
 	}
 }
 
-func (w *AsyncWorldLauncher) Stop() {
+func (w *AsyncWorld) Update() {
+	w.update()
+}
+
+func (w *AsyncWorld) Optimize(t time.Duration, force bool) {}
+
+func (w *AsyncWorld) SetGate(gate IGate) IGate {
+	w.gate = gate
+	gate.resetData(&w.gate)
+	w.gate.baseInit(&w.ecsWorld)
+	return w.gate
+}
+
+func (w *AsyncWorld) GetGate() IGate {
+	return w.gate
+}
+
+func (w *AsyncWorld) Stop() {
 	w.wStop <- struct{}{}
 }
+
+type SyncWorld struct {
+	ecsWorld
+}
+
+func NewSyncWorld(config *WorldConfig) *SyncWorld {
+	w := &SyncWorld{}
+	w.ecsWorld.init(config)
+	return w
+}
+
+func (w *SyncWorld) Startup() {
+	w.startup()
+}
+
+func (w *SyncWorld) Update() {
+	w.update()
+}
+
+func (w *SyncWorld) Optimize(t time.Duration, force bool) {}

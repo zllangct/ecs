@@ -8,7 +8,7 @@ type InputSystem struct {
 	ecs.System[InputSystem]
 }
 
-func (is *InputSystem) Init(initializer *ecs.SystemInitializer) {
+func (is *InputSystem) Init(initializer ecs.SystemInitializer) {
 	is.SetRequirements(initializer, &Movement{}, &MoveChange{})
 }
 

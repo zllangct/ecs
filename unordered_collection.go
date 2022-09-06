@@ -49,6 +49,9 @@ func (c *UnorderedCollection[T]) Get(idx int64) *T {
 }
 
 func (c *UnorderedCollection[T]) getPointer(idx int64) unsafe.Pointer {
+	if len(c.data) == 0 {
+		panic("get pointer from empty collection")
+	}
 	return unsafe.Pointer(uintptr(unsafe.Pointer(&c.data[0])) + uintptr(idx)*c.eleSize)
 }
 
@@ -122,6 +125,7 @@ func (c *UnorderedCollection[T]) ChangeReset() {
 }
 
 func (c *UnorderedCollection[T]) Clear() {
+	Log.Debugf("clear collection %v", c)
 	c.data = make([]T, 0, c.initSize)
 	c.change = 0
 	c.len = 0
@@ -133,6 +137,17 @@ func (c *UnorderedCollection[T]) ElementType() reflect.Type {
 
 func (c *UnorderedCollection[T]) getData() []T {
 	return c.data
+}
+
+func (c *UnorderedCollection[T]) getIndexByElePointer(element *T) int64 {
+	if c.len == 0 {
+		return -1
+	}
+	idx := int64(((uintptr)(unsafe.Pointer(element)) - uintptr(unsafe.Pointer(&c.data[0]))) / c.eleSize)
+	if idx < 0 || idx > c.len-1 {
+		return -1
+	}
+	return idx
 }
 
 func NewUnorderedCollectionIterator[T ComponentObject](collection *UnorderedCollection[T], readOnly ...bool) Iterator[T] {

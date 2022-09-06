@@ -23,10 +23,15 @@ const (
 type ComponentType uint8
 
 const (
-	ComponentTypeNormal ComponentType = iota
-	ComponentTypeDisposable
-	ComponentTypeFree
-	ComponentTypeFreeDisposable
+	ComponentTypeFreeMask       ComponentType = 1 << 7
+	ComponentTypeDisposableMask ComponentType = 1 << 6
+)
+
+const (
+	ComponentTypeNormal         ComponentType = 0
+	ComponentTypeDisposable                   = 1 | ComponentTypeDisposableMask
+	ComponentTypeFree                         = 2 | ComponentTypeFreeMask
+	ComponentTypeFreeDisposable               = 3 | ComponentTypeFreeMask | ComponentTypeDisposableMask
 )
 
 type EmptyComponent struct {
@@ -45,10 +50,10 @@ type IComponent interface {
 	getIntType() uint16
 	getComponentType() ComponentType
 	getPermission() ComponentPermission
-	check(initializer *SystemInitializer)
+	check(initializer SystemInitializer)
 	getSeq() uint32
 	newCollection(meta *ComponentMetaInfo) IComponentSet
-	addToCollection(p unsafe.Pointer)
+	addToCollection(ct ComponentType, p unsafe.Pointer)
 	deleteFromCollection(collection interface{})
 
 	debugAddress() unsafe.Pointer
@@ -141,19 +146,19 @@ func (c Component[T]) OwnerEntity() Entity {
 	return c.owner
 }
 
-func (c *Component[T]) init() {
-
-	c.setType(c.getComponentType())
-	c.setState(ComponentStateInvalid)
-}
-
 func (c *Component[T]) getComponentType() ComponentType {
 	return ComponentTypeNormal
 }
 
-func (c *Component[T]) addToCollection(p unsafe.Pointer) {
+func (c *Component[T]) addToCollection(ct ComponentType, p unsafe.Pointer) {
 	cc := (*ComponentSet[T])(p)
-	ins := cc.Add(c.rawInstance(), c.owner)
+	var ins *T
+	if ct&ComponentTypeFreeMask > 0 {
+		ins, _ = cc.UnorderedCollection.Add(c.rawInstance())
+	} else {
+		ins = cc.Add(c.rawInstance(), c.owner)
+	}
+
 	(*Component[T])(unsafe.Pointer(ins)).setState(ComponentStateActive)
 }
 
@@ -236,14 +241,14 @@ func (c *Component[T]) getPermission() ComponentPermission {
 	return ComponentReadWrite
 }
 
-func (c *Component[T]) check(initializer *SystemInitializer) {
-	ins := c.instance()
-	typ := ins.Type()
-	meta := initializer.sys.World().getComponentMeta()
-	if !meta.Exist(typ) {
-		meta.CreateComponentMetaInfo(typ, ins.getComponentType())
+func (c *Component[T]) check(initializer SystemInitializer) {
+	if initializer.isValid() {
+		panic("out of initialization stage")
 	}
-	initializer.sys.World().getComponentCollection().checkSet(ins)
+	ins := c.instance()
+	sys := initializer.getSystem()
+	sys.World().getOrCreateComponentMetaInfo(ins)
+	sys.World().getComponentCollection().checkSet(ins)
 }
 
 func (c *Component[T]) debugAddress() unsafe.Pointer {

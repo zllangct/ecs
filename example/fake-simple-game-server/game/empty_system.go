@@ -9,7 +9,7 @@ type EmptySystem struct {
 	isPostStart bool
 }
 
-func (e *EmptySystem) Init(initializer *ecs.SystemInitializer) {
+func (e *EmptySystem) Init(initializer ecs.SystemInitializer) {
 	ecs.Log.Info("empty system init")
 }
 

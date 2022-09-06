@@ -53,7 +53,11 @@ func (s *ShapeIter[T]) tryNext() *T {
 				skip = true
 				break
 			}
-			*(**byte)(unsafe.Pointer((uintptr)(unsafe.Pointer(s.cur)) + s.indices.subOffset[i])) = (*byte)(subPointer)
+			if s.indices.readOnly[i] {
+				*(**byte)(unsafe.Pointer((uintptr)(unsafe.Pointer(s.cur)) + s.indices.subOffset[i])) = &(*(*byte)(subPointer))
+			} else {
+				*(**byte)(unsafe.Pointer((uintptr)(unsafe.Pointer(s.cur)) + s.indices.subOffset[i])) = (*byte)(subPointer)
+			}
 		}
 		if !skip {
 			s.offset = i

@@ -15,11 +15,11 @@ type GatePointer[T GateObject] interface {
 }
 
 type GateInitializer struct {
-	gate IGate
+	gate *IGate
 }
 
 func (g *GateInitializer) EventRegister(event CustomEventName, fn CustomEventHandler) {
-	g.gate.eventRegister(event, fn)
+	(*g.gate).eventRegister(event, fn)
 }
 
 type IGateInitializer interface {
@@ -40,7 +40,7 @@ type Gate[T GateObject] struct {
 	world         *ecsWorld
 	events        map[CustomEventName]CustomEventHandler
 	eventQueue    []CustomEvent
-	syncQueue     []func(*UtilityGetter)
+	syncQueue     []func(UtilityGetter)
 	isInitialized bool
 }
 
@@ -50,12 +50,13 @@ func (p *Gate[T]) baseInit(w *ecsWorld) {
 	p.world = w
 	p.events = make(map[CustomEventName]CustomEventHandler)
 	p.eventQueue = make([]CustomEvent, 0)
-	p.syncQueue = make([]func(*UtilityGetter), 0)
+	p.syncQueue = make([]func(UtilityGetter), 0)
 	ins := (*T)(unsafe.Pointer(p))
 	if i, ok := any(ins).(IGateInitializer); ok {
-		i.Init(GateInitializer{
-			gate: p,
-		})
+		gi := GateInitializer{}
+		*gi.gate = p
+		i.Init(gi)
+		*gi.gate = nil
 	}
 	p.isInitialized = true
 }
@@ -88,11 +89,14 @@ func (p *Gate[T]) dispatch() {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	getter := &UtilityGetter{world: p.world}
+	ug := UtilityGetter{}
+	iw := iWorldBase(p.world)
+	ug.world = &iw
+
 	for _, e := range p.eventQueue {
 		if fn, ok := p.events[e.Event]; ok {
 			err := TryAndReport(func() {
-				fn(getter, e.Args)
+				fn(ug, e.Args)
 			})
 			if err != nil {
 				Log.Error(err)
@@ -104,21 +108,22 @@ func (p *Gate[T]) dispatch() {
 	p.eventQueue = make([]CustomEvent, 0)
 
 	for _, fn := range p.syncQueue {
-		fn(getter)
+		fn(ug)
 	}
-	p.syncQueue = make([]func(*UtilityGetter), 0)
+	p.syncQueue = make([]func(UtilityGetter), 0)
 
-	getter.world = nil
+	*ug.world = nil
+	ug.world = nil
 }
 
-func (p *Gate[T]) Sync(fn func(getter *UtilityGetter)) {
+func (p *Gate[T]) Sync(fn func(getter UtilityGetter)) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
 	p.syncQueue = append(p.syncQueue, fn)
 }
 
-func GetUtility[T SystemObject, U UtilityObject](getter IUtilityGetter) (*U, bool) {
+func GetUtility[T SystemObject, U UtilityObject](getter UtilityGetter) (*U, bool) {
 	w := getter.getWorld()
 	if w == nil {
 		return nil, false

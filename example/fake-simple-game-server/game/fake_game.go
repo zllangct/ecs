@@ -18,7 +18,7 @@ type Msg2Client struct {
 
 type FakeGame struct {
 	clients  sync.Map
-	world    ecs.IWorld
+	world    ecs.iWorldBase
 	chatRoom *ChatRoom
 }
 

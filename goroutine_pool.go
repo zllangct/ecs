@@ -14,12 +14,12 @@ type Worker struct {
 // Start goroutine pool.
 func (w *Worker) Start() {
 	c := func() (c bool) {
-		defer func() {
-			if r := recover(); r != nil {
-				Log.Error(r)
-			}
-			c = true
-		}()
+		//defer func() {
+		//	if r := recover(); r != nil {
+		//		Log.Error(r)
+		//	}
+		//	c = true
+		//}()
 		var job func()
 		for {
 			select {

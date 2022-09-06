@@ -6,7 +6,7 @@ type Test1System struct {
 	ecs.System[Test1System]
 }
 
-func (t *Test1System) Init(initializer *ecs.SystemInitializer) {
+func (t *Test1System) Init(initializer ecs.SystemInitializer) {
 	t.SetRequirements(initializer, &Test1{})
 }
 
@@ -23,7 +23,7 @@ type Test2System struct {
 	ecs.System[Test2System]
 }
 
-func (t *Test2System) Init(initializer *ecs.SystemInitializer) {
+func (t *Test2System) Init(initializer ecs.SystemInitializer) {
 	t.SetRequirements(initializer, &Test2{})
 }
 
@@ -40,8 +40,8 @@ type Test3System struct {
 	ecs.System[Test3System]
 }
 
-func (t *Test3System) Init(initializer *ecs.SystemInitializer) {
-	t.SetRequirements(initializer, &Test1{})
+func (t *Test3System) Init(initializer ecs.SystemInitializer) {
+	t.SetRequirements(initializer, &Test3{})
 }
 
 func (t *Test3System) Update(event ecs.Event) {
@@ -57,7 +57,7 @@ type Test4System struct {
 	ecs.System[Test4System]
 }
 
-func (t *Test4System) Init(initializer *ecs.SystemInitializer) {
+func (t *Test4System) Init(initializer ecs.SystemInitializer) {
 	t.SetRequirements(initializer, &Test4{})
 }
 
@@ -74,7 +74,7 @@ type Test5System struct {
 	ecs.System[Test5System]
 }
 
-func (t *Test5System) Init(initializer *ecs.SystemInitializer) {
+func (t *Test5System) Init(initializer ecs.SystemInitializer) {
 	t.SetRequirements(initializer, &Test5{})
 }
 

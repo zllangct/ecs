@@ -25,7 +25,7 @@ type __optimizer_Bench_S_1 struct {
 	System[__optimizer_Bench_S_1]
 }
 
-func (t *__optimizer_Bench_S_1) Init(initializer *SystemInitializer) {
+func (t *__optimizer_Bench_S_1) Init(initializer SystemInitializer) {
 	t.SetRequirements(initializer, &__optimizer_Bench_C_1{}, &__optimizer_Bench_C_2{})
 }
 
@@ -47,14 +47,14 @@ func (t *__optimizer_Bench_S_1) Update(event Event) {
 }
 
 type __optimizer_Bench_GameECS struct {
-	world    IWorld
+	world    iWorldBase
 	entities []Entity
 }
 
 func (g *__optimizer_Bench_GameECS) init() {
 	println("init")
 	config := NewDefaultWorldConfig()
-	g.world = NewWorld(config)
+	g.world = NewSyncWorld(config)
 
 	RegisterSystem[__optimizer_Bench_S_1](g.world)
 

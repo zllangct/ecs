@@ -12,15 +12,19 @@ import (
 )
 
 func TestFrame(t *testing.T) {
+	ecs.EnableMainThreadDebug()
+
 	game := &GameECS{}
-	config := ecs.NewDefaultWorldConfig()
-	game.init(config)
+	game.init(ecs.NewDefaultWorldConfig())
+
+	game.world.Startup()
 
 	var delta time.Duration
+	_ = delta
 	var ts time.Time
 	for i := 0; i < 10; i++ {
 		ts = time.Now()
-		doFrame(game.world, uint64(i), delta)
+		game.world.Update()
 		game.attack()
 		delta = time.Since(ts)
 		//ecs.Log.Info("===== Frame:", i, "=====", delta)
@@ -28,9 +32,12 @@ func TestFrame(t *testing.T) {
 }
 
 func TestEcsOptimizer(t *testing.T) {
+	ecs.EnableMainThreadDebug()
+
 	game := &GameECS{}
-	config := ecs.NewDefaultWorldConfig()
-	game.init(config)
+	game.init(ecs.NewDefaultWorldConfig())
+
+	game.world.Startup()
 
 	var frameInterval = time.Millisecond * 33
 	var delta time.Duration
@@ -38,12 +45,13 @@ func TestEcsOptimizer(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		//ecs.Log.Info("===== Frame:", i)
 		ts = time.Now()
-		doFrame(game.world, uint64(i), delta)
+
+		game.world.Update()
 		game.attack()
 		delta = time.Since(ts)
 		ecs.Log.Info("===== Frame:", i, "=====", delta)
 		if frameInterval-delta != 0 {
-			game.world.optimize(frameInterval-delta, true)
+			game.world.Optimize(frameInterval-delta, true)
 			time.Sleep(frameInterval - delta)
 			delta = frameInterval
 		}

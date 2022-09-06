@@ -11,7 +11,7 @@ type SyncSystem struct {
 	ecs.System[SyncSystem]
 }
 
-func (m *SyncSystem) Init(initializer *ecs.SystemInitializer) {
+func (m *SyncSystem) Init(initializer ecs.SystemInitializer) {
 	m.SetRequirements(initializer, &Position{}, &PlayerComponent{})
 }
 

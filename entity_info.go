@@ -17,25 +17,50 @@ func (e *EntityInfo) Entity() Entity {
 	return e.entity
 }
 
-func (e *EntityInfo) Add(components ...IComponent) []error {
-	for _, c := range components {
-		e.world.addComponent(e.entity, c)
-		e.compound.Add(e.world.GetComponentMetaInfo(c.Type()).it)
+func (e *EntityInfo) Add(components ...IComponent) {
+	if mainThreadDebug {
+		checkMainThread()
 	}
-	return nil
+	for _, c := range components {
+		if !e.compound.Exist(e.world.getComponentMetaInfoByType(c.Type()).it) {
+			e.world.addComponent(e.entity, c)
+		}
+	}
 }
 
-func (e *EntityInfo) addComponentInternal(it uint16) {
+func (e *EntityInfo) Has(its ...uint16) bool {
+	for i := 0; i < len(its); i++ {
+		if !e.compound.Exist(its[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func (e *EntityInfo) HasType(components ...IComponent) bool {
+	for i := 0; i < len(components); i++ {
+		if !e.compound.Exist(e.world.getComponentMetaInfoByType(components[i].Type()).it) {
+			return false
+		}
+	}
+	return true
+}
+
+func (e *EntityInfo) addToCompound(it uint16) {
 	e.compound.Add(it)
 }
 
-func (e *EntityInfo) removeComponentInternal(it uint16) {
+func (e *EntityInfo) removeFromCompound(it uint16) {
 	e.compound.Remove(it)
 }
 
 func (e *EntityInfo) Remove(components ...IComponent) {
+	if mainThreadDebug {
+		checkMainThread()
+	}
 	for _, c := range components {
-		e.world.deleteComponent(e.entity, c)
-		e.compound.Remove(e.world.GetComponentMetaInfo(c.Type()).it)
+		if e.compound.Exist(e.world.getComponentMetaInfoByType(c.Type()).it) {
+			e.world.deleteComponent(e.entity, c)
+		}
 	}
 }

@@ -45,6 +45,10 @@ func (c *OrderedIntSet[T]) Find(it T) int {
 	return -1
 }
 
+func (c *OrderedIntSet[T]) Exist(it T) bool {
+	return c.Find(it) != -1
+}
+
 func (c *OrderedIntSet[T]) IsSubSet(subSet OrderedIntSet[T]) bool {
 	offset := 0
 	length := len(*c)
@@ -78,10 +82,11 @@ func (c *OrderedIntSet[T]) Add(it T) bool {
 	return true
 }
 
-func (c *OrderedIntSet[T]) Remove(it T) {
+func (c *OrderedIntSet[T]) Remove(it T) bool {
 	idx := c.Find(it)
 	if idx < 0 {
-		return
+		return false
 	}
 	*c = append((*c)[:idx], (*c)[idx+1:]...)
+	return true
 }

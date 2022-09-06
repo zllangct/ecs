@@ -15,7 +15,7 @@ type ComponentPermission uint8
 type IRequirement interface {
 	Type() reflect.Type
 	getPermission() ComponentPermission
-	check(initializer *SystemInitializer)
+	check(initializer SystemInitializer)
 }
 
 type ReadOnly[T ComponentObject] struct{}
@@ -28,12 +28,7 @@ func (r *ReadOnly[T]) getPermission() ComponentPermission {
 	return ComponentReadOnly
 }
 
-func (r *ReadOnly[T]) check(initializer *SystemInitializer) {
+func (r *ReadOnly[T]) check(initializer SystemInitializer) {
 	ins := any((*T)(unsafe.Pointer(r))).(IComponent)
-	typ := ins.Type()
-	initializer.sys.World().getComponentCollection().checkSet(ins)
-	meta := initializer.sys.World().getComponentMeta()
-	if !meta.Exist(typ) {
-		meta.CreateComponentMetaInfo(typ, ins.getComponentType())
-	}
+	ins.check(initializer)
 }

@@ -26,13 +26,29 @@ const (
 )
 
 type SystemInitializer struct {
-	sys ISystem
+	sys *ISystem
+}
+
+func (s *SystemInitializer) getSystem() ISystem {
+	if s.sys == nil {
+		panic("out of initialization stage")
+	}
+	return *s.sys
+}
+
+func (s *SystemInitializer) SetBroken(reason string) {
+	(*s.sys).setBroken()
+	panic(reason)
+}
+
+func (s *SystemInitializer) isValid() bool {
+	return *s.sys == nil
 }
 
 type ISystem interface {
 	Type() reflect.Type
 	Order() Order
-	World() IWorld
+	World() iWorldBase
 	GetRequirements() map[reflect.Type]IRequirement
 	IsRequire(component IComponent) bool
 	ID() int64
@@ -51,7 +67,7 @@ type ISystem interface {
 	getPointer() unsafe.Pointer
 	isRequire(componentType reflect.Type) bool
 	setOrder(order Order)
-	setRequirements(initializer *SystemInitializer, rqs ...IRequirement)
+	setRequirements(initializer SystemInitializer, rqs ...IRequirement)
 	getState() SystemState
 	setState(state SystemState)
 	setSecurity(isSafe bool)
@@ -61,6 +77,8 @@ type ISystem interface {
 	baseInit(world *ecsWorld, ins ISystem)
 	getOptimizer() *OptimizerReporter
 	getGetterCache() *GetterCache
+	setBroken()
+	isValid() bool
 }
 
 type SystemObject interface {
@@ -84,6 +102,7 @@ type System[T SystemObject] struct {
 	utility           IUtility
 	realType          reflect.Type
 	state             SystemState
+	valid             bool
 	isSafe            bool
 	executing         bool
 	id                int64
@@ -141,7 +160,10 @@ func (s *System[T]) eventsAsyncExecute() {
 	api.sys = nil
 }
 
-func (s *System[T]) SetRequirements(initializer *SystemInitializer, rqs ...IRequirement) {
+func (s *System[T]) SetRequirements(initializer SystemInitializer, rqs ...IRequirement) {
+	if initializer.isValid() {
+		panic("out of initialization stage")
+	}
 	s.setRequirements(initializer, rqs...)
 }
 
@@ -153,7 +175,7 @@ func (s *System[T]) setRequirementsInternal(rqs ...IRequirement) {
 	for _, value := range rqs {
 		typ = value.Type()
 		s.requirements[typ] = value
-		s.World().GetComponentMetaInfo(typ)
+		s.World().getComponentMetaInfoByType(typ)
 	}
 }
 
@@ -161,7 +183,7 @@ func (s *System[T]) isInitialized() bool {
 	return s.state >= SystemStateInit
 }
 
-func (s *System[T]) setRequirements(initializer *SystemInitializer, rqs ...IRequirement) {
+func (s *System[T]) setRequirements(initializer SystemInitializer, rqs ...IRequirement) {
 	if s.requirements == nil {
 		s.requirements = map[reflect.Type]IRequirement{}
 	}
@@ -170,7 +192,7 @@ func (s *System[T]) setRequirements(initializer *SystemInitializer, rqs ...IRequ
 		typ = value.Type()
 		value.check(initializer)
 		s.requirements[typ] = value
-		s.World().GetComponentMetaInfo(typ)
+		s.World().getComponentMetaInfoByType(typ)
 	}
 }
 
@@ -181,7 +203,10 @@ func (s *System[T]) isThreadSafe() bool {
 	return s.isSafe
 }
 
-func (s *System[T]) SetUtility(utility IUtility) {
+func (s *System[T]) SetUtility(initializer SystemInitializer, utility IUtility) {
+	if initializer.isValid() {
+		panic("out of initialization stage")
+	}
 	s.utility = utility
 	s.utility.setSystem(s)
 	s.utility.setWorld(s.world)
@@ -235,6 +260,14 @@ func (s *System[T]) setState(state SystemState) {
 	s.state = state
 }
 
+func (s *System[T]) setBroken() {
+	s.valid = false
+}
+
+func (s *System[T]) isValid() bool {
+	return s.valid
+}
+
 func (s *System[T]) setExecuting(isExecuting bool) {
 	s.executing = isExecuting
 }
@@ -267,16 +300,20 @@ func (s *System[T]) baseInit(world *ecsWorld, ins ISystem) {
 	}
 	s.world = world
 
-	initialzer := &SystemInitializer{sys: s}
+	s.valid = true
+
+	initializer := SystemInitializer{}
+	is := ISystem(s)
+	initializer.sys = &is
 	if i, ok := ins.(InitReceiver); ok {
 		err := TryAndReport(func() {
-			i.Init(initialzer)
+			i.Init(initializer)
 		})
 		if err != nil {
 			Log.Error(err)
 		}
 	}
-	initialzer.sys = nil
+	*initializer.sys = nil
 
 	s.state = SystemStateStart
 }
@@ -304,7 +341,7 @@ func (s *System[T]) Order() Order {
 	return s.order
 }
 
-func (s *System[T]) World() IWorld {
+func (s *System[T]) World() iWorldBase {
 	return s.world
 }
 

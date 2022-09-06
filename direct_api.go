@@ -5,49 +5,13 @@ import (
 	"unsafe"
 )
 
-// world api
-
-func GetWorldID(world IWorld) int64 {
-	return world.GetID()
-}
-
-func GetWorldStatus(world IWorld) WorldStatus {
-	return world.GetStatus()
-}
-
-func RegisterSystem[T SystemObject](world IWorld, order ...Order) {
+func RegisterSystem[T SystemObject](world iWorldBase, order ...Order) {
 	world.registerForT(new(T), order...)
 }
 
-func GetSystem[T SystemObject](w IWorld) (ISystem, bool) {
-	return w.getSystem(TypeOf[T]())
-}
-
-func GetEntityInfo(world IWorld, entity Entity) (*EntityInfo, bool) {
-	return world.GetEntityInfo(entity)
-}
-
-func AddFreeComponent[T FreeComponentObject, TP FreeComponentPointer[T]](world IWorld, component *T) {
+func AddFreeComponent[T FreeComponentObject, TP FreeComponentPointer[T]](world iWorldBase, component *T) {
 	world.AddFreeComponent(TP(component))
 }
-
-// entity api
-
-func NewEntity(world IWorld) *EntityInfo {
-	return world.(*ecsWorld).NewEntity()
-}
-
-func Destroy(world IWorld, entity Entity) {
-	world.(*ecsWorld).deleteEntity(entity)
-}
-
-func AddComponent(world IWorld, entity Entity, components ...IComponent) {
-	for _, com := range components {
-		world.addComponent(entity, com)
-	}
-}
-
-// system api
 
 func GetInterestedComponent[T ComponentObject](sys ISystem, entity Entity) *T {
 	return GetRelatedComponent[T](sys, entity)
@@ -91,7 +55,15 @@ func GetRelatedComponent[T ComponentObject](sys ISystem, entity Entity) *T {
 	return cache.Get(entity)
 }
 
-func GetIntType(world IWorld, typ reflect.Type) uint16 {
-	info := world.GetComponentMetaInfo(typ)
-	return info.it
+func IGateToInstance[T GateObject](gate any) *T {
+	g, ok := gate.(*T)
+	if ok {
+		return nil
+	}
+	return g
+}
+
+func TypeOf[T any]() reflect.Type {
+	ins := (*T)(nil)
+	return reflect.TypeOf(ins).Elem()
 }

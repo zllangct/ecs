@@ -5,16 +5,12 @@ import (
 	"unsafe"
 )
 
-type IUtilityGetter interface {
-	getWorld() IWorld
-}
-
 type UtilityGetter struct {
-	world *ecsWorld
+	world *iWorldBase
 }
 
-func (g *UtilityGetter) getWorld() IWorld {
-	return g.world
+func (g *UtilityGetter) getWorld() iWorldBase {
+	return *g.world
 }
 
 type UtilityObject interface {
@@ -25,15 +21,15 @@ type IUtility interface {
 	Do(fn func(*SystemApi))
 	getPointer() unsafe.Pointer
 	setSystem(sys ISystem)
-	setWorld(world IWorld)
+	setWorld(world iWorldBase)
 }
 
 type Utility[T SystemObject] struct {
-	w   IWorld
+	w   iWorldBase
 	sys ISystem
 }
 
-func (u *Utility[T]) setWorld(w IWorld) {
+func (u *Utility[T]) setWorld(w iWorldBase) {
 	u.w = w
 }
 

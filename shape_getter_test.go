@@ -26,13 +26,12 @@ type __ShapeGetter_Test_S_1 struct {
 	getter1 *ShapeGetter[__ShapeGetter_Test_Shape_1]
 }
 
-func (t *__ShapeGetter_Test_S_1) Init(initializer *SystemInitializer) {
+func (t *__ShapeGetter_Test_S_1) Init(initializer SystemInitializer) {
 	t.SetRequirements(initializer, &__ShapeGetter_Test_C_1{}, &__ShapeGetter_Test_C_2{})
 
-	var err error
-	t.getter1, err = NewShapeGetter[__ShapeGetter_Test_Shape_1](initializer)
-	if err != nil {
-		Log.Fatal(err)
+	t.getter1 = NewShapeGetter[__ShapeGetter_Test_Shape_1](initializer)
+	if t.getter1 == nil {
+		initializer.SetBroken("invalid getter")
 	}
 }
 
@@ -45,17 +44,17 @@ func (t *__ShapeGetter_Test_S_1) Update(event Event) {
 }
 
 func TestNewShapeGetter(t *testing.T) {
-	world := NewWorld(NewDefaultWorldConfig())
+	world := NewSyncWorld(NewDefaultWorldConfig())
 	RegisterSystem[__ShapeGetter_Test_S_1](world)
 
-	launcher := world.GetSyncLauncher()
+	world.Startup()
 
 	for i := 0; i < 3; i++ {
 		e := world.NewEntity()
 		e.Add(&__ShapeGetter_Test_C_1{Field1: i}, &__ShapeGetter_Test_C_2{Field1: i * 10})
 	}
 
-	launcher.Update()
+	world.Update()
 	time.Sleep(time.Second)
-	launcher.Update()
+	world.Update()
 }

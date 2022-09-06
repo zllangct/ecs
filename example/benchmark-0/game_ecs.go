@@ -6,15 +6,15 @@ import (
 )
 
 type GameECS struct {
-	world    ecs.IWorld
+	world    *ecs.SyncWorld
 	entities []ecs.Entity
 }
 
 func (g *GameECS) init(config *ecs.WorldConfig) {
-	g.world = ecs.NewWorld(config)
+	g.world = ecs.NewSyncWorld(config)
 
-	//ecs.RegisterSystem[MoveSystem](g.world)
-	//ecs.RegisterSystem[DamageSystem](g.world)
+	ecs.RegisterSystem[MoveSystem](g.world)
+	ecs.RegisterSystem[DamageSystem](g.world)
 	ecs.RegisterSystem[Test1System](g.world)
 	ecs.RegisterSystem[Test2System](g.world)
 	ecs.RegisterSystem[Test3System](g.world)
@@ -29,11 +29,8 @@ func (g *GameECS) attack() {
 		ActionType: 1,
 	}
 	for _, entity := range g.entities {
-		info, _ := ecs.GetEntityInfo(g.world, entity)
-		err := info.Add(act)
-		if err != nil {
-			ecs.Log.Infof("%+v", err)
-		}
+		info, _ := g.world.GetEntityInfo(entity)
+		info.Add(act)
 	}
 }
 

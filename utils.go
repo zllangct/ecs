@@ -3,7 +3,6 @@ package ecs
 import (
 	"errors"
 	"math/rand"
-	"reflect"
 	"runtime/debug"
 	"sync/atomic"
 	"time"
@@ -86,11 +85,6 @@ func StrHash(str string, groupCount int) int {
 		total += int(str[i])
 	}
 	return total % groupCount
-}
-
-func TypeOf[T any]() reflect.Type {
-	ins := (*T)(nil)
-	return reflect.TypeOf(ins).Elem()
 }
 
 func memcmp(a unsafe.Pointer, b unsafe.Pointer, len uintptr) (ret bool) {
