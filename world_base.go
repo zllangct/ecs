@@ -23,6 +23,12 @@ func EnableMainThreadDebug() {
 	mainThreadDebug = true
 }
 
+var metaInfoDebug = false
+
+func EnableMetaInfoDebug() {
+	metaInfoDebug = true
+}
+
 func checkMainThread() {
 	if id := atomic.LoadInt64(&mainThreadID); id != goroutineID() && id > 0 {
 		panic("not main thread")
@@ -167,10 +173,13 @@ func (w *ecsWorld) startup() {
 		panic("world is not initialized or already running.")
 	}
 
-	w.systemFlow.SystemInfoPrint()
-	w.componentMeta.ComponentMetaInfoPrint()
+	if metaInfoDebug {
+		w.systemFlow.SystemInfoPrint()
+		w.componentMeta.ComponentMetaInfoPrint()
+	}
 
 	w.SwitchMainThread()
+
 	w.workPool.Start()
 
 	w.setStatus(WorldStatusRunning)
