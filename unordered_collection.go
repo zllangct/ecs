@@ -45,14 +45,14 @@ func NewUnorderedCollection[T any](initSize ...int) *UnorderedCollection[T] {
 }
 
 func (c *UnorderedCollection[T]) Get(idx int64) *T {
-	return (*T)(unsafe.Pointer(uintptr(unsafe.Pointer(&c.data[0])) + uintptr(idx)*c.eleSize))
+	return (*T)(unsafe.Add(unsafe.Pointer(&c.data[0]), uintptr(idx)*c.eleSize))
 }
 
 func (c *UnorderedCollection[T]) getPointer(idx int64) unsafe.Pointer {
 	if len(c.data) == 0 {
 		panic("get pointer from empty collection")
 	}
-	return unsafe.Pointer(uintptr(unsafe.Pointer(&c.data[0])) + uintptr(idx)*c.eleSize)
+	return unsafe.Add(unsafe.Pointer(&c.data[0]), uintptr(idx)*c.eleSize)
 }
 
 func (c *UnorderedCollection[T]) Add(element *T) (*T, int64) {

@@ -113,7 +113,7 @@ func BenchmarkUnorderedCollection_SliceRead(b *testing.B) {
 	})
 	b.Run("unordered collection 2", func(b *testing.B) {
 		for n := 0; n < b.N; n++ {
-			_ = (*__unorderedCollection_Test_item)(unsafe.Pointer(uintptr(unsafe.Pointer(&c.data[0])) + uintptr(n%total)*c.eleSize))
+			_ = (*__unorderedCollection_Test_item)(unsafe.Add(unsafe.Pointer(&c.data[0]), uintptr(n%total)*c.eleSize))
 		}
 	})
 	b.Run("unordered collection empty func", func(b *testing.B) {
@@ -164,7 +164,7 @@ func BenchmarkUnorderedCollection_ReadUnsafe(b *testing.B) {
 
 	b.Run("unsafe", func(b *testing.B) {
 		for n := 0; n < b.N; n++ {
-			_ = (*__unorderedCollection_Test_item)(unsafe.Pointer(uintptr(unsafe.Pointer(&data[0])) + uintptr(int64((n+1)%total))*eleSize))
+			_ = (*__unorderedCollection_Test_item)(unsafe.Add(unsafe.Pointer(&data[0]), uintptr(int64((n+1)%total))*eleSize))
 		}
 	})
 }

@@ -151,9 +151,9 @@ func (s *ShapeGetter[T]) GetSpecific(entity Entity) (*T, bool) {
 			return s.cur, false
 		}
 		if s.readOnly[i] {
-			*(**byte)(unsafe.Pointer((uintptr)(unsafe.Pointer(s.cur)) + s.subOffset[i])) = &(*(*byte)(subPointer))
+			*(**byte)(unsafe.Add(unsafe.Pointer(s.cur), s.subOffset[i])) = &(*(*byte)(subPointer))
 		} else {
-			*(**byte)(unsafe.Pointer((uintptr)(unsafe.Pointer(s.cur)) + s.subOffset[i])) = (*byte)(subPointer)
+			*(**byte)(unsafe.Add(unsafe.Pointer(s.cur), s.subOffset[i])) = (*byte)(subPointer)
 		}
 	}
 	return s.cur, true

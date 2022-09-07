@@ -63,11 +63,11 @@ func (i *Iter[T]) Next() *T {
 	if !i.End() {
 		if i.readOnly {
 			//i.curTemp = i.data[i.offset]
-			i.curTemp = *(*T)(unsafe.Pointer(uintptr(i.head) + i.pend))
+			i.curTemp = *(*T)(unsafe.Add(i.head, i.pend))
 			i.cur = &i.curTemp
 		} else {
 			//i.cur = &(i.data[i.offset])
-			i.cur = (*T)(unsafe.Pointer(uintptr(i.head) + i.pend))
+			i.cur = (*T)(unsafe.Add(i.head, i.pend))
 		}
 	} else {
 		i.cur = nil

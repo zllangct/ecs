@@ -89,7 +89,7 @@ func StrHash(str string, groupCount int) int {
 
 func memcmp(a unsafe.Pointer, b unsafe.Pointer, len uintptr) (ret bool) {
 	for i := uintptr(0); i < len; i++ {
-		if *(*byte)(unsafe.Pointer(uintptr(a) + i)) != *(*byte)(unsafe.Pointer(uintptr(b) + i)) {
+		if *(*byte)(unsafe.Add(a, i)) != *(*byte)(unsafe.Add(b, i)) {
 			ret = false
 			return
 		}

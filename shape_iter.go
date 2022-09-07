@@ -41,7 +41,11 @@ func (s *ShapeIter[T]) tryNext() *T {
 	for i := s.offset; i < s.maxLen; i++ {
 		p = s.indices.containers[s.mainKeyIndex].getPointer(int64(s.offset))
 		ec = (*EmptyComponent)(p)
-		*(**byte)(unsafe.Pointer((uintptr)(unsafe.Pointer(s.cur)) + s.indices.subOffset[s.mainKeyIndex])) = (*byte)(p)
+		if s.indices.readOnly[s.mainKeyIndex] {
+			*(**byte)(unsafe.Add(unsafe.Pointer(s.cur), s.indices.subOffset[s.mainKeyIndex])) = &(*(*byte)(p))
+		} else {
+			*(**byte)(unsafe.Add(unsafe.Pointer(s.cur), s.indices.subOffset[s.mainKeyIndex])) = (*byte)(p)
+		}
 		entity := ec.Owner()
 		skip = false
 		for i := 0; i < len(s.indices.subTypes); i++ {
@@ -54,9 +58,9 @@ func (s *ShapeIter[T]) tryNext() *T {
 				break
 			}
 			if s.indices.readOnly[i] {
-				*(**byte)(unsafe.Pointer((uintptr)(unsafe.Pointer(s.cur)) + s.indices.subOffset[i])) = &(*(*byte)(subPointer))
+				*(**byte)(unsafe.Add(unsafe.Pointer(s.cur), s.indices.subOffset[i])) = &(*(*byte)(subPointer))
 			} else {
-				*(**byte)(unsafe.Pointer((uintptr)(unsafe.Pointer(s.cur)) + s.indices.subOffset[i])) = (*byte)(subPointer)
+				*(**byte)(unsafe.Add(unsafe.Pointer(s.cur), s.indices.subOffset[i])) = (*byte)(subPointer)
 			}
 		}
 		if !skip {
