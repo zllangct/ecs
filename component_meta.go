@@ -44,8 +44,6 @@ func (c *componentMeta) CreateComponentMetaInfo(typ reflect.Type, ct ComponentTy
 	info.componentType = ct
 	info.typ = typ
 
-	Log.Debugf("create component meta info: %v, %v", info.it, info.typ.String())
-
 	c.types[typ] = info.it
 	info = c.infos.Add(info.it, info)
 
@@ -94,4 +92,39 @@ func (c *componentMeta) GetComponentMetaInfoByType(typ reflect.Type) *ComponentM
 		panic(fmt.Sprintf("must register component %s first", typ.String()))
 	}
 	return c.infos.Get(it)
+}
+
+func (c *componentMeta) ComponentMetaInfoPrint() {
+	fn := func(m map[reflect.Type]uint16) {
+		total := len(m)
+		count := 0
+		prefix := "│  ├─"
+		prefix2 := "│  └─"
+		str := ""
+		for typ, _ := range m {
+			str += " " + typ.Name()
+			count++
+			if count%5 == 0 {
+				if count == total {
+					Log.Infof("%s%s", prefix2, str)
+				} else {
+					Log.Infof("%s%s", prefix, str)
+				}
+				str = ""
+			}
+		}
+		if str != "" {
+			Log.Infof("%s%s", prefix2, str)
+			str = ""
+		}
+	}
+
+	Log.Infof("┌──────────────── # Component Info # ─────────────────")
+	Log.Infof("├─ Total: %d", len(c.types))
+	fn(c.types)
+	Log.Infof("├─ Disposable: %d", len(c.disposable))
+	fn(c.disposable)
+	Log.Infof("├─ Free: %d", len(c.free))
+	fn(c.free)
+	Log.Infof("└────────────── # Component Info End # ───────────────")
 }

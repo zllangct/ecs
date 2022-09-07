@@ -64,7 +64,6 @@ type iWorldBase interface {
 	RegisterSystem(system ISystem)
 	RegisterComponent(component IComponent)
 	GetMetrics() *Metrics
-	GetUtilityGetter() UtilityGetter
 
 	getComponentMetaInfoByType(typ reflect.Type) *ComponentMetaInfo
 	optimize(t time.Duration, force bool)
@@ -168,7 +167,8 @@ func (w *ecsWorld) startup() {
 		panic("world is not initialized or already running.")
 	}
 
-	// TODO 系统在初始化阶段已注册完毕，此处打印系统执行顺序和并行关系
+	w.systemFlow.SystemInfoPrint()
+	w.componentMeta.ComponentMetaInfoPrint()
 
 	w.SwitchMainThread()
 	w.workPool.Start()
@@ -202,7 +202,7 @@ func (w *ecsWorld) setStatus(status WorldStatus) {
 	w.status = status
 }
 
-func (w *ecsWorld) GetUtilityGetter() UtilityGetter {
+func (w *ecsWorld) getUtilityGetter() UtilityGetter {
 	ug := UtilityGetter{}
 	iw := iWorldBase(w)
 	ug.world = &iw

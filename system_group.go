@@ -124,6 +124,15 @@ func (p *SystemGroup) next() []ISystem {
 	return systems
 }
 
+func (p *SystemGroup) batchCount() int {
+	batch := 0
+	sg := *p
+	for ss := sg.next(); len(ss) > 0; ss = sg.next() {
+		batch++
+	}
+	return batch
+}
+
 // get all systems
 func (p *SystemGroup) all() []ISystem {
 	systems := make([]ISystem, len(p.systems))

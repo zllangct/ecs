@@ -112,3 +112,10 @@ func (w *SyncWorld) Update() {
 }
 
 func (w *SyncWorld) Optimize(t time.Duration, force bool) {}
+
+func (w *SyncWorld) GetUtilityGetter() UtilityGetter {
+	ug := UtilityGetter{}
+	iw := iWorldBase(w)
+	ug.world = &iw
+	return ug
+}

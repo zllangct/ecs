@@ -1,6 +1,7 @@
 package ecs
 
 import (
+	"fmt"
 	"reflect"
 	"sync"
 )
@@ -154,7 +155,6 @@ func (p *systemFlow) eventDispatch() {
 
 func (p *systemFlow) systemUpdate(event Event) {
 	var sq SystemGroupList
-
 	var sys ISystem
 	var imp bool = false
 	var runSync bool = false
@@ -425,4 +425,87 @@ func (p *systemFlow) isImpEvent(system ISystem, period Stage) bool {
 
 func (p *systemFlow) stop() {
 	p.reset()
+}
+
+func (p *systemFlow) SystemInfoPrint() {
+	m := map[Stage]string{
+		StageSyncBeforeStart: "StageSyncBeforeStart",
+		StageStart:           "StageStart",
+		StageSyncAfterStart:  "StageSyncAfterStart",
+
+		StageSyncBeforePreUpdate: "StageSyncBeforePreUpdate",
+		StagePreUpdate:           "StagePreUpdate",
+		StageSyncAfterPreUpdate:  "StageSyncAfterPreUpdate",
+
+		StageSyncBeforeUpdate: "StageSyncBeforeUpdate",
+		StageUpdate:           "StageUpdate",
+		StageSyncAfterUpdate:  "StageSyncAfterUpdate",
+
+		StageSyncBeforePostUpdate: "StageSyncBeforePostUpdate",
+		StagePostUpdate:           "StagePostUpdate",
+		StageSyncAfterPostUpdate:  "StageSyncAfterPostUpdate",
+
+		StageSyncBeforeDestroy: "StageSyncBeforeDestroy",
+		StageDestroy:           "StageDestroy",
+		StageSyncAfterDestroy:  "StageSyncAfterDestroy",
+	}
+	Log.Infof("┌──────────────── # System Info # ─────────────────")
+	Log.Infof("├─ Total: %d", len(p.systems))
+
+	var output []string
+	var sq SystemGroupList
+	for pi, period := range p.stageList {
+		var slContent []string
+		sq = p.stages[period]
+		for i, sl := range sq {
+			sl.reset()
+			batchTotal := sl.batchCount()
+			batch := 0
+			var batchContent []string
+			for ss := sl.next(); len(ss) > 0; ss = sl.next() {
+				if systemCount := len(ss); systemCount != 0 {
+
+					str := "│     │  └─ "
+					if batch == batchTotal-1 {
+						str = "│        └─ "
+					}
+					for i := 0; i < systemCount; i++ {
+						str += fmt.Sprintf("%s ", ss[i].Type().Name())
+					}
+					if batch == batchTotal-1 {
+						batchContent = append(batchContent, fmt.Sprintf("│     └─ Batch %d", batch))
+					} else {
+						batchContent = append(batchContent, fmt.Sprintf("│     ├─ Batch %d", batch))
+					}
+					batchContent = append(batchContent, str)
+				}
+				batch++
+			}
+			if len(batchContent) > 0 {
+				s := make([]string, 0, len(batchContent)+1)
+				if i == len(sq)-1 {
+					s = append(s, fmt.Sprintf("│  └─ Order %d", i))
+				} else {
+					s = append(s, fmt.Sprintf("│  ├─ Order %d", i))
+				}
+				s = append(s, batchContent...)
+				slContent = append(slContent, s...)
+			}
+		}
+		if len(slContent) > 0 {
+			s := make([]string, 0, len(slContent)+1)
+			if pi == len(p.stageList)-1 {
+				s = append(s, fmt.Sprintf("└─ Stage %s", m[period]))
+			} else {
+				s = append(s, fmt.Sprintf("├─ Stage %s", m[period]))
+			}
+			s = append(s, slContent...)
+			output = append(output, s...)
+		}
+	}
+
+	for _, v := range output {
+		Log.Info(v)
+	}
+	Log.Infof("└────────────── # System Info End # ───────────────")
 }
