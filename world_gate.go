@@ -27,17 +27,17 @@ type IGateInitializer interface {
 }
 
 type IGate interface {
-	baseInit(w *ecsWorld)
+	baseInit(w *worldBase)
 	dispatch()
 	eventRegister(event CustomEventName, fn CustomEventHandler)
 	resetData(src *IGate)
-	getWorld() *ecsWorld
+	getWorld() *worldBase
 	Emit(event CustomEventName, args ...interface{})
 }
 
 type Gate[T GateObject] struct {
 	lock          sync.Mutex
-	world         *ecsWorld
+	world         *worldBase
 	events        map[CustomEventName]CustomEventHandler
 	eventQueue    []CustomEvent
 	syncQueue     []func(UtilityGetter)
@@ -46,7 +46,7 @@ type Gate[T GateObject] struct {
 
 func (p Gate[T]) __GateIdentification() {}
 
-func (p *Gate[T]) baseInit(w *ecsWorld) {
+func (p *Gate[T]) baseInit(w *worldBase) {
 	p.world = w
 	p.events = make(map[CustomEventName]CustomEventHandler)
 	p.eventQueue = make([]CustomEvent, 0)
@@ -66,7 +66,7 @@ func (p *Gate[T]) resetData(src *IGate) {
 	(*iface)(unsafe.Pointer(src)).data = unsafe.Pointer(&cp)
 }
 
-func (p *Gate[T]) getWorld() *ecsWorld {
+func (p *Gate[T]) getWorld() *worldBase {
 	return p.world
 }
 

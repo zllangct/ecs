@@ -74,7 +74,7 @@ type ISystem interface {
 	isThreadSafe() bool
 	setExecuting(isExecuting bool)
 	isExecuting() bool
-	baseInit(world *ecsWorld, ins ISystem)
+	baseInit(world *worldBase, ins ISystem)
 	getOptimizer() *OptimizerReporter
 	getGetterCache() *GetterCache
 	setBroken()
@@ -98,7 +98,7 @@ type System[T SystemObject] struct {
 	getterCache       *GetterCache
 	order             Order
 	optimizerReporter *OptimizerReporter
-	world             *ecsWorld
+	world             *worldBase
 	utility           IUtility
 	realType          reflect.Type
 	state             SystemState
@@ -289,7 +289,7 @@ func (s *System[T]) isRequire(typ reflect.Type) bool {
 	return ok
 }
 
-func (s *System[T]) baseInit(world *ecsWorld, ins ISystem) {
+func (s *System[T]) baseInit(world *worldBase, ins ISystem) {
 	s.requirements = map[reflect.Type]IRequirement{}
 	s.eventsSync = make([]func(api *SystemApi), 0)
 	s.eventsAsync = make([]func(api *SystemApi), 0)

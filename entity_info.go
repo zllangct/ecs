@@ -1,7 +1,7 @@
 package ecs
 
 type EntityInfo struct {
-	world    *ecsWorld
+	world    *worldBase
 	entity   Entity
 	compound Compound
 }

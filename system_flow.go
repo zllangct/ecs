@@ -46,14 +46,14 @@ type SystemGroupList []*SystemGroup
 
 // system execute flow
 type systemFlow struct {
-	world     *ecsWorld
+	world     *worldBase
 	stages    map[Stage]SystemGroupList
 	stageList []Stage
 	systems   map[reflect.Type]ISystem
 	wg        *sync.WaitGroup
 }
 
-func newSystemFlow(runtime *ecsWorld) *systemFlow {
+func newSystemFlow(runtime *worldBase) *systemFlow {
 	sf := &systemFlow{
 		world:   runtime,
 		systems: map[reflect.Type]ISystem{},

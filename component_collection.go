@@ -28,13 +28,13 @@ type IComponentCollection interface {
 
 type ComponentCollection struct {
 	collections *SparseArray[uint16, IComponentSet]
-	world       *ecsWorld
+	world       *worldBase
 	bucket      int64
 	locks       []sync.RWMutex
 	opLog       []map[reflect.Type]*opTaskList
 }
 
-func NewComponentCollection(world *ecsWorld, k int) *ComponentCollection {
+func NewComponentCollection(world *worldBase, k int) *ComponentCollection {
 	cc := &ComponentCollection{
 		world:       world,
 		collections: NewSparseArray[uint16, IComponentSet](),

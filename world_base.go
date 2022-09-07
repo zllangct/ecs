@@ -45,7 +45,7 @@ type WorldConfig struct {
 	HashCount         int    //容器桶数量
 	CollectionVersion int
 	FrameInterval     time.Duration //帧间隔
-	StopCallback      func(world *ecsWorld)
+	StopCallback      func(world *worldBase)
 }
 
 func NewDefaultWorldConfig() *WorldConfig {
@@ -85,7 +85,7 @@ type iWorldBase interface {
 	registerForT(system interface{}, order ...Order)
 }
 
-type ecsWorld struct {
+type worldBase struct {
 	//id
 	id int64
 	//world status
@@ -116,7 +116,7 @@ type ecsWorld struct {
 	pureUpdateDelta time.Duration
 }
 
-func (w *ecsWorld) init(config *WorldConfig) *ecsWorld {
+func (w *worldBase) init(config *WorldConfig) *worldBase {
 	w.id = LocalUniqueID()
 	w.systemFlow = nil
 	w.config = config
@@ -160,15 +160,15 @@ func (w *ecsWorld) init(config *WorldConfig) *ecsWorld {
 	return w
 }
 
-func (w *ecsWorld) GetID() int64 {
+func (w *worldBase) GetID() int64 {
 	return w.id
 }
 
-func (w *ecsWorld) SwitchMainThread() {
+func (w *worldBase) SwitchMainThread() {
 	atomic.StoreInt64(&mainThreadID, goroutineID())
 }
 
-func (w *ecsWorld) startup() {
+func (w *worldBase) startup() {
 	if w.GetStatus() != WorldStatusInitialized {
 		panic("world is not initialized or already running.")
 	}
@@ -185,7 +185,7 @@ func (w *ecsWorld) startup() {
 	w.setStatus(WorldStatusRunning)
 }
 
-func (w *ecsWorld) update() {
+func (w *worldBase) update() {
 	if mainThreadDebug {
 		checkMainThread()
 	}
@@ -203,44 +203,44 @@ func (w *ecsWorld) update() {
 	w.frame++
 }
 
-func (w *ecsWorld) optimize(t time.Duration, force bool) {
+func (w *worldBase) optimize(t time.Duration, force bool) {
 	w.optimizer.optimize(t, force)
 }
 
-func (w *ecsWorld) setStatus(status WorldStatus) {
+func (w *worldBase) setStatus(status WorldStatus) {
 	w.status = status
 }
 
-func (w *ecsWorld) getUtilityGetter() UtilityGetter {
+func (w *worldBase) getUtilityGetter() UtilityGetter {
 	ug := UtilityGetter{}
 	iw := iWorldBase(w)
 	ug.world = &iw
 	return ug
 }
 
-func (w *ecsWorld) GetStatus() WorldStatus {
+func (w *worldBase) GetStatus() WorldStatus {
 	return w.status
 }
 
-func (w *ecsWorld) GetMetrics() *Metrics {
+func (w *worldBase) GetMetrics() *Metrics {
 	return w.metrics
 }
 
-func (w *ecsWorld) RegisterSystem(system ISystem) {
+func (w *worldBase) RegisterSystem(system ISystem) {
 	if mainThreadDebug {
 		checkMainThread()
 	}
 	w.systemFlow.register(system)
 }
 
-func (w *ecsWorld) RegisterComponent(component IComponent) {
+func (w *worldBase) RegisterComponent(component IComponent) {
 	if mainThreadDebug {
 		checkMainThread()
 	}
 	w.componentMeta.GetOrCreateComponentMetaInfo(component)
 }
 
-func (w *ecsWorld) registerForT(system interface{}, order ...Order) {
+func (w *worldBase) registerForT(system interface{}, order ...Order) {
 	sys := system.(ISystem)
 	if len(order) > 0 {
 		sys.setOrder(order[0])
@@ -248,7 +248,7 @@ func (w *ecsWorld) registerForT(system interface{}, order ...Order) {
 	w.RegisterSystem(system.(ISystem))
 }
 
-func (w *ecsWorld) getSystem(sys reflect.Type) (ISystem, bool) {
+func (w *worldBase) getSystem(sys reflect.Type) (ISystem, bool) {
 	s, ok := w.systemFlow.systems[sys]
 	if ok {
 		return s.(ISystem), ok
@@ -256,52 +256,52 @@ func (w *ecsWorld) getSystem(sys reflect.Type) (ISystem, bool) {
 	return nil, ok
 }
 
-func (w *ecsWorld) addJob(job func(), hashKey ...uint32) {
+func (w *worldBase) addJob(job func(), hashKey ...uint32) {
 	w.workPool.Add(job, hashKey...)
 }
 
-func (w *ecsWorld) addEntity(info EntityInfo) *EntityInfo {
+func (w *worldBase) addEntity(info EntityInfo) *EntityInfo {
 	return w.entities.Add(info)
 }
 
-func (w *ecsWorld) GetEntityInfo(entity Entity) (*EntityInfo, bool) {
+func (w *worldBase) GetEntityInfo(entity Entity) (*EntityInfo, bool) {
 	return w.entities.GetEntityInfo(entity)
 }
 
-func (w *ecsWorld) deleteEntity(entity Entity) {
+func (w *worldBase) deleteEntity(entity Entity) {
 	w.entities.Remove(entity)
 }
 
-func (w *ecsWorld) getComponentSet(typ reflect.Type) IComponentSet {
+func (w *worldBase) getComponentSet(typ reflect.Type) IComponentSet {
 	return w.components.getComponentSet(typ)
 }
 
-func (w *ecsWorld) getComponentSetByIntType(it uint16) IComponentSet {
+func (w *worldBase) getComponentSetByIntType(it uint16) IComponentSet {
 	return w.components.getComponentSetByIntType(it)
 }
 
-func (w *ecsWorld) getComponentMetaInfoByType(typ reflect.Type) *ComponentMetaInfo {
+func (w *worldBase) getComponentMetaInfoByType(typ reflect.Type) *ComponentMetaInfo {
 	return w.componentMeta.GetComponentMetaInfoByType(typ)
 }
 
-func (w *ecsWorld) getComponentCollection() IComponentCollection {
+func (w *worldBase) getComponentCollection() IComponentCollection {
 	return w.components
 }
 
-func (w *ecsWorld) getComponentMeta() *componentMeta {
+func (w *worldBase) getComponentMeta() *componentMeta {
 	return w.componentMeta
 }
 
-func (w *ecsWorld) getOrCreateComponentMetaInfo(component IComponent) *ComponentMetaInfo {
+func (w *worldBase) getOrCreateComponentMetaInfo(component IComponent) *ComponentMetaInfo {
 	return w.componentMeta.GetOrCreateComponentMetaInfo(component)
 }
 
-func (w *ecsWorld) NewEntity() *EntityInfo {
+func (w *worldBase) NewEntity() *EntityInfo {
 	info := EntityInfo{world: w, entity: w.idGenerator.NewID()}
 	return w.addEntity(info)
 }
 
-func (w *ecsWorld) addComponent(entity Entity, component IComponent) {
+func (w *worldBase) addComponent(entity Entity, component IComponent) {
 	typ := component.Type()
 	if !w.componentMeta.Exist(typ) {
 		w.componentMeta.CreateComponentMetaInfo(component.Type(), component.getComponentType())
@@ -309,15 +309,15 @@ func (w *ecsWorld) addComponent(entity Entity, component IComponent) {
 	w.components.operate(CollectionOperateAdd, entity, component)
 }
 
-func (w *ecsWorld) deleteComponent(entity Entity, component IComponent) {
+func (w *worldBase) deleteComponent(entity Entity, component IComponent) {
 	w.components.operate(CollectionOperateDelete, entity, component)
 }
 
-func (w *ecsWorld) deleteComponentByIntType(entity Entity, it uint16) {
+func (w *worldBase) deleteComponentByIntType(entity Entity, it uint16) {
 	w.components.deleteOperate(CollectionOperateDelete, entity, it)
 }
 
-func (w *ecsWorld) AddFreeComponent(component IComponent) {
+func (w *worldBase) AddFreeComponent(component IComponent) {
 	switch component.getComponentType() {
 	case ComponentTypeFree, ComponentTypeFreeDisposable:
 	default:
@@ -327,7 +327,7 @@ func (w *ecsWorld) AddFreeComponent(component IComponent) {
 	w.addComponent(0, component)
 }
 
-func (w *ecsWorld) ClearFreeComponentSetByType(typ reflect.Type) {
+func (w *worldBase) ClearFreeComponentSetByType(typ reflect.Type) {
 	free := w.componentMeta.GetFreeTypes()
 	if it, ok := free[typ]; ok {
 		w.components.deleteOperate(CollectionOperateDeleteAll, 0, it)

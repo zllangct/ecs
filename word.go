@@ -10,11 +10,11 @@ type IWorld interface {
 }
 
 type WorldBase struct {
-	ecsWorld
+	worldBase
 }
 
 func (w *WorldBase) Init(config *WorldConfig) {
-	w.ecsWorld.init(config)
+	w.worldBase.init(config)
 }
 
 func (w *WorldBase) Startup() {
@@ -28,7 +28,7 @@ func (w *WorldBase) Update() {
 func (w *WorldBase) Optimize(t time.Duration, force bool) {}
 
 type AsyncWorld struct {
-	ecsWorld
+	worldBase
 	wStop       chan struct{}
 	gate        IGate
 	stopHandler func(world *AsyncWorld)
@@ -38,7 +38,7 @@ func NewAsyncWorld(config *WorldConfig) *AsyncWorld {
 	w := &AsyncWorld{
 		wStop: make(chan struct{}),
 	}
-	w.ecsWorld.init(config)
+	w.worldBase.init(config)
 	return w
 }
 
@@ -81,7 +81,7 @@ func (w *AsyncWorld) Optimize(t time.Duration, force bool) {}
 func (w *AsyncWorld) SetGate(gate IGate) IGate {
 	w.gate = gate
 	gate.resetData(&w.gate)
-	w.gate.baseInit(&w.ecsWorld)
+	w.gate.baseInit(&w.worldBase)
 	return w.gate
 }
 
@@ -94,12 +94,12 @@ func (w *AsyncWorld) Stop() {
 }
 
 type SyncWorld struct {
-	ecsWorld
+	worldBase
 }
 
 func NewSyncWorld(config *WorldConfig) *SyncWorld {
 	w := &SyncWorld{}
-	w.ecsWorld.init(config)
+	w.worldBase.init(config)
 	return w
 }
 
