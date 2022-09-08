@@ -9,15 +9,15 @@ import (
 type ShapeInfo struct {
 	typ    reflect.Type
 	eNum   int64
-	shapes []IShapeGetter
+	shapes []IShape
 }
 
 type OptimizerReporter struct {
-	shapeUsage map[reflect.Type]IShapeGetter
+	shapeUsage map[reflect.Type]IShape
 }
 
 func (o *OptimizerReporter) init() {
-	o.shapeUsage = map[reflect.Type]IShapeGetter{}
+	o.shapeUsage = map[reflect.Type]IShape{}
 }
 
 type optimizer struct {
@@ -56,7 +56,7 @@ func (o *optimizer) collect() {
 				shapeInfo := &ShapeInfo{
 					typ:    shp.getType(),
 					eNum:   shp.base().executeNum,
-					shapes: []IShapeGetter{shp},
+					shapes: []IShape{shp},
 				}
 				shapeRef[shp.getType()] = shapeInfo
 			}

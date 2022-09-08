@@ -18,22 +18,22 @@ type Target struct {
 
 type DamageSystem struct {
 	ecs.System[DamageSystem]
-	casterGetter *ecs.ShapeGetter[Caster]
-	targetGetter *ecs.ShapeGetter[Target]
+	casterGetter *ecs.Shape[Caster]
+	targetGetter *ecs.Shape[Target]
 }
 
-func (d *DamageSystem) Init(initializer ecs.SystemInitializer) {
+func (d *DamageSystem) Init(si ecs.SystemInitializer) {
 	d.SetRequirements(
-		initializer,
+		si,
 		&ecs.ReadOnly[Position]{},
 		&ecs.ReadOnly[Force]{},
 		&ecs.ReadOnly[Action]{},
 		&HealthPoint{})
-	d.casterGetter = ecs.NewShapeGetter[Caster](initializer).SetGuide(&Action{})
-	d.targetGetter = ecs.NewShapeGetter[Target](initializer)
+	d.casterGetter = ecs.NewShape[Caster](si).SetGuide(&Action{})
+	d.targetGetter = ecs.NewShape[Target](si)
 
 	if !d.casterGetter.IsValid() || !d.targetGetter.IsValid() {
-		initializer.SetBroken("invalid shape getter")
+		si.SetBroken("invalid shape getter")
 	}
 }
 
@@ -52,7 +52,7 @@ func (d *DamageSystem) Update(event ecs.Event) {
 	for caster := casterIter.Begin(); !casterIter.End(); caster = casterIter.Next() {
 		count++
 		for target := targetIter.Begin(); !targetIter.End(); target = targetIter.Next() {
-			if caster.Action.Owner() != target.HealthPoint.Owner() {
+			if caster.Action.Owner() == target.HealthPoint.Owner() {
 				continue
 			}
 

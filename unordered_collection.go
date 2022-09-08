@@ -125,7 +125,6 @@ func (c *UnorderedCollection[T]) ChangeReset() {
 }
 
 func (c *UnorderedCollection[T]) Clear() {
-	//Log.Debugf("clear collection %v", c)
 	c.data = make([]T, 0, c.initSize)
 	c.change = 0
 	c.len = 0

@@ -5,22 +5,22 @@ import (
 	"unsafe"
 )
 
-type IShapeGetter interface {
-	base() *getterBase
+type IShape interface {
+	base() *shapeBase
 	getType() reflect.Type
 }
 
-type getterBase struct {
+type shapeBase struct {
 	sys        ISystem
 	executeNum int64
 	typ        reflect.Type
 }
 
-func (s *getterBase) base() *getterBase {
+func (s *shapeBase) base() *shapeBase {
 	return s
 }
 
-func (s *getterBase) init(typ reflect.Type, getter IShapeGetter) {
+func (s *shapeBase) init(typ reflect.Type, getter IShape) {
 	opt := s.sys.getOptimizer()
 	if _, ok := opt.shapeUsage[typ]; !ok {
 		opt.shapeUsage[typ] = getter
@@ -34,8 +34,8 @@ type ShapeIndices struct {
 	readOnly   []bool
 }
 
-type ShapeGetter[T any] struct {
-	getterBase
+type Shape[T any] struct {
+	shapeBase
 	initializer  SystemInitializer
 	mainKeyIndex int
 	subTypes     []uint16
@@ -46,13 +46,13 @@ type ShapeGetter[T any] struct {
 	valid        bool
 }
 
-func NewShapeGetter[T any](initializer SystemInitializer) *ShapeGetter[T] {
+func NewShape[T any](initializer SystemInitializer) *Shape[T] {
 	if initializer.isValid() {
 		panic("out of initialization stage")
 	}
 	sys := initializer.getSystem()
-	getter := &ShapeGetter[T]{
-		getterBase:  getterBase{sys: sys},
+	getter := &Shape[T]{
+		shapeBase:   shapeBase{sys: sys},
 		initializer: initializer,
 	}
 
@@ -94,18 +94,18 @@ func NewShapeGetter[T any](initializer SystemInitializer) *ShapeGetter[T] {
 	return getter
 }
 
-func (s *ShapeGetter[T]) IsValid() bool {
+func (s *Shape[T]) IsValid() bool {
 	return s.valid
 }
 
-func (s *ShapeGetter[T]) getType() reflect.Type {
+func (s *Shape[T]) getType() reflect.Type {
 	if s.typ == nil {
-		s.typ = TypeOf[ShapeGetter[T]]()
+		s.typ = TypeOf[Shape[T]]()
 	}
 	return s.typ
 }
 
-func (s *ShapeGetter[T]) Get() IShapeIterator[T] {
+func (s *Shape[T]) Get() IShapeIterator[T] {
 	s.executeNum++
 
 	if !s.valid {
@@ -141,7 +141,7 @@ func (s *ShapeGetter[T]) Get() IShapeIterator[T] {
 		mainKeyIndex)
 }
 
-func (s *ShapeGetter[T]) GetSpecific(entity Entity) (*T, bool) {
+func (s *Shape[T]) GetSpecific(entity Entity) (*T, bool) {
 	if !s.valid {
 		return s.cur, false
 	}
@@ -159,7 +159,7 @@ func (s *ShapeGetter[T]) GetSpecific(entity Entity) (*T, bool) {
 	return s.cur, true
 }
 
-func (s *ShapeGetter[T]) SetGuide(component IComponent) *ShapeGetter[T] {
+func (s *Shape[T]) SetGuide(component IComponent) *Shape[T] {
 	meta := s.initializer.getSystem().World().getComponentMetaInfoByType(component.Type())
 	for i, r := range s.subTypes {
 		if r == meta.it {

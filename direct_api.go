@@ -17,6 +17,10 @@ func GetInterestedComponent[T ComponentObject](sys ISystem, entity Entity) *T {
 	return GetRelatedComponent[T](sys, entity)
 }
 
+func BindGate[T GateObject](world *AsyncWorld) {
+	world.BindGate(any(new(T)).(IGate))
+}
+
 func GetInterestedComponents[T ComponentObject](sys ISystem) Iterator[T] {
 	if sys.getState() == SystemStateInvalid {
 		return EmptyIter[T]()
@@ -55,7 +59,8 @@ func GetRelatedComponent[T ComponentObject](sys ISystem, entity Entity) *T {
 	return cache.Get(entity)
 }
 
-func IGateToInstance[T GateObject](gate any) *T {
+func GetGate[T GateObject](world *AsyncWorld) *T {
+	gate := any(world.GetGate())
 	g, ok := gate.(*T)
 	if ok {
 		return nil

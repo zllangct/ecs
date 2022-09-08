@@ -35,7 +35,7 @@ type __world_Test_S_1 struct {
 
 func (w *__world_Test_S_1) Init(initializer SystemInitializer) {
 	w.SetRequirements(initializer, &__world_Test_C_1{}, &__world_Test_C_2{}, &__world_Test_C_3{})
-	w.SetUtility(initializer, &__world_Test_U_Input{})
+	w.BindUtility(initializer, &__world_Test_U_Input{})
 }
 
 func (w *__world_Test_S_1) Update(event Event) {
@@ -136,12 +136,15 @@ func (g *__world_Test_Gate) input1(entity Entity, name string) {
 }
 
 func Test_ecsWorld_World_launcher(t *testing.T) {
+	EnableMainThreadDebug()
+
 	config := NewDefaultWorldConfig()
 	config.FrameInterval = time.Second
 
 	world := NewAsyncWorld(config)
 
 	RegisterSystem[__world_Test_S_1](world)
+	BindGate[__world_Test_Gate](world)
 
 	world.Startup()
 
@@ -153,8 +156,7 @@ func Test_ecsWorld_World_launcher(t *testing.T) {
 		entities[i] = e1.Entity()
 	}
 
-	iGate := world.SetGate(&__world_Test_Gate{})
-	gate := IGateToInstance[__world_Test_Gate](iGate)
+	gate := GetGate[__world_Test_Gate](world)
 	if gate == nil {
 		t.Fatal("gate is nil")
 	}
@@ -172,6 +174,7 @@ func Test_ecsWorld_World_launcher(t *testing.T) {
 	gate.input1(entities[0], "name2")
 
 	for {
+		world.Update()
 		time.Sleep(time.Second)
 	}
 }

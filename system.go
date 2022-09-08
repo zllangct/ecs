@@ -203,7 +203,7 @@ func (s *System[T]) isThreadSafe() bool {
 	return s.isSafe
 }
 
-func (s *System[T]) SetUtility(initializer SystemInitializer, utility IUtility) {
+func (s *System[T]) BindUtility(initializer SystemInitializer, utility IUtility) {
 	if initializer.isValid() {
 		panic("out of initialization stage")
 	}

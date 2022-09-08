@@ -86,30 +86,18 @@ type iWorldBase interface {
 }
 
 type worldBase struct {
-	//id
-	id int64
-	//world status
-	status WorldStatus
-	//config
-	config *WorldConfig
-	//system flow,all systems
-	systemFlow *systemFlow
-	//all components
-	components IComponentCollection
-	//all entities
-	entities *EntitySet
-	//optimizer
-	optimizer *optimizer
-	//entity id generator
-	idGenerator *EntityIDGenerator
-
-	componentMeta *componentMeta
-
-	utilities map[reflect.Type]interface{}
-
-	workPool *Pool
-	metrics  *Metrics
-
+	id              int64
+	status          WorldStatus
+	config          *WorldConfig
+	systemFlow      *systemFlow
+	components      IComponentCollection
+	entities        *EntitySet
+	optimizer       *optimizer
+	idGenerator     *EntityIDGenerator
+	componentMeta   *componentMeta
+	utilities       map[reflect.Type]interface{}
+	workPool        *Pool
+	metrics         *Metrics
 	frame           uint64
 	ts              time.Time
 	delta           time.Duration
@@ -151,7 +139,6 @@ func (w *worldBase) init(config *WorldConfig) *worldBase {
 		w.config.HashCount = config.CpuNum
 	}
 
-	//initialise system flow
 	sf := newSystemFlow(w)
 	w.systemFlow = sf
 
@@ -173,15 +160,13 @@ func (w *worldBase) startup() {
 		panic("world is not initialized or already running.")
 	}
 
-	if metaInfoDebug {
+	if metaInfoDebug || w.config.Debug {
 		w.systemFlow.SystemInfoPrint()
 		w.componentMeta.ComponentMetaInfoPrint()
 	}
 
 	w.SwitchMainThread()
-
 	w.workPool.Start()
-
 	w.setStatus(WorldStatusRunning)
 }
 

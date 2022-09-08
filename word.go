@@ -78,7 +78,13 @@ func (w *AsyncWorld) Update() {
 
 func (w *AsyncWorld) Optimize(t time.Duration, force bool) {}
 
-func (w *AsyncWorld) SetGate(gate IGate) IGate {
+func (w *AsyncWorld) BindGate(gate IGate) IGate {
+	if mainThreadDebug {
+		checkMainThread()
+	}
+	if w.status != WorldStatusInitialized {
+		panic("world is not initialized, must init first.")
+	}
 	w.gate = gate
 	gate.resetData(&w.gate)
 	w.gate.baseInit(&w.worldBase)

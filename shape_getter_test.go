@@ -23,13 +23,13 @@ type __ShapeGetter_Test_Shape_1 struct {
 type __ShapeGetter_Test_S_1 struct {
 	System[__ShapeGetter_Test_S_1]
 
-	getter1 *ShapeGetter[__ShapeGetter_Test_Shape_1]
+	getter1 *Shape[__ShapeGetter_Test_Shape_1]
 }
 
 func (t *__ShapeGetter_Test_S_1) Init(initializer SystemInitializer) {
 	t.SetRequirements(initializer, &__ShapeGetter_Test_C_1{}, &__ShapeGetter_Test_C_2{})
 
-	t.getter1 = NewShapeGetter[__ShapeGetter_Test_Shape_1](initializer)
+	t.getter1 = NewShape[__ShapeGetter_Test_Shape_1](initializer)
 	if t.getter1 == nil {
 		initializer.SetBroken("invalid getter")
 	}
