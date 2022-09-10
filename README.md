@@ -296,17 +296,17 @@ func (u *TestUtility) ChangeName(entity Entity, name string) {
 }
 
 func main() {
-	// 获取配置并创建世界
+    // 获取配置并创建世界
     config := NewDefaultWorldConfig()
     world := NewSyncWorld(config)
 
-	// 注册系统
+    // 注册系统
     RegisterSystem[TestSystem1](world)
 
-	// 启动世界
+    // 启动世界
     world.Startup()
 
-	// 添加一下测试用的实体
+    // 添加一下测试用的实体
     entities := make([]Entity, 100)
     for i := 0; i < 100; i++ {
         e1 := world.NewEntity()
@@ -314,17 +314,17 @@ func main() {
         entities[i] = e1.Entity()
     }
 
-	// 尝试更新世界，使实体与他们的组件生效
+    // 尝试更新世界，使实体与他们的组件生效
     world.Update()
 
-	// 获取Utility，并调用Utility的ChangeName方法，修改实体的Name字段
+    // 获取Utility，并调用Utility的ChangeName方法，修改实体的Name字段
     getter := world.GetUtilityGetter()
     u, ok := GetUtility[TestUtility](getter)
 	if ok {
         u.ChangeName(entities[0], "name0")
     }
 
-	// 持续更新你的世界
+    // 持续更新你的世界
     for {
         world.Update()
         time.Sleep(time.Second)
