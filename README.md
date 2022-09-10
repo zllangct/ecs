@@ -196,7 +196,7 @@ type TestSystem struct {
 // 所有系统事件都是可选的，如果不需要某个事件，可以不实现
 
 // 系统Init事件
-func (w *TestSystem) Init(si SystemInitializer) {}
+func (w *TestSystem) Init(sic SystemInitConstraint) {}
 
 // 系统Start事件
 func (w *TestSystem) Start(event Event) {}
@@ -215,7 +215,7 @@ func (w *TestSystem) PostUpdate(event Event) {}
 
 ```
 我们的ECS是阶段化的执行流程，提供了丰富的阶段性事件，当然最常用的是Update事件，当需要额外控制System先后顺序的时候，可以选择合适的事件混合使用。  
-##### 支持的事件：
+##### 支持的阶段事件：
 * Init
 * SyncBeforeStart
 * Start
@@ -231,7 +231,27 @@ func (w *TestSystem) PostUpdate(event Event) {}
 * SyncAfterPostUpdate
 * SyncBeforeDestroy
 * Destroy
-* SyncAfterDestroy_
+* SyncAfterDestroy
+##### 阶段事件特征：
+| 阶段事件 | 执行次数 | 执行时机              | 同步 | 异步 |
+| --- |------|-------------------| --- |---|
+| Init | 1    | World Init阶段      | √      | × |
+| SyncBeforeStart | 1    | World Update阶段    |  √         | × |
+| Start | 1    | World Update阶段          | ×          | √ |
+| SyncAfterStart | N    | World Update阶段          | √          | × |
+| SyncBeforePreUpdate | N    | World Update阶段  | √          | × |
+| PreUpdate | N    | World Update阶段  | ×          | √ |
+| SyncAfterPreUpdate | N    | World Update阶段  | √          | × |
+| SyncBeforeUpdate | N    | World Update阶段     | √          | × |
+| Update | N    | World Update阶段     | ×          | √ |
+| SyncAfterUpdate | N    | World Update阶段     | √          | × |
+| SyncBeforePostUpdate | N    | World Update阶段 | √          | × |
+| PostUpdate | N    | World Update阶段 | ×          | √ |
+| SyncAfterPostUpdate | N    | World Update阶段 | √          | × |
+| SyncBeforeDestroy | 1    | World Destroy阶段    | √          | × |
+| Destroy | 1    | World Destroy阶段    | ×          | √ |
+| SyncAfterDestroy | 1    | World Destroy阶段    | √          | × |
+
 
 ### 使用Utility与System交互
 “Component中只有数据，System只有逻辑，只有System可以操作Component”这是我们ECS设计的指导思路，当所有的输入都来源于ECS的内部，所有系统之间
@@ -390,48 +410,210 @@ func main() {
 }
 
 ```
-
 ### 如何处理System的执行顺序
+我们的ECS中有两种方式可以控制逻辑的顺序：
+* 选择合适的阶段
+* 指定系统的执行顺序  
+
+&emsp;&emsp;文档的前方我们已经提到过，ECS中的设计有16个阶段，非常丰富，足以满足绝大部分的开发需求，其中包含Sync开头的同步点阶段，非Sync开头的异步并行阶段，
+详细请看[支持的阶段事件](#支持的阶段事件)。值得注意的是，当业务逻辑需要某个阶段时可以实现对应阶段的事件，不需要时无需实现。
+```go
+type TestSystem1 struct {
+    ecs.System[TestSystem1]
+}
+
+func (s *TestSystem1) Init(si SystemInitConstraint) {
+    Log.Info("TestSystem1 Init")
+}
+
+func (s *TestSystem1) Start(event Event) {
+    Log.Info("TestSystem1 Start")
+}
+
+func (s *TestSystem1) Update(event Event) {
+    Log.Info("TestSystem1 Update")
+}
+
+// 前缀为Sync的阶段为同步阶段，同步阶段中ECS系统单线程执行，所以所有的操作都是安全的。
+func (s *TestSystem1) SyncAfterUpdate(event Event) {
+    Log.Info("TestSystem1 SyncAfterUpdate")
+}
+```
+
+&emsp;&emsp;当丰富的阶段任然无法满足你的需求，比如你需要在同一阶段中指定系统的执行顺序，
+这时你可以在系统的注册阶段指定其顺序。先后循序为指定Order数值由小到大执行，如下面代码所以，
+系统的执行顺序为：TestSystem2 -> TestSystem3 -> TestSystem1。
+```go
+world := NewSyncWorld(config)
+
+// 内置顺序选项, 默认为Append
+// OrderFront   Order = 所有系统的前面
+// OrderAppend  Order = 所有系统的后面
+
+// 你可以使用的顺序是： 0-99999999
+RegisterSystem[TestSystem1](world, Order(150))
+RegisterSystem[TestSystem2](world, Order(5))
+RegisterSystem[TestSystem3](world, Order(100))
+```
+
 ### 如何选择不同类型的Component
 #### 常规组件
-#### Free组件
-#### Disposable组件
-* 比如我们需要获取新增的Entity，可以在创建Entity时，同时添加Disposable组件，在Update中获取该Disposable组件集合，从而获取新增的Entity。Disposable组件
-会在每一帧被清空，可以活的当做一次性tag使用。
-#### FreeDisposable组件
-### 系统中获取组件的方式
-### 系统间的数据流动
-### 一个完整的例子
+正常情况下，我们的数据都属于正常组件这一类，比如玩家的位置、等级、血量等，这些数据会伴随实体的全生命周期, 知道实体被销毁。
+类于Buff这样的组件，不会伴随实体全生命周期，但会持续一段时间，也可以视作常规组件。常规组件的定义方式：
+```go
+type Position struct {
+    ecs.Component[Position]
+    X float32
+    Y float32
+    Z float32
+}
 
+type HP struct {
+    ecs.Component[HP]
+    Value int32
+}
+```
+#### Free组件
+Free组件是特殊的组件之一，它不会被添加到实体中，它游离态的组件，通常可作为一些临时数据的载体与多个系统共享。典型的用法是将Free组件
+作为系统间共享数据的“队列”，比如，客户端通过网络上行的移动指令，在实际的开发中往往需要将这些指令缓存起来，多个指令同时处理。
+```go
+type MoveCommand struct {
+    ecs.FreeComponent[MoveCommand]
+    ...
+}
+```
+#### Disposable组件
+Disposable组件特殊的组件之一，它是一次性组件，会在每帧结束后清理。假设我们需要获取新增的Entity，可以在创建Entity时，同时添加Disposable组件，
+在Update中获取该Disposable组件集合，从而获取新增的Entity。Disposable组件
+会在每一帧被清空，可以活的当做一次性tag使用。
+```go
+type TagNew struct {
+    ecs.DisposableComponent[TagNew]
+    ...
+}
+```
+#### FreeDisposable组件
+FreeDisposable组件是Free组件与Disposable组件的结合体，它是一次性的游离态组件，会在每帧结束后清理。
+```go
+type FreeDisposable struct {
+    ecs.FreeDisposableComponent[FreeDisposable]
+    ...
+}
+```
+### 系统中获取组件的方式
+获取Component是System中最常用的操作, 获取和遍历Component的效率是评价ECS框架优良最重要的指标之一，是ECS框架设计的核心和重心。
+我们的ECS框架提供了非常高效的获取和遍历Component的操作，做到了寻址级别的查询效率，同时连续内存的存储方式，使得遍历Component的性能也非常优秀。
+我们提供了两种方式获取和筛选Component。
+* 通过 GetComponent 获取指定Entity的指定Component
+```go
+c := ecs.GetComponent[TestComponent1](entity)
+```
+* 通过 GetComponentAll和GetRelated获取主要组件和其关联组件。
+```go
+type TestSystem1 struct {
+    ecs.System[TestSystem1]
+}
+
+func (s *TestSystem1) Init(si SystemInitConstraint) {
+    // 设置系统感兴趣的组件
+    s.SetRequirements(si, &TestComponent1{}, &TestComponent1{}, &TestComponent1{})
+}
+
+func (s *TestSystem1) Update(event Event) {
+    Log.Info("TestSystem1 Update")
+
+    iter := ecs.GetComponentAll[TestComponent1](w)
+    for c := iter.Begin(); !iter.End(); c = iter.Next() {
+        c2 := ecs.GetRelated[TestComponent2](w, c.owner)
+        if c2 == nil {
+            continue
+        }
+		
+        c.Field1 += 1
+        c.Field2 += 1
+    }
+}
+```
+* 通过 Shape同时获取兄弟组件, 这种方式非常方便的获取到同一Entity的多个Component，但不如第一种方式灵活。
+```go
+type Shape1 struct {
+    TestComponent1 *TestComponent1
+    TestComponent2 *TestComponent2
+    TestComponent3 *TestComponent3
+}
+
+type TestSystem1 struct {
+    ecs.System[TestSystem1]
+	shp 
+}
+
+func (s *TestSystem1) Init(si SystemInitConstraint) {
+    // 设置系统感兴趣的组件
+    s.SetRequirements(si, &TestComponent1{}, &TestComponent1{}, &TestComponent1{})
+    // 初始化ShapeGetter
+    s.shp = NewShape[Shape1](si)
+}
+
+func (s *TestSystem1) Update(event Event) {
+    Log.Info("TestSystem1 Update")
+
+    iter := s.shp.Get()
+    for shp := iter.Begin(); !iter.End(); shp = iter.Next() {
+        c.TestComponent1.Field1 += 1
+        c.TestComponent2.Field1 += 1
+        c.TestComponent3.Field1 += 1
+    }
+}
+```
+### 系统间的数据流动
+（努力完善中）
+### 一个完整的例子
+（努力完善中）
 ## Benchmark
 （努力完善中）
 
 ## API文档
-
+（努力完善中）
 ## 设计细节
+（努力完善中）
 ### 架构
+（努力完善中）
 ### 日志
+（努力完善中）
 ### World
+（努力完善中）
 ### Entity
 * Entity复用
 * 不保证全局唯一
 * Entity的ID是一个64位的整数，高32位是世界ID，低32位是EntityID，这样设计的目的是为了支持多个世界的存在，比如，我们可以在一个世界中创建一个Entity，然后把这个Entity
 ### Component
+（努力完善中）
 ### System
+（努力完善中）
 ### Utility
+（努力完善中）
 ### Shape
+（努力完善中）
 ### Compound
+（努力完善中）
 ### 一次Update的执行流程
+（努力完善中）
 ### 从添加Component到生效
+（努力完善中）
 ### 容器
 * unordered_set
 * sparse_array
 * ordered_int_set
 ### 迭代器
+（努力完善中）
 ### 协程池
+（努力完善中）
 ### ECS序列化和反序列化
+（努力完善中）
 ### ECS中的并行
+（努力完善中）
 ### Entity ID的管理
+（努力完善中）
 ### 如何行为限制
 * 通过状态量，限制某些API的访问时期，比如某些API只能在初始化阶段执行，否则将收到错误警告
 * 通过guard参数，某些API的调用需要接受一个guard参数，guard参数的作用域受到框架的限制，比如在System的Init事件中
@@ -452,7 +634,7 @@ func main() {
 * 稀疏数组的内存占用问题
 * EntityInfo的修改需要再同步点进行
 * 不支持不对等tick，不存在多层次tick，比如A系统tick间隔50ms，B系统tick间隔30ms
-* 并行时task的拆分粒度
+* 并行时task的拆分粒度固定，不支持动态调整，优化器实现后，可以根据优化器的结果，动态调整task的拆分粒度
 * 并行退化，当开发者的系统依赖混乱，会导致系统关联度过高，框架调度时，会将有数据竞争的系统放到同一个线程中执行，从而导致并行退化，
 最糟糕的情况是，退化为单线程系统
 * 行为限制的缺失，由于golang语言的特性，无法严格得按照ECS的设计思路限制开发者的行为，开发者必须对数据驱动有一定的了解，无法严格
@@ -466,5 +648,6 @@ func main() {
 * [ ] 代码覆盖率
 * [ ] world序列化
 * [ ] 更新Atomic
-
+* [ ] 测试用例混乱
+* [ ] Example FakeGame 暂不可用
 

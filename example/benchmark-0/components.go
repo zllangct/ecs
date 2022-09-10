@@ -60,3 +60,28 @@ type Test5 struct {
 	ecs.Component[Test5]
 	Test5 int
 }
+
+type Test6 struct {
+	ecs.Component[Test6]
+	Test6 int
+}
+
+type Test7 struct {
+	ecs.Component[Test7]
+	Test7 int
+}
+
+type Test8 struct {
+	ecs.Component[Test8]
+	Test8 int
+}
+
+type Test9 struct {
+	ecs.Component[Test9]
+	Test9 int
+}
+
+type Test10 struct {
+	ecs.Component[Test10]
+	Test10 int
+}

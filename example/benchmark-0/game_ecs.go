@@ -20,6 +20,11 @@ func (g *GameECS) init(config *ecs.WorldConfig) {
 	ecs.RegisterSystem[Test3System](g.world)
 	ecs.RegisterSystem[Test4System](g.world)
 	ecs.RegisterSystem[Test5System](g.world)
+	ecs.RegisterSystem[Test6System](g.world)
+	ecs.RegisterSystem[Test7System](g.world)
+	ecs.RegisterSystem[Test8System](g.world)
+	ecs.RegisterSystem[Test9System](g.world)
+	ecs.RegisterSystem[Test10System](g.world)
 
 	DataGenerateECS(g)
 }

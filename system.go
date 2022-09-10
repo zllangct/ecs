@@ -169,7 +169,6 @@ func (s *System[T]) setRequirementsInternal(rqs ...IRequirement) {
 	for _, value := range rqs {
 		typ = value.Type()
 		s.requirements[typ] = value
-		s.World().getComponentMetaInfoByType(typ)
 	}
 }
 

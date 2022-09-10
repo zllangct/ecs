@@ -28,6 +28,11 @@ type Player struct {
 	Test3              int
 	Test4              int
 	Test5              int
+	Test6              int
+	Test7              int
+	Test8              int
+	Test9              int
+	Test10             int
 }
 
 type GameNormal struct {
@@ -64,7 +69,7 @@ func DataGenerateNormal(normal *GameNormal) {
 func (g *GameNormal) doFrame(parallel bool, frame uint64, delta time.Duration) {
 	if parallel {
 		wg := &sync.WaitGroup{}
-		wg.Add(7)
+		wg.Add(12)
 		go func() {
 			g.DoMoveParallel(delta)
 			wg.Done()
@@ -93,6 +98,26 @@ func (g *GameNormal) doFrame(parallel bool, frame uint64, delta time.Duration) {
 			g.SimuLoadParallel5()
 			wg.Done()
 		}()
+		go func() {
+			g.SimuLoadParallel6()
+			wg.Done()
+		}()
+		go func() {
+			g.SimuLoadParallel7()
+			wg.Done()
+		}()
+		go func() {
+			g.SimuLoadParallel8()
+			wg.Done()
+		}()
+		go func() {
+			g.SimuLoadParallel9()
+			wg.Done()
+		}()
+		go func() {
+			g.SimuLoadParallel10()
+			wg.Done()
+		}()
 		wg.Wait()
 	} else {
 		// 移动
@@ -105,6 +130,11 @@ func (g *GameNormal) doFrame(parallel bool, frame uint64, delta time.Duration) {
 		g.SimuLoad3()
 		g.SimuLoad4()
 		g.SimuLoad5()
+		g.SimuLoad6()
+		g.SimuLoad7()
+		g.SimuLoad8()
+		g.SimuLoad9()
+		g.SimuLoad10()
 	}
 }
 func (g *GameNormal) SimuLoad1() {
@@ -139,6 +169,41 @@ func (g *GameNormal) SimuLoad5() {
 	for _, p := range g.players {
 		for i := 0; i < DummyMaxFor; i++ {
 			p.Test5 += 1
+		}
+	}
+}
+func (g *GameNormal) SimuLoad6() {
+	for _, p := range g.players {
+		for i := 0; i < DummyMaxFor; i++ {
+			p.Test5 += 1
+		}
+	}
+}
+func (g *GameNormal) SimuLoad7() {
+	for _, p := range g.players {
+		for i := 0; i < DummyMaxFor; i++ {
+			p.Test5 += 1
+		}
+	}
+}
+func (g *GameNormal) SimuLoad8() {
+	for _, p := range g.players {
+		for i := 0; i < DummyMaxFor; i++ {
+			p.Test5 += 1
+		}
+	}
+}
+func (g *GameNormal) SimuLoad9() {
+	for _, p := range g.players {
+		for i := 0; i < DummyMaxFor; i++ {
+			p.Test5 += 1
+		}
+	}
+}
+func (g *GameNormal) SimuLoad10() {
+	for _, p := range g.players {
+		for i := 0; i < DummyMaxFor; i++ {
+			p.Test10 += 1
 		}
 	}
 }
@@ -184,6 +249,51 @@ func (g *GameNormal) SimuLoadParallel5() {
 		p.rw.Lock()
 		for i := 0; i < DummyMaxFor; i++ {
 			p.Test5 += 1
+		}
+		p.rw.Unlock()
+	}
+}
+func (g *GameNormal) SimuLoadParallel6() {
+	for _, p := range g.players {
+		p.rw.Lock()
+		for i := 0; i < DummyMaxFor; i++ {
+			p.Test6 += 1
+		}
+		p.rw.Unlock()
+	}
+}
+func (g *GameNormal) SimuLoadParallel7() {
+	for _, p := range g.players {
+		p.rw.Lock()
+		for i := 0; i < DummyMaxFor; i++ {
+			p.Test7 += 1
+		}
+		p.rw.Unlock()
+	}
+}
+func (g *GameNormal) SimuLoadParallel8() {
+	for _, p := range g.players {
+		p.rw.Lock()
+		for i := 0; i < DummyMaxFor; i++ {
+			p.Test8 += 1
+		}
+		p.rw.Unlock()
+	}
+}
+func (g *GameNormal) SimuLoadParallel9() {
+	for _, p := range g.players {
+		p.rw.Lock()
+		for i := 0; i < DummyMaxFor; i++ {
+			p.Test9 += 1
+		}
+		p.rw.Unlock()
+	}
+}
+func (g *GameNormal) SimuLoadParallel10() {
+	for _, p := range g.players {
+		p.rw.Lock()
+		for i := 0; i < DummyMaxFor; i++ {
+			p.Test10 += 1
 		}
 		p.rw.Unlock()
 	}
