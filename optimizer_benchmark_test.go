@@ -25,14 +25,14 @@ type __optimizer_Bench_S_1 struct {
 	System[__optimizer_Bench_S_1]
 }
 
-func (t *__optimizer_Bench_S_1) Init(si SystemInitializer) {
+func (t *__optimizer_Bench_S_1) Init(si SystemInitConstraint) {
 	t.SetRequirements(si, &__optimizer_Bench_C_1{}, &__optimizer_Bench_C_2{})
 }
 
 func (t *__optimizer_Bench_S_1) Update(event Event) {
-	iter := GetInterestedComponents[__optimizer_Bench_C_1](t)
+	iter := GetComponentAll[__optimizer_Bench_C_1](t)
 	for c := iter.Begin(); !iter.End(); c = iter.Next() {
-		c2 := GetRelatedComponent[__optimizer_Bench_C_2](t, c.owner)
+		c2 := GetRelated[__optimizer_Bench_C_2](t, c.owner)
 		if c2 == nil {
 			continue
 		}
@@ -60,7 +60,7 @@ func (g *__optimizer_Bench_GameECS) init() {
 
 	for i := 0; i < testOptimizerEntityMax; i++ {
 		c := &__optimizer_Bench_C_1{}
-		e := g.world.NewEntity()
+		e := g.world.newEntity()
 		e.Add(c)
 		g.entities = append(g.entities, e.Entity())
 	}

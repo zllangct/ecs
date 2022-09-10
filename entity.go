@@ -76,6 +76,7 @@ func (e *EntityIDGenerator) FreeID(entity Entity) {
 
 	real := entity.ToRealID()
 	e.ids[real.index].index = -1
+	e.ids[real.index].reuse++
 
 	e.removeDelay[e.delayFree] = real
 	e.delayFree++

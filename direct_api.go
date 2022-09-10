@@ -10,18 +10,14 @@ func RegisterSystem[T SystemObject](world iWorldBase, order ...Order) {
 }
 
 func AddFreeComponent[T FreeComponentObject, TP FreeComponentPointer[T]](world iWorldBase, component *T) {
-	world.AddFreeComponent(TP(component))
+	world.addFreeComponent(TP(component))
 }
 
-func GetInterestedComponent[T ComponentObject](sys ISystem, entity Entity) *T {
-	return GetRelatedComponent[T](sys, entity)
+func GetComponent[T ComponentObject](sys ISystem, entity Entity) *T {
+	return GetRelated[T](sys, entity)
 }
 
-func BindGate[T GateObject](world *AsyncWorld) {
-	world.BindGate(any(new(T)).(IGate))
-}
-
-func GetInterestedComponents[T ComponentObject](sys ISystem) Iterator[T] {
+func GetComponentAll[T ComponentObject](sys ISystem) Iterator[T] {
 	if sys.getState() == SystemStateInvalid {
 		return EmptyIter[T]()
 	}
@@ -41,7 +37,7 @@ func GetInterestedComponents[T ComponentObject](sys ISystem) Iterator[T] {
 	return NewComponentSetIterator[T](c.(*ComponentSet[T]), r.getPermission() == ComponentReadOnly)
 }
 
-func GetRelatedComponent[T ComponentObject](sys ISystem, entity Entity) *T {
+func GetRelated[T ComponentObject](sys ISystem, entity Entity) *T {
 	typ := TypeOf[T]()
 	isRequire := sys.isRequire(typ)
 	if !isRequire {
@@ -59,13 +55,28 @@ func GetRelatedComponent[T ComponentObject](sys ISystem, entity Entity) *T {
 	return cache.Get(entity)
 }
 
-func GetGate[T GateObject](world *AsyncWorld) *T {
-	gate := any(world.GetGate())
-	g, ok := gate.(*T)
-	if ok {
-		return nil
+func BindUtility[T UtilityObject, TP UtilityPointer[T]](si SystemInitConstraint) {
+	if si.isValid() {
+		panic("out of initialization stage")
 	}
-	return g
+	utility := TP(new(T))
+	sys := si.getSystem()
+	utility.setSystem(sys)
+	utility.setWorld(sys.World())
+	sys.setUtility(utility)
+	sys.World().base().utilities[utility.Type()] = utility
+}
+
+func GetUtility[T UtilityObject](getter IUtilityGetter) (*T, bool) {
+	w := getter.getWorld()
+	if w == nil {
+		return nil, false
+	}
+	u, ok := w.getUtilityForT(TypeOf[T]())
+	if !ok {
+		return nil, false
+	}
+	return (*T)(u), true
 }
 
 func TypeOf[T any]() reflect.Type {

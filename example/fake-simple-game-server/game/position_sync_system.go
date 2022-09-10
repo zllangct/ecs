@@ -11,14 +11,14 @@ type SyncSystem struct {
 	ecs.System[SyncSystem]
 }
 
-func (m *SyncSystem) Init(si ecs.SystemInitializer) {
+func (m *SyncSystem) Init(si ecs.SystemInitConstraint) {
 	m.SetRequirements(si, &Position{}, &PlayerComponent{})
 }
 
 func (m *SyncSystem) PostUpdate(event ecs.Event) {
-	p := ecs.GetInterestedComponents[Position](m)
+	p := ecs.GetComponentAll[Position](m)
 	for i := p.Begin(); !p.End(); i = p.Next() {
-		pc := ecs.GetRelatedComponent[PlayerComponent](m, i.Owner())
+		pc := ecs.GetRelated[PlayerComponent](m, i.Owner())
 		if pc == nil {
 			continue
 		}

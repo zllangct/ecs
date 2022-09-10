@@ -22,7 +22,7 @@ type DamageSystem struct {
 	targetGetter *ecs.Shape[Target]
 }
 
-func (d *DamageSystem) Init(si ecs.SystemInitializer) {
+func (d *DamageSystem) Init(si ecs.SystemInitConstraint) {
 	d.SetRequirements(
 		si,
 		&ecs.ReadOnly[Position]{},
@@ -44,8 +44,6 @@ func (d *DamageSystem) Update(event ecs.Event) {
 	暴击倍率、暴击率、攻击范围等数据。考虑攻击范围时需要，知道位置相关信息，由Position组件提供数据支持，在全遍历
 	所有位置关系时，消耗比较大，可通过AOI优化，减小遍历规模，优化搜索效率，此处示例不做额外处理。
 	*/
-	reporter := d.World().GetMetrics().NewReporter("damage system")
-	reporter.Start()
 	casterIter := d.casterGetter.Get()
 	targetIter := d.targetGetter.Get()
 	count := 0
@@ -77,7 +75,4 @@ func (d *DamageSystem) Update(event ecs.Event) {
 			}
 		}
 	}
-	reporter.Sample("damage")
-	reporter.Stop()
-	reporter.Print()
 }

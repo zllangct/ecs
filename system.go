@@ -18,30 +18,23 @@ const (
 	SystemStateDestroyed
 )
 
-const (
-	SystemCustomEventInvalid CustomEventName = ""
-	SystemCustomEventPause                   = "__internal__Pause"
-	SystemCustomEventResume                  = "__internal__Resume"
-	SystemCustomEventStop                    = "__internal__Stop"
-)
-
-type SystemInitializer struct {
+type SystemInitConstraint struct {
 	sys *ISystem
 }
 
-func (s *SystemInitializer) getSystem() ISystem {
+func (s *SystemInitConstraint) getSystem() ISystem {
 	if s.sys == nil {
 		panic("out of initialization stage")
 	}
 	return *s.sys
 }
 
-func (s *SystemInitializer) SetBroken(reason string) {
+func (s *SystemInitConstraint) SetBroken(reason string) {
 	(*s.sys).setBroken()
 	panic(reason)
 }
 
-func (s *SystemInitializer) isValid() bool {
+func (s *SystemInitConstraint) isValid() bool {
 	return *s.sys == nil
 }
 
@@ -60,14 +53,14 @@ type ISystem interface {
 	pause()
 	resume()
 	stop()
-	doSync(func(api *SystemApi))
 	doAsync(func(api *SystemApi))
+	doSync(func(api *SystemApi))
 	eventsSyncExecute()
 	eventsAsyncExecute()
 	getPointer() unsafe.Pointer
 	isRequire(componentType reflect.Type) bool
 	setOrder(order Order)
-	setRequirements(initializer SystemInitializer, rqs ...IRequirement)
+	setRequirements(initializer SystemInitConstraint, rqs ...IRequirement)
 	getState() SystemState
 	setState(state SystemState)
 	setSecurity(isSafe bool)
@@ -79,6 +72,7 @@ type ISystem interface {
 	getGetterCache() *GetterCache
 	setBroken()
 	isValid() bool
+	setUtility(u IUtility)
 }
 
 type SystemObject interface {
@@ -160,7 +154,7 @@ func (s *System[T]) eventsAsyncExecute() {
 	api.sys = nil
 }
 
-func (s *System[T]) SetRequirements(initializer SystemInitializer, rqs ...IRequirement) {
+func (s *System[T]) SetRequirements(initializer SystemInitConstraint, rqs ...IRequirement) {
 	if initializer.isValid() {
 		panic("out of initialization stage")
 	}
@@ -183,7 +177,7 @@ func (s *System[T]) isInitialized() bool {
 	return s.state >= SystemStateInit
 }
 
-func (s *System[T]) setRequirements(initializer SystemInitializer, rqs ...IRequirement) {
+func (s *System[T]) setRequirements(initializer SystemInitConstraint, rqs ...IRequirement) {
 	if s.requirements == nil {
 		s.requirements = map[reflect.Type]IRequirement{}
 	}
@@ -196,20 +190,15 @@ func (s *System[T]) setRequirements(initializer SystemInitializer, rqs ...IRequi
 	}
 }
 
+func (s *System[T]) setUtility(u IUtility) {
+	s.utility = u
+}
+
 func (s *System[T]) setSecurity(isSafe bool) {
 	s.isSafe = isSafe
 }
 func (s *System[T]) isThreadSafe() bool {
 	return s.isSafe
-}
-
-func (s *System[T]) BindUtility(initializer SystemInitializer, utility IUtility) {
-	if initializer.isValid() {
-		panic("out of initialization stage")
-	}
-	s.utility = utility
-	s.utility.setSystem(s)
-	s.utility.setWorld(s.world)
 }
 
 func (s *System[T]) GetUtility() IUtility {
@@ -302,7 +291,7 @@ func (s *System[T]) baseInit(world *worldBase, ins ISystem) {
 
 	s.valid = true
 
-	initializer := SystemInitializer{}
+	initializer := SystemInitConstraint{}
 	is := ISystem(s)
 	initializer.sys = &is
 	if i, ok := ins.(InitReceiver); ok {
@@ -314,6 +303,7 @@ func (s *System[T]) baseInit(world *worldBase, ins ISystem) {
 		}
 	}
 	*initializer.sys = nil
+	initializer.sys = nil
 
 	s.state = SystemStateStart
 }
@@ -346,7 +336,7 @@ func (s *System[T]) World() iWorldBase {
 }
 
 func (s *System[T]) GetEntityInfo(entity Entity) (*EntityInfo, bool) {
-	return s.world.GetEntityInfo(entity)
+	return s.world.getEntityInfo(entity)
 }
 
 // get optimizer

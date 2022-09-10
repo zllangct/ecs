@@ -8,7 +8,7 @@ type MoveSystem struct {
 	ecs.System[MoveSystem]
 }
 
-func (m *MoveSystem) Init(si ecs.SystemInitializer) {
+func (m *MoveSystem) Init(si ecs.SystemInitConstraint) {
 	m.SetRequirements(si, &Position{}, &ecs.ReadOnly[Movement]{})
 }
 
@@ -16,10 +16,10 @@ func (m *MoveSystem) Update(event ecs.Event) {
 	delta := event.Delta
 
 	count := 0
-	iter := ecs.GetInterestedComponents[Movement](m)
+	iter := ecs.GetComponentAll[Movement](m)
 	for move := iter.Begin(); !iter.End(); move = iter.Next() {
 		entity := move.Owner()
-		pos := ecs.GetRelatedComponent[Position](m, entity)
+		pos := ecs.GetRelated[Position](m, entity)
 		if pos == nil {
 			continue
 		}

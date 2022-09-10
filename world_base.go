@@ -5,6 +5,7 @@ import (
 	"runtime"
 	"sync/atomic"
 	"time"
+	"unsafe"
 )
 
 type WorldStatus int
@@ -62,18 +63,19 @@ func NewDefaultWorldConfig() *WorldConfig {
 }
 
 type iWorldBase interface {
-	GetStatus() WorldStatus
-	GetID() int64
-	NewEntity() *EntityInfo
-	GetEntityInfo(id Entity) (*EntityInfo, bool)
-	AddFreeComponent(component IComponent)
-	RegisterSystem(system ISystem)
-	RegisterComponent(component IComponent)
-	GetMetrics() *Metrics
-
+	getStatus() WorldStatus
+	getID() int64
+	addFreeComponent(component IComponent)
+	registerSystem(system ISystem)
+	registerComponent(component IComponent)
+	getMetrics() *Metrics
+	getEntityInfo(id Entity) (*EntityInfo, bool)
+	newEntity() *EntityInfo
 	getComponentMetaInfoByType(typ reflect.Type) *ComponentMetaInfo
 	optimize(t time.Duration, force bool)
 	getSystem(sys reflect.Type) (ISystem, bool)
+	addUtility(utility IUtility)
+	getUtilityForT(typ reflect.Type) (unsafe.Pointer, bool)
 	update()
 	setStatus(status WorldStatus)
 	addComponent(entity Entity, component IComponent)
@@ -83,6 +85,7 @@ type iWorldBase interface {
 	getComponentMeta() *componentMeta
 	getOrCreateComponentMetaInfo(component IComponent) *ComponentMetaInfo
 	registerForT(system interface{}, order ...Order)
+	base() *worldBase
 }
 
 type worldBase struct {
@@ -95,7 +98,7 @@ type worldBase struct {
 	optimizer       *optimizer
 	idGenerator     *EntityIDGenerator
 	componentMeta   *componentMeta
-	utilities       map[reflect.Type]interface{}
+	utilities       map[reflect.Type]IUtility
 	workPool        *Pool
 	metrics         *Metrics
 	frame           uint64
@@ -124,7 +127,7 @@ func (w *worldBase) init(config *WorldConfig) *worldBase {
 	w.idGenerator = NewEntityIDGenerator(1024, 10)
 
 	w.componentMeta = NewComponentMeta()
-	w.utilities = make(map[reflect.Type]interface{})
+	w.utilities = make(map[reflect.Type]IUtility)
 
 	w.metrics = NewMetrics(w.config.IsMetrics, w.config.IsMetricsPrint)
 
@@ -147,7 +150,11 @@ func (w *worldBase) init(config *WorldConfig) *worldBase {
 	return w
 }
 
-func (w *worldBase) GetID() int64 {
+func (w *worldBase) base() *worldBase {
+	return w
+}
+
+func (w *worldBase) getID() int64 {
 	return w.id
 }
 
@@ -156,7 +163,7 @@ func (w *worldBase) SwitchMainThread() {
 }
 
 func (w *worldBase) startup() {
-	if w.GetStatus() != WorldStatusInitialized {
+	if w.getStatus() != WorldStatusInitialized {
 		panic("world is not initialized or already running.")
 	}
 
@@ -203,22 +210,30 @@ func (w *worldBase) getUtilityGetter() UtilityGetter {
 	return ug
 }
 
-func (w *worldBase) GetStatus() WorldStatus {
+func (w *worldBase) addUtility(utility IUtility) {
+	w.utilities[utility.Type()] = utility
+}
+func (w *worldBase) getUtilityForT(typ reflect.Type) (unsafe.Pointer, bool) {
+	u, ok := w.utilities[typ]
+	return u.getPointer(), ok
+}
+
+func (w *worldBase) getStatus() WorldStatus {
 	return w.status
 }
 
-func (w *worldBase) GetMetrics() *Metrics {
+func (w *worldBase) getMetrics() *Metrics {
 	return w.metrics
 }
 
-func (w *worldBase) RegisterSystem(system ISystem) {
+func (w *worldBase) registerSystem(system ISystem) {
 	if mainThreadDebug {
 		checkMainThread()
 	}
 	w.systemFlow.register(system)
 }
 
-func (w *worldBase) RegisterComponent(component IComponent) {
+func (w *worldBase) registerComponent(component IComponent) {
 	if mainThreadDebug {
 		checkMainThread()
 	}
@@ -230,7 +245,7 @@ func (w *worldBase) registerForT(system interface{}, order ...Order) {
 	if len(order) > 0 {
 		sys.setOrder(order[0])
 	}
-	w.RegisterSystem(system.(ISystem))
+	w.registerSystem(system.(ISystem))
 }
 
 func (w *worldBase) getSystem(sys reflect.Type) (ISystem, bool) {
@@ -249,7 +264,7 @@ func (w *worldBase) addEntity(info EntityInfo) *EntityInfo {
 	return w.entities.Add(info)
 }
 
-func (w *worldBase) GetEntityInfo(entity Entity) (*EntityInfo, bool) {
+func (w *worldBase) getEntityInfo(entity Entity) (*EntityInfo, bool) {
 	return w.entities.GetEntityInfo(entity)
 }
 
@@ -281,7 +296,7 @@ func (w *worldBase) getOrCreateComponentMetaInfo(component IComponent) *Componen
 	return w.componentMeta.GetOrCreateComponentMetaInfo(component)
 }
 
-func (w *worldBase) NewEntity() *EntityInfo {
+func (w *worldBase) newEntity() *EntityInfo {
 	info := EntityInfo{world: w, entity: w.idGenerator.NewID()}
 	return w.addEntity(info)
 }
@@ -302,7 +317,7 @@ func (w *worldBase) deleteComponentByIntType(entity Entity, it uint16) {
 	w.components.deleteOperate(CollectionOperateDelete, entity, it)
 }
 
-func (w *worldBase) AddFreeComponent(component IComponent) {
+func (w *worldBase) addFreeComponent(component IComponent) {
 	switch component.getComponentType() {
 	case ComponentTypeFree, ComponentTypeFreeDisposable:
 	default:

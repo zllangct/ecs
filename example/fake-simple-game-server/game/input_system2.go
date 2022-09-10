@@ -15,15 +15,15 @@ type InputSystem2 struct {
 	ecs.System[InputSystem2]
 }
 
-func (is *InputSystem2) Init(si ecs.SystemInitializer) {
+func (is *InputSystem2) Init(si ecs.SystemInitConstraint) {
 	is.SetRequirements(si, &Movement{}, &MoveChange{})
 }
 
 func (is *InputSystem2) PreUpdate(event ecs.Event) {
-	iterMC := ecs.GetInterestedComponents[MoveChange2](is)
+	iterMC := ecs.GetComponentAll[MoveChange2](is)
 	var mov *Movement
 	for mc := iterMC.Begin(); !iterMC.End(); mc = iterMC.Next() {
-		mov = ecs.GetRelatedComponent[Movement](is, mc.Owner())
+		mov = ecs.GetRelated[Movement](is, mc.Owner())
 		if mov != nil {
 			ecs.Log.Infof("move changed: old: %+v, new: %+v", mov, mc)
 			mov.V = mc.V

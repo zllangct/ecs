@@ -26,7 +26,7 @@ type __ShapeGetter_Test_S_1 struct {
 	getter1 *Shape[__ShapeGetter_Test_Shape_1]
 }
 
-func (t *__ShapeGetter_Test_S_1) Init(initializer SystemInitializer) {
+func (t *__ShapeGetter_Test_S_1) Init(initializer SystemInitConstraint) {
 	t.SetRequirements(initializer, &__ShapeGetter_Test_C_1{}, &__ShapeGetter_Test_C_2{})
 
 	t.getter1 = NewShape[__ShapeGetter_Test_Shape_1](initializer)
@@ -50,7 +50,7 @@ func TestNewShapeGetter(t *testing.T) {
 	world.Startup()
 
 	for i := 0; i < 3; i++ {
-		e := world.NewEntity()
+		e := world.newEntity()
 		e.Add(&__ShapeGetter_Test_C_1{Field1: i}, &__ShapeGetter_Test_C_2{Field1: i * 10})
 	}
 

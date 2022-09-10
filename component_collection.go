@@ -179,7 +179,7 @@ func (c *ComponentCollection) getTempTasks() []func() {
 				if task.op == CollectionOperateDelete {
 					continue
 				}
-				info, ok := c.world.GetEntityInfo(task.target)
+				info, ok := c.world.getEntityInfo(task.target)
 				if ok {
 					switch task.op {
 					case CollectionOperateAdd:

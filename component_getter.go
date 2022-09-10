@@ -5,8 +5,6 @@ import (
 	"unsafe"
 )
 
-// reflect.Type is not comparable, so we need to implement our own
-// to replace by SparseArray[K, V] when reflect.Type is comparable
 type GetterCache struct {
 	indices []reflect.Type
 	values  []unsafe.Pointer

@@ -342,7 +342,7 @@ func (p *systemFlow) run(event Event) {
 
 // register method only in world init or func init(){}
 func (p *systemFlow) register(system ISystem) {
-	if p.world.GetStatus() != WorldStatusInitialized {
+	if p.world.getStatus() != WorldStatusInitialized {
 		panic("system register only in world init")
 	}
 

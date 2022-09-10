@@ -15,8 +15,6 @@ type ICollection interface {
 	Len() int
 	Range(func(v any) bool)
 	Clear()
-	ChangeCount() int64
-	ChangeReset()
 	ElementType() reflect.Type
 
 	getPointer(idx int64) unsafe.Pointer
@@ -25,7 +23,6 @@ type ICollection interface {
 type UnorderedCollection[T any] struct {
 	eleSize  uintptr
 	len      int64
-	change   int64
 	initSize int64
 	data     []T
 }
@@ -63,7 +60,6 @@ func (c *UnorderedCollection[T]) Add(element *T) (*T, int64) {
 	}
 	idx := c.len
 	c.len++
-	c.change++
 	return &c.data[idx], idx
 }
 
@@ -76,7 +72,6 @@ func (c *UnorderedCollection[T]) Remove(idx int64) (*T, int64, int64) {
 	c.data[idx], c.data[lastIdx] = c.data[lastIdx], c.data[idx]
 	c.shrink()
 	c.len--
-	c.change++
 	removed := c.data[lastIdx]
 	return &removed, lastIdx, idx
 }
@@ -116,17 +111,8 @@ func (c *UnorderedCollection[T]) shrink() {
 	}
 }
 
-func (c *UnorderedCollection[T]) ChangeCount() int64 {
-	return c.change
-}
-
-func (c *UnorderedCollection[T]) ChangeReset() {
-	c.change = 0
-}
-
 func (c *UnorderedCollection[T]) Clear() {
 	c.data = make([]T, 0, c.initSize)
-	c.change = 0
 	c.len = 0
 }
 

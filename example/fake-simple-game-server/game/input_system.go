@@ -8,15 +8,15 @@ type InputSystem struct {
 	ecs.System[InputSystem]
 }
 
-func (is *InputSystem) Init(si ecs.SystemInitializer) {
+func (is *InputSystem) Init(si ecs.SystemInitConstraint) {
 	is.SetRequirements(si, &Movement{}, &MoveChange{})
 }
 
 func (is *InputSystem) PreUpdate(event ecs.Event) {
-	iterMC := ecs.GetInterestedComponents[MoveChange](is)
+	iterMC := ecs.GetComponentAll[MoveChange](is)
 	var mov *Movement
 	for mc := iterMC.Begin(); !iterMC.End(); mc = iterMC.Next() {
-		mov = ecs.GetRelatedComponent[Movement](is, mc.Entity)
+		mov = ecs.GetRelated[Movement](is, mc.Entity)
 		if mov != nil {
 			ecs.Log.Infof("move changed: old: %+v, new: %+v", mov, mc)
 			mov.V = mc.V

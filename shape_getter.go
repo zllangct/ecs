@@ -36,7 +36,7 @@ type ShapeIndices struct {
 
 type Shape[T any] struct {
 	shapeBase
-	initializer  SystemInitializer
+	initializer  SystemInitConstraint
 	mainKeyIndex int
 	subTypes     []uint16
 	subOffset    []uintptr
@@ -46,7 +46,7 @@ type Shape[T any] struct {
 	valid        bool
 }
 
-func NewShape[T any](initializer SystemInitializer) *Shape[T] {
+func NewShape[T any](initializer SystemInitConstraint) *Shape[T] {
 	if initializer.isValid() {
 		panic("out of initialization stage")
 	}

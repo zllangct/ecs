@@ -17,7 +17,7 @@ type MoveSystem struct {
 	getter    *ecs.Shape[ecs.Shape2[Movement, Position], *ecs.Shape2[Movement, Position]]
 }
 
-func (m *MoveSystem) Init(si ecs.SystemInitializer) {
+func (m *MoveSystem) Init(si ecs.SystemInitConstraint) {
 	m.SetRequirements(si, &Position{}, &Movement{})
 	m.EventRegister("UpdateTimeScale", m.UpdateTimeScale)
 	getter, err := ecs.NewShape[ecs.Shape2[Movement, Position]](m)

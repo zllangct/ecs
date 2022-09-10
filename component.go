@@ -50,11 +50,12 @@ type IComponent interface {
 	getIntType() uint16
 	getComponentType() ComponentType
 	getPermission() ComponentPermission
-	check(initializer SystemInitializer)
+	check(initializer SystemInitConstraint)
 	getSeq() uint32
 	newCollection(meta *ComponentMetaInfo) IComponentSet
 	addToCollection(ct ComponentType, p unsafe.Pointer)
 	deleteFromCollection(collection interface{})
+	isValidComponentType() bool
 
 	debugAddress() unsafe.Pointer
 }
@@ -159,7 +160,9 @@ func (c *Component[T]) addToCollection(ct ComponentType, p unsafe.Pointer) {
 		ins = cc.Add(c.rawInstance(), c.owner)
 	}
 
-	(*Component[T])(unsafe.Pointer(ins)).setState(ComponentStateActive)
+	if ins != nil {
+		(*Component[T])(unsafe.Pointer(ins)).setState(ComponentStateActive)
+	}
 }
 
 func (c *Component[T]) deleteFromCollection(collection interface{}) {
@@ -241,14 +244,32 @@ func (c *Component[T]) getPermission() ComponentPermission {
 	return ComponentReadWrite
 }
 
-func (c *Component[T]) check(initializer SystemInitializer) {
+func (c *Component[T]) check(initializer SystemInitConstraint) {
 	if initializer.isValid() {
 		panic("out of initialization stage")
 	}
 	ins := c.instance()
+	if !ins.isValidComponentType() {
+		panic("invalid component type")
+	}
 	sys := initializer.getSystem()
 	sys.World().getOrCreateComponentMetaInfo(ins)
 	sys.World().getComponentCollection().checkSet(ins)
+}
+
+func (c *Component[T]) isValidComponentType() bool {
+	typ := c.Type()
+	fieldNum := typ.NumField()
+	if fieldNum < 1 {
+		return false
+	}
+	for i := 1; i < fieldNum; i++ {
+		subType := typ.Field(i).Type
+		if !IsPureValueType(subType) {
+			return false
+		}
+	}
+	return true
 }
 
 func (c *Component[T]) debugAddress() unsafe.Pointer {

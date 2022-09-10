@@ -3,6 +3,7 @@ package ecs
 import (
 	"errors"
 	"math/rand"
+	"reflect"
 	"runtime/debug"
 	"sync/atomic"
 	"time"
@@ -77,6 +78,27 @@ func TryAndReport(task func()) (err error) {
 	}()
 	task()
 	return nil
+}
+
+func IsPureValueType(typ reflect.Type) bool {
+	switch typ.Kind() {
+	case reflect.Bool, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		reflect.Float32, reflect.Float64:
+		return true
+	case reflect.Array:
+		return IsPureValueType(typ.Elem())
+	case reflect.Struct:
+		for i := 0; i < typ.NumField(); i++ {
+			subType := typ.Field(i).Type
+			if !IsPureValueType(subType) {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
 }
 
 func StrHash(str string, groupCount int) int {

@@ -11,15 +11,18 @@ type IComponentSet interface {
 	GetElementMeta() *ComponentMetaInfo
 	GetComponent(entity Entity) IComponent
 	Remove(entity Entity)
-
 	Sort()
+
+	changeCount() int64
+	changeReset()
 	pointer() unsafe.Pointer
 	getPointerByEntity(entity Entity) unsafe.Pointer
 }
 
 type ComponentSet[T ComponentObject] struct {
 	SparseArray[int32, T]
-	meta *ComponentMetaInfo
+	change int64
+	meta   *ComponentMetaInfo
 }
 
 func NewComponentSet[T ComponentObject](meta *ComponentMetaInfo, initSize ...int) *ComponentSet[T] {
@@ -32,7 +35,12 @@ func NewComponentSet[T ComponentObject](meta *ComponentMetaInfo, initSize ...int
 
 func (c *ComponentSet[T]) Add(element *T, entity Entity) *T {
 	index := entity.ToRealID().index
-	return c.SparseArray.Add(index, element)
+	data := c.SparseArray.Add(index, element)
+	if data == nil {
+		return nil
+	}
+	c.change++
+	return data
 }
 
 func (c *ComponentSet[T]) remove(entity Entity) *T {
@@ -41,7 +49,11 @@ func (c *ComponentSet[T]) remove(entity Entity) *T {
 }
 
 func (c *ComponentSet[T]) Remove(entity Entity) {
-	c.remove(entity)
+	data := c.remove(entity)
+	if data == nil {
+		return
+	}
+	c.change++
 }
 
 func (c *ComponentSet[T]) RemoveAndReturn(entity Entity) *T {
@@ -65,8 +77,16 @@ func (c *ComponentSet[T]) pointer() unsafe.Pointer {
 	return unsafe.Pointer(c)
 }
 
+func (c *ComponentSet[T]) changeCount() int64 {
+	return c.change
+}
+
+func (c *ComponentSet[T]) changeReset() {
+	c.change = 0
+}
+
 func (c *ComponentSet[T]) Sort() {
-	if c.ChangeCount() == 0 {
+	if c.changeCount() == 0 {
 		return
 	}
 	var zeroSeq = SeqMax
@@ -87,7 +107,7 @@ func (c *ComponentSet[T]) Sort() {
 		cp = (*Component[T])(unsafe.Pointer(&(c.data[i])))
 		c.indices[cp.owner.ToRealID().index] = i
 	}
-	c.ChangeReset()
+	c.changeReset()
 }
 
 func (c *ComponentSet[T]) GetComponent(entity Entity) IComponent {
