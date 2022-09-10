@@ -9,30 +9,35 @@ import (
 type CollectionOperate uint8
 
 const (
-	CollectionOperateNone   CollectionOperate = iota
-	CollectionOperateAdd                      //add component operation
-	CollectionOperateDelete                   //delete component operation
+	CollectionOperateNone      CollectionOperate = iota
+	CollectionOperateAdd                         //add component operation
+	CollectionOperateDelete                      //delete component operation
+	CollectionOperateDeleteAll                   //delete component by type operation
 )
 
 type IComponentCollection interface {
-	operate(op CollectionOperate, entity *EntityInfo, component IComponent)
+	operate(op CollectionOperate, entity Entity, component IComponent)
+	deleteOperate(op CollectionOperate, entity Entity, it uint16)
 	getTempTasks() []func()
 	clearDisposable()
-	getCollection(typ reflect.Type) ICollection
-	getCollections() map[reflect.Type]ICollection
+	getComponentSet(typ reflect.Type) IComponentSet
+	getComponentSetByIntType(typ uint16) IComponentSet
+	getCollections() *SparseArray[uint16, IComponentSet]
+	checkSet(com IComponent)
 }
 
 type ComponentCollection struct {
-	collections map[reflect.Type]ICollection
+	collections *SparseArray[uint16, IComponentSet]
+	world       *worldBase
 	bucket      int64
 	locks       []sync.RWMutex
 	opLog       []map[reflect.Type]*opTaskList
-	once        []map[reflect.Type]struct{}
 }
 
-func NewComponentCollection(k int) *ComponentCollection {
+func NewComponentCollection(world *worldBase, k int) *ComponentCollection {
 	cc := &ComponentCollection{
-		collections: map[reflect.Type]ICollection{},
+		world:       world,
+		collections: NewSparseArray[uint16, IComponentSet](),
 	}
 
 	for i := 1; ; i++ {
@@ -48,8 +53,6 @@ func NewComponentCollection(k int) *ComponentCollection {
 	}
 	cc.opLog = make([]map[reflect.Type]*opTaskList, cc.bucket+1)
 	cc.initOptTemp()
-	cc.once = make([]map[reflect.Type]struct{}, cc.bucket+1)
-	cc.initOnce()
 
 	return cc
 }
@@ -62,25 +65,13 @@ func (c *ComponentCollection) initOptTemp() {
 	}
 }
 
-func (c *ComponentCollection) initOnce() {
-	for index := range c.once {
-		c.locks[index].Lock()
-		c.once[index] = make(map[reflect.Type]struct{})
-		c.locks[index].Unlock()
-	}
-}
-
-func (c *ComponentCollection) operate(op CollectionOperate, entity *EntityInfo, component IComponent) {
+func (c *ComponentCollection) operate(op CollectionOperate, entity Entity, component IComponent) {
 	var hash int64
 	switch component.getComponentType() {
 	case ComponentTypeFree, ComponentTypeFreeDisposable:
 		hash = int64((uintptr)(unsafe.Pointer(&hash))) & c.bucket
 	case ComponentTypeNormal, ComponentTypeDisposable:
-		if entity == nil {
-			Log.Errorf("invalid operate, entity is nil")
-			return
-		}
-		hash = entity.hashKey() & c.bucket
+		hash = int64(entity) & c.bucket
 	}
 
 	typ := component.Type()
@@ -103,39 +94,46 @@ func (c *ComponentCollection) operate(op CollectionOperate, entity *EntityInfo, 
 	tl.Append(newOpt)
 }
 
-func (c *ComponentCollection) clearDisposable() {
-	for i := 0; i < len(c.once); i++ {
-		c.locks[i].Lock()
-		m := c.once[i]
-		if len(m) > 0 {
-			for typ, _ := range m {
-				c.removeAllByType(typ)
-				delete(m, typ)
-				//Log.Info("collection Remove (Disposable):", typ.String())
-			}
-		}
-		c.locks[i].Unlock()
-	}
-}
-
-func (c *ComponentCollection) disposableTemp(com IComponent, typ reflect.Type) {
+func (c *ComponentCollection) deleteOperate(op CollectionOperate, entity Entity, it uint16) {
 	var hash int64
-	switch com.getComponentType() {
-	case ComponentTypeFree, ComponentTypeFreeDisposable:
+	meta := c.world.componentMeta.GetComponentMetaInfoByIntType(it)
+	if meta.componentType&ComponentTypeFreeMask > 0 {
 		hash = int64((uintptr)(unsafe.Pointer(&hash))) & c.bucket
-	case ComponentTypeNormal, ComponentTypeDisposable:
-		info := com.Owner()
-		if info == nil {
-			Log.Errorf("invalid operate, entity is nil")
-			return
-		}
-		hash = info.hashKey() & c.bucket
+	} else {
+		hash = int64(entity) & c.bucket
 	}
+
+	typ := meta.typ
+	newOpt := opTaskPool.Get()
+	newOpt.target = entity
+	newOpt.com = nil
+	newOpt.op = op
+
+	b := c.opLog[hash]
+
 	c.locks[hash].Lock()
 	defer c.locks[hash].Unlock()
 
-	if _, ok := c.once[hash][typ]; !ok {
-		c.once[hash][typ] = struct{}{}
+	tl, ok := b[typ]
+	if !ok {
+		tl = &opTaskList{}
+		b[typ] = tl
+	}
+
+	tl.Append(newOpt)
+}
+
+func (c *ComponentCollection) clearDisposable() {
+	disposable := c.world.componentMeta.GetDisposableTypes()
+	for r, _ := range disposable {
+		c.removeAllByType(r)
+	}
+}
+
+func (c *ComponentCollection) clearFree() {
+	disposable := c.world.componentMeta.GetDisposableTypes()
+	for r, _ := range disposable {
+		c.removeAllByType(r)
 	}
 }
 
@@ -160,45 +158,63 @@ func (c *ComponentCollection) getTempTasks() []func() {
 
 	var tasks []func()
 	for typ, list := range combination {
-		typTemp := typ
 		taskList := list
-		collection, ok := c.collections[typTemp]
-		if !ok {
-			c.collections[typTemp] = taskList.head.com.newCollection()
-			collection = c.collections[typTemp]
+		meta := c.world.getComponentMetaInfoByType(typ)
+		setp := c.collections.Get(meta.it)
+		if setp == nil {
+			c.checkSet(taskList.head.com)
+			setp = c.collections.Get(meta.it)
 		}
 
 		fn := func() {
-			c.opExecute(taskList, collection)
+			c.opExecute(taskList, *setp)
 		}
 		tasks = append(tasks, fn)
 	}
+
+	fn := func() {
+		for typ, list := range combination {
+			meta := c.world.getComponentMetaInfoByType(typ)
+			for task := list.head; task != nil; task = task.next {
+				if task.op == CollectionOperateDelete {
+					continue
+				}
+				info, ok := c.world.getEntityInfo(task.target)
+				if ok {
+					switch task.op {
+					case CollectionOperateAdd:
+						switch task.com.getComponentType() {
+						case ComponentTypeNormal, ComponentTypeDisposable:
+							info.addToCompound(meta.it)
+						}
+					case CollectionOperateDelete:
+						switch task.com.getComponentType() {
+						case ComponentTypeNormal, ComponentTypeDisposable:
+							info.removeFromCompound(meta.it)
+						}
+					}
+				}
+			}
+		}
+	}
+	tasks = append(tasks, fn)
 	return tasks
 }
 
-func (c *ComponentCollection) opExecute(taskList *opTaskList, collection any) {
-	var t reflect.Type
+func (c *ComponentCollection) opExecute(taskList *opTaskList, collection IComponentSet) {
+	meta := collection.GetElementMeta()
 	for task := taskList.head; task != nil; task = task.next {
-		t = task.com.Type()
 		switch task.op {
 		case CollectionOperateAdd:
-			ret := task.com.addToCollection(collection)
-			switch task.com.getComponentType() {
-			case ComponentTypeNormal:
-				task.target.componentAdded(t, ret)
-			case ComponentTypeDisposable:
-				c.disposableTemp(task.com, t)
-				task.target.componentAdded(t, ret)
-			case ComponentTypeFreeDisposable:
-				c.disposableTemp(task.com, t)
-			}
-			task.com = ret
+			task.com.setIntType(meta.it)
+			task.com.setOwner(task.target)
+			task.com.addToCollection(task.com.getComponentType(), collection.pointer())
 		case CollectionOperateDelete:
-			task.com.deleteFromCollection(collection)
-			switch task.com.getComponentType() {
-			case ComponentTypeNormal, ComponentTypeDisposable:
-				task.target.componentDeleted(t, task.com.getComponentType())
+			if meta.componentType&ComponentTypeFreeMask == 0 {
+				collection.Remove(task.target)
 			}
+		case CollectionOperateDeleteAll:
+			collection.Clear()
 		}
 	}
 	next := taskList.head
@@ -210,14 +226,34 @@ func (c *ComponentCollection) opExecute(taskList *opTaskList, collection any) {
 	taskList.Reset()
 }
 
-func (c *ComponentCollection) getCollection(typ reflect.Type) ICollection {
-	return c.collections[typ]
+func (c *ComponentCollection) getComponentSet(typ reflect.Type) IComponentSet {
+	meta := c.world.getComponentMetaInfoByType(typ)
+	return *(c.collections.Get(meta.it))
 }
 
-func (c *ComponentCollection) getCollections() map[reflect.Type]ICollection {
+func (c *ComponentCollection) getComponentSetByIntType(it uint16) IComponentSet {
+	return *(c.collections.Get(it))
+}
+
+func (c *ComponentCollection) getCollections() *SparseArray[uint16, IComponentSet] {
 	return c.collections
 }
 
+func (c *ComponentCollection) checkSet(com IComponent) {
+	typ := com.Type()
+	meta := c.world.getComponentMetaInfoByType(typ)
+	isExist := c.collections.Exist(meta.it)
+	if !isExist {
+		set := com.newCollection(meta)
+		c.collections.Add(set.GetElementMeta().it, &set)
+	}
+}
+
 func (c *ComponentCollection) removeAllByType(typ reflect.Type) {
-	delete(c.collections, typ)
+	meta := c.world.getComponentMetaInfoByType(typ)
+	set := c.collections.Get(meta.it)
+	if set == nil {
+		return
+	}
+	(*set).Clear()
 }

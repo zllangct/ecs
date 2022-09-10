@@ -5,49 +5,49 @@ import (
 	"testing"
 )
 
-type Com1 struct {
-	Component[Com1, *Com1]
+type __systemGroup_Test_C_1 struct {
+	Component[__systemGroup_Test_C_1]
 }
-type Com2 struct {
-	Component[Com2, *Com2]
+type __systemGroup_Test_C_2 struct {
+	Component[__systemGroup_Test_C_2]
 }
-type Com3 struct {
-	Component[Com3, *Com3]
+type __systemGroup_Test_C_3 struct {
+	Component[__systemGroup_Test_C_3]
 }
-type Com4 struct {
-	Component[Com4, *Com4]
+type __systemGroup_Test_C_4 struct {
+	Component[__systemGroup_Test_C_4]
 }
-type Com5 struct {
-	Component[Com5, *Com5]
+type __systemGroup_Test_C_5 struct {
+	Component[__systemGroup_Test_C_5]
 }
-type Com6 struct {
-	Component[Com6, *Com6]
+type __systemGroup_Test_C_6 struct {
+	Component[__systemGroup_Test_C_6]
 }
-type Com7 struct {
-	Component[Com7, *Com7]
+type __systemGroup_Test_C_7 struct {
+	Component[__systemGroup_Test_C_7]
 }
-type Com8 struct {
-	Component[Com8, *Com8]
+type __systemGroup_Test_C_8 struct {
+	Component[__systemGroup_Test_C_8]
 }
-type Com9 struct {
-	Component[Com9, *Com9]
+type __systemGroup_Test_C_9 struct {
+	Component[__systemGroup_Test_C_9]
 }
-type Com10 struct {
-	Component[Com10, *Com10]
+type __systemGroup_Test_C_10 struct {
+	Component[__systemGroup_Test_C_10]
 }
 
-type TestSystem struct {
-	System[TestSystem, *TestSystem]
+type __systemGroup_Test_S_1 struct {
+	System[__systemGroup_Test_S_1]
 	Name int
 }
 
-func NewTestSystem(ID int, rqs ...IRequirement) *TestSystem {
-	s := &TestSystem{Name: ID}
-	s.SetRequirements(rqs...)
+func NewTestSystem(ID int, rqs ...IRequirement) *__systemGroup_Test_S_1 {
+	s := &__systemGroup_Test_S_1{Name: ID}
+	s.setRequirementsInternal(rqs...)
 	return s
 }
 
-func (p *TestSystem) Call(label int) interface{} {
+func (p *__systemGroup_Test_S_1) Call(label int) interface{} {
 	switch label {
 	case 1:
 		println(p.Name)
@@ -55,23 +55,19 @@ func (p *TestSystem) Call(label int) interface{} {
 	return nil
 }
 
-func (p *TestSystem) Filter(component IComponent, op CollectionOperate) {
-
-}
-
 func TestNewSystemGroup(t *testing.T) {
 	tests := []ISystem{
-		NewTestSystem(1, &Com1{}, &Com2{}),
-		NewTestSystem(2, &ReadOnly[Com1]{}, &Com3{}),
-		NewTestSystem(3, &Com2{}, &Com5{}),
-		NewTestSystem(4, &Com2{}, &Com3{}, &Com6{}),
-		NewTestSystem(5, &Com7{}),
-		NewTestSystem(6, &Com9{}, &Com10{}),
-		NewTestSystem(7, &Com6{}),
-		NewTestSystem(8, &Com1{}, &Com5{}),
-		NewTestSystem(9, &Com4{}, &Com6{}),
-		NewTestSystem(10, &Com7{}, &Com5{}),
-		NewTestSystem(11, &ReadOnly[Com1]{}),
+		NewTestSystem(1, &__systemGroup_Test_C_1{}, &__systemGroup_Test_C_2{}),
+		NewTestSystem(2, &ReadOnly[__systemGroup_Test_C_1]{}, &__systemGroup_Test_C_3{}),
+		NewTestSystem(3, &__systemGroup_Test_C_2{}, &__systemGroup_Test_C_5{}),
+		NewTestSystem(4, &__systemGroup_Test_C_2{}, &__systemGroup_Test_C_3{}, &__systemGroup_Test_C_6{}),
+		NewTestSystem(5, &__systemGroup_Test_C_7{}),
+		NewTestSystem(6, &__systemGroup_Test_C_9{}, &__systemGroup_Test_C_10{}),
+		NewTestSystem(7, &__systemGroup_Test_C_6{}),
+		NewTestSystem(8, &__systemGroup_Test_C_1{}, &__systemGroup_Test_C_5{}),
+		NewTestSystem(9, &__systemGroup_Test_C_4{}, &__systemGroup_Test_C_6{}),
+		NewTestSystem(10, &__systemGroup_Test_C_7{}, &__systemGroup_Test_C_5{}),
+		NewTestSystem(11, &ReadOnly[__systemGroup_Test_C_1]{}),
 	}
 	sg := NewSystemGroup()
 	for _, test := range tests {

@@ -1,8 +1,6 @@
 package ecs
 
 import (
-	"container/list"
-	"errors"
 	"reflect"
 	"sync"
 	"unsafe"
@@ -20,40 +18,65 @@ const (
 	SystemStateDestroyed
 )
 
-const (
-	SystemCustomEventInvalid CustomEventName = ""
-	SystemCustomEventPause                   = "__internal__Pause"
-	SystemCustomEventResume                  = "__internal__Resume"
-	SystemCustomEventStop                    = "__internal__Stop"
-)
+type SystemInitConstraint struct {
+	sys *ISystem
+}
+
+func (s *SystemInitConstraint) getSystem() ISystem {
+	if s.sys == nil {
+		panic("out of initialization stage")
+	}
+	return *s.sys
+}
+
+func (s *SystemInitConstraint) SetBroken(reason string) {
+	(*s.sys).setBroken()
+	panic(reason)
+}
+
+func (s *SystemInitConstraint) isValid() bool {
+	return *s.sys == nil
+}
 
 type ISystem interface {
 	Type() reflect.Type
 	Order() Order
-	World() IWorld
-	Requirements() map[reflect.Type]IRequirement
-	Emit(event CustomEventName, args ...interface{})
-	IsRequire(component IComponent) (IRequirement, bool)
+	World() iWorldBase
+	GetRequirements() map[reflect.Type]IRequirement
+	IsRequire(component IComponent) bool
 	ID() int64
 	Pause()
 	Resume()
 	Stop()
 
-	isRequire(componentType reflect.Type) (IRequirement, bool)
+	GetUtility() IUtility
+	pause()
+	resume()
+	stop()
+	doAsync(func(api *SystemApi))
+	doSync(func(api *SystemApi))
+	eventsSyncExecute()
+	eventsAsyncExecute()
+	getPointer() unsafe.Pointer
+	isRequire(componentType reflect.Type) bool
 	setOrder(order Order)
-	setRequirements(rqs ...IRequirement)
+	setRequirements(initializer SystemInitConstraint, rqs ...IRequirement)
 	getState() SystemState
 	setState(state SystemState)
+	setSecurity(isSafe bool)
+	isThreadSafe() bool
 	setExecuting(isExecuting bool)
 	isExecuting() bool
-	checkoutComponent(entity *EntityInfo, com IComponent) IComponent
-	baseInit(world *ecsWorld, ins ISystem)
-	eventDispatch()
+	baseInit(world *worldBase, ins ISystem)
 	getOptimizer() *OptimizerReporter
+	getGetterCache() *GetterCache
+	setBroken()
+	isValid() bool
+	setUtility(u IUtility)
 }
 
 type SystemObject interface {
-	systemIdentification()
+	__SystemIdentification()
 }
 
 type SystemPointer[T SystemObject] interface {
@@ -61,213 +84,241 @@ type SystemPointer[T SystemObject] interface {
 	*T
 }
 
-type System[T SystemObject, TP SystemPointer[T]] struct {
+type System[T SystemObject] struct {
 	lock              sync.Mutex
 	requirements      map[reflect.Type]IRequirement
-	events            map[CustomEventName]CustomEventHandler
-	eventQueue        *list.List
+	eventsSync        []func(api *SystemApi)
+	eventsAsync       []func(api *SystemApi)
+	getterCache       *GetterCache
 	order             Order
 	optimizerReporter *OptimizerReporter
-	world             *ecsWorld
+	world             *worldBase
+	utility           IUtility
 	realType          reflect.Type
 	state             SystemState
+	valid             bool
+	isSafe            bool
 	executing         bool
 	id                int64
 }
 
-func (s System[T, TP]) systemIdentification() {}
+func (s System[T]) __SystemIdentification() {}
 
-func (s *System[T, TP]) instance() (sys ISystem) {
+func (s *System[T]) instance() (sys ISystem) {
 	(*iface)(unsafe.Pointer(&sys)).data = unsafe.Pointer(s)
 	return
 }
 
-func (s *System[T, TP]) rawInstance() *T {
+func (s *System[T]) rawInstance() *T {
 	return (*T)(unsafe.Pointer(s))
 }
 
-func (s *System[T, TP]) ID() int64 {
+func (s *System[T]) ID() int64 {
 	if s.id == 0 {
-		s.id = UniqueID()
+		s.id = LocalUniqueID()
 	}
 	return s.id
 }
 
-func (s *System[T, TP]) EventRegister(event CustomEventName, fn CustomEventHandler) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	s.events[event] = fn
+func (s *System[T]) doSync(fn func(api *SystemApi)) {
+	s.eventsSync = append(s.eventsSync, fn)
 }
 
-func (s *System[T, TP]) Emit(event CustomEventName, args ...interface{}) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	s.eventQueue.PushBack(CustomEvent{
-		Event: event,
-		Args:  args,
-	})
+func (s *System[T]) doAsync(fn func(api *SystemApi)) {
+	s.eventsAsync = append(s.eventsAsync, fn)
 }
 
-func (s *System[T, TP]) eventDispatch() {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+func (s *System[T]) eventsSyncExecute() {
+	api := &SystemApi{sys: s}
+	events := s.eventsSync
+	s.eventsSync = make([]func(api *SystemApi), 0)
+	for _, f := range events {
+		f(api)
+	}
+	api.sys = nil
+}
 
-	for i := s.eventQueue.Front(); i != nil; i = i.Next() {
-		e := i.Value.(CustomEvent)
-		if fn, ok := s.events[e.Event]; ok {
-			err := TryAndReport(func() {
-				fn(e.Args)
-			})
-			if err != nil {
-				Log.Error(err)
-			}
-		} else {
-			Log.Errorf("event not found: %s", e.Event)
+func (s *System[T]) eventsAsyncExecute() {
+	api := &SystemApi{sys: s}
+	events := s.eventsAsync
+	s.eventsAsync = make([]func(api *SystemApi), 0)
+	var err error
+	for _, f := range events {
+		err = TryAndReport(func() {
+			f(api)
+		})
+		if err != nil {
+			Log.Error(err)
 		}
 	}
-
-	s.eventQueue.Init()
+	api.sys = nil
 }
 
-func (s *System[T, TP]) SetRequirements(rqs ...IRequirement) {
-	s.setRequirements(rqs...)
-}
-
-func (s *System[T, TP]) isInitialized() bool {
-	return s.state >= SystemStateInit
-}
-
-func (s *System[T, TP]) setRequirements(rqs ...IRequirement) {
-	if s.isInitialized() {
-		return
+func (s *System[T]) SetRequirements(initializer SystemInitConstraint, rqs ...IRequirement) {
+	if initializer.isValid() {
+		panic("out of initialization stage")
 	}
+	s.setRequirements(initializer, rqs...)
+}
+
+func (s *System[T]) setRequirementsInternal(rqs ...IRequirement) {
 	if s.requirements == nil {
 		s.requirements = map[reflect.Type]IRequirement{}
 	}
+	var typ reflect.Type
 	for _, value := range rqs {
-		s.requirements[value.Type()] = value
+		typ = value.Type()
+		s.requirements[typ] = value
 	}
 }
 
-func (s *System[T, TP]) Pause() {
-	s.Emit(SystemCustomEventPause, nil)
+func (s *System[T]) isInitialized() bool {
+	return s.state >= SystemStateInit
 }
 
-func (s *System[T, TP]) Resume() {
-	s.Emit(SystemCustomEventResume, nil)
+func (s *System[T]) setRequirements(initializer SystemInitConstraint, rqs ...IRequirement) {
+	if s.requirements == nil {
+		s.requirements = map[reflect.Type]IRequirement{}
+	}
+	var typ reflect.Type
+	for _, value := range rqs {
+		typ = value.Type()
+		value.check(initializer)
+		s.requirements[typ] = value
+		s.World().getComponentMetaInfoByType(typ)
+	}
 }
 
-func (s *System[T, TP]) Stop() {
-	s.Emit(SystemCustomEventStop, nil)
+func (s *System[T]) setUtility(u IUtility) {
+	s.utility = u
 }
 
-func (s *System[T, TP]) pause(e []interface{}) error {
+func (s *System[T]) setSecurity(isSafe bool) {
+	s.isSafe = isSafe
+}
+func (s *System[T]) isThreadSafe() bool {
+	return s.isSafe
+}
+
+func (s *System[T]) GetUtility() IUtility {
+	return s.utility
+}
+
+func (s *System[T]) Pause() {
+	s.doAsync(func(api *SystemApi) {
+		api.Pause()
+	})
+}
+
+func (s *System[T]) Resume() {
+	s.doAsync(func(api *SystemApi) {
+		api.Resume()
+	})
+}
+
+func (s *System[T]) Stop() {
+	s.doAsync(func(api *SystemApi) {
+		api.Stop()
+	})
+}
+
+func (s *System[T]) pause() {
 	if s.getState() == SystemStateUpdate {
 		s.setState(SystemStatePause)
-	} else {
-		return errors.New("system not running")
 	}
-	return nil
 }
 
-func (s *System[T, TP]) resume(e []interface{}) error {
+func (s *System[T]) resume() {
 	if s.getState() == SystemStatePause {
 		s.setState(SystemStateUpdate)
-	} else {
-		return errors.New("system not pausing")
 	}
-	return nil
 }
 
-func (s *System[T, TP]) stop(e []interface{}) error {
-	if s.getState() == SystemStatePause {
-		s.setState(SystemStateUpdate)
-	} else {
-		return errors.New("system not pausing")
+func (s *System[T]) stop() {
+	if s.getState() < SystemStateDestroy {
+		s.setState(SystemStateDestroy)
 	}
-	return nil
 }
 
-func (s *System[T, TP]) getState() SystemState {
+func (s *System[T]) getState() SystemState {
 	return s.state
 }
 
-func (s *System[T, TP]) setState(state SystemState) {
+func (s *System[T]) setState(state SystemState) {
 	s.state = state
 }
 
-func (s *System[T, TP]) setExecuting(isExecuting bool) {
+func (s *System[T]) setBroken() {
+	s.valid = false
+}
+
+func (s *System[T]) isValid() bool {
+	return s.valid
+}
+
+func (s *System[T]) setExecuting(isExecuting bool) {
 	s.executing = isExecuting
 }
 
-func (s *System[T, TP]) isExecuting() bool {
+func (s *System[T]) isExecuting() bool {
 	return s.executing
 }
 
-func (s *System[T, TP]) Requirements() map[reflect.Type]IRequirement {
+func (s *System[T]) GetRequirements() map[reflect.Type]IRequirement {
 	return s.requirements
 }
 
-func (s *System[T, TP]) IsRequire(com IComponent) (IRequirement, bool) {
+func (s *System[T]) IsRequire(com IComponent) bool {
 	return s.isRequire(com.Type())
 }
 
-func (s *System[T, TP]) isRequire(typ reflect.Type) (IRequirement, bool) {
-	r, ok := s.requirements[typ]
-	return r, ok
+func (s *System[T]) isRequire(typ reflect.Type) bool {
+	_, ok := s.requirements[typ]
+	return ok
 }
 
-func (s *System[T, TP]) baseInit(world *ecsWorld, ins ISystem) {
+func (s *System[T]) baseInit(world *worldBase, ins ISystem) {
 	s.requirements = map[reflect.Type]IRequirement{}
-	s.events = make(map[CustomEventName]CustomEventHandler)
-	s.eventQueue = list.New()
+	s.eventsSync = make([]func(api *SystemApi), 0)
+	s.eventsAsync = make([]func(api *SystemApi), 0)
+	s.getterCache = NewGetterCache(len(s.requirements))
 
 	if ins.Order() == OrderInvalid {
 		s.setOrder(OrderDefault)
 	}
 	s.world = world
 
-	s.EventRegister(SystemCustomEventPause, func(i []interface{}) {
-		err := s.pause(i)
-		if err != nil {
-			Log.Error(err)
-		}
-	})
-	s.EventRegister(SystemCustomEventResume, func(i []interface{}) {
-		err := s.resume(i)
-		if err != nil {
-			Log.Error(err)
-		}
-	})
-	s.EventRegister(SystemCustomEventStop, func(i []interface{}) {
-		err := s.stop(i)
-		if err != nil {
-			Log.Error(err)
-		}
-	})
+	s.valid = true
 
+	initializer := SystemInitConstraint{}
+	is := ISystem(s)
+	initializer.sys = &is
 	if i, ok := ins.(InitReceiver); ok {
 		err := TryAndReport(func() {
-			i.Init()
+			i.Init(initializer)
 		})
 		if err != nil {
 			Log.Error(err)
 		}
 	}
+	*initializer.sys = nil
+	initializer.sys = nil
 
-	s.state = SystemStateInit
+	s.state = SystemStateStart
 }
 
-func (s *System[T, TP]) Type() reflect.Type {
+func (s *System[T]) getPointer() unsafe.Pointer {
+	return unsafe.Pointer(s)
+}
+
+func (s *System[T]) Type() reflect.Type {
 	if s.realType == nil {
 		s.realType = TypeOf[T]()
 	}
 	return s.realType
 }
 
-func (s *System[T, TP]) setOrder(order Order) {
+func (s *System[T]) setOrder(order Order) {
 	if s.isInitialized() {
 		return
 	}
@@ -275,36 +326,27 @@ func (s *System[T, TP]) setOrder(order Order) {
 	s.order = order
 }
 
-func (s *System[T, TP]) Order() Order {
+func (s *System[T]) Order() Order {
 	return s.order
 }
 
-func (s *System[T, TP]) World() IWorld {
+func (s *System[T]) World() iWorldBase {
 	return s.world
 }
 
-func (s *System[T, TP]) CheckoutComponent(info *EntityInfo, com IComponent) IComponent {
-	return s.checkoutComponent(info, com)
-}
-
-func (s *System[T, TP]) checkoutComponent(entity *EntityInfo, com IComponent) IComponent {
-	_, isRequire := s.IsRequire(com)
-	if !isRequire {
-		return nil
-	}
-
-	return entity.getComponent(com)
-}
-
-func (s *System[T, TP]) GetEntityInfo(entity Entity) *EntityInfo {
-	return s.world.GetEntityInfo(entity)
+func (s *System[T]) GetEntityInfo(entity Entity) (*EntityInfo, bool) {
+	return s.world.getEntityInfo(entity)
 }
 
 // get optimizer
-func (s *System[T, TP]) getOptimizer() *OptimizerReporter {
+func (s *System[T]) getOptimizer() *OptimizerReporter {
 	if s.optimizerReporter == nil {
 		s.optimizerReporter = &OptimizerReporter{}
 		s.optimizerReporter.init()
 	}
 	return s.optimizerReporter
+}
+
+func (s *System[T]) getGetterCache() *GetterCache {
+	return s.getterCache
 }

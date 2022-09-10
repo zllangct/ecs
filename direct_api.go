@@ -1,142 +1,85 @@
 package ecs
 
 import (
-	"errors"
-	"fmt"
+	"reflect"
 	"unsafe"
 )
 
-// runtime api
-
-func Configure(config *RuntimeConfig) {
-	Runtime.Configure(config)
-}
-
-func Run() {
-	Runtime.run()
-}
-
-func Stop() {
-	Runtime.stop()
-}
-
-func CreateWorld(config *WorldConfig) IWorld {
-	return Runtime.newWorld(config)
-}
-
-func DestroyWorld(world IWorld) {
-	Runtime.destroyWorld(world.(*ecsWorld))
-}
-
-func AddJob(job func(), hashKey ...uint32) {
-	Runtime.addJob(job, hashKey...)
-}
-
-// world api
-
-func WorldRun(world IWorld) {
-	world.Run()
-}
-
-func GetWorldID(world IWorld) int64 {
-	return world.GetID()
-}
-
-func GetWorldStatus(world IWorld) WorldStatus {
-	return world.GetStatus()
-}
-
-func RegisterSystem[T SystemObject](world IWorld, order ...Order) {
+func RegisterSystem[T SystemObject](world iWorldBase, order ...Order) {
 	world.registerForT(new(T), order...)
 }
 
-func GetSystem[T SystemObject](w IWorld) (ISystem, bool) {
-	return w.GetSystem(TypeOf[T]())
+func AddFreeComponent[T FreeComponentObject, TP FreeComponentPointer[T]](world iWorldBase, component *T) {
+	world.addFreeComponent(TP(component))
 }
 
-func GetEntityInfo(world IWorld, entity Entity) *EntityInfo {
-	return world.GetEntityInfo(entity)
+func GetComponent[T ComponentObject](sys ISystem, entity Entity) *T {
+	return GetRelated[T](sys, entity)
 }
 
-func AddFreeComponent[T FreeComponentObject, TP FreeComponentPointer[T]](world IWorld, component *T) {
-	world.AddFreeComponent(TP(component))
-}
-
-// entity api
-
-func NewEntity(world IWorld) *EntityInfo {
-	return newEntityInfo(world.(*ecsWorld))
-}
-
-func EntityDestroyByInfo(info *EntityInfo) {
-	info.Destroy()
-}
-
-func EntityDestroy(world IWorld, entity Entity) {
-	info := world.GetEntityInfo(entity)
-	if info != nil {
-		info.Destroy()
-	}
-}
-
-// system api
-
-func NewPeripheralSystem[T PeripheralSystemObject, TP PeripheralSystemPointer[T]]() *T {
-	var ins T
-	psys := IPeripheralSystem(TP(&ins))
-	psys.init()
-	if i, ok := psys.(InitReceiver); ok {
-		i.Init()
-	}
-	return &ins
-}
-
-func GetInterestedComponents[T ComponentObject, TP ComponentPointer[T]](sys ISystem, outError ...*error) Iterator[T, TP] {
-	setError := func(format string, args ...interface{}) Iterator[T, TP] {
-		if len(outError) > 0 {
-			*(outError[0]) = errors.New(fmt.Sprintf(format, args...))
-		}
-		return EmptyIter[T, TP]()
-	}
+func GetComponentAll[T ComponentObject](sys ISystem) Iterator[T] {
 	if sys.getState() == SystemStateInvalid {
-		return setError("must init system first")
+		return EmptyIter[T]()
 	}
 	if !sys.isExecuting() {
-		return setError("must called in system")
+		return EmptyIter[T]()
 	}
 	typ := GetType[T]()
-	readOnly := false
-	if r, ok := sys.Requirements()[typ]; !ok {
-		return setError("not require, typ:", typ)
-	} else {
-		readOnly = r.getPermission() == ComponentReadOnly
+	r, ok := sys.GetRequirements()[typ]
+	if !ok {
+		return EmptyIter[T]()
 	}
-	if sys.World() == nil {
-		return setError("world is nil")
-	}
-	c := sys.World().getComponents(typ)
+
+	c := sys.World().getComponentSet(typ)
 	if c == nil {
-		return EmptyIter[T, TP]()
+		return EmptyIter[T]()
 	}
-	return NewIterator[T, TP](c.(*Collection[T]), readOnly)
+	return NewComponentSetIterator[T](c.(*ComponentSet[T]), r.getPermission() == ComponentReadOnly)
 }
 
-func GetRelatedComponent[T ComponentObject](sys ISystem, entity *EntityInfo) *T {
-	if entity == nil {
-		return nil
-	}
+func GetRelated[T ComponentObject](sys ISystem, entity Entity) *T {
 	typ := TypeOf[T]()
-	r, isRequire := sys.isRequire(typ)
+	isRequire := sys.isRequire(typ)
 	if !isRequire {
 		return nil
 	}
-	c := entity.getComponentByType(typ)
-	var ret *T
-	if r.getPermission() == ComponentReadOnly {
-		temp := *(*T)((*iface)(unsafe.Pointer(&c)).data)
-		ret = &temp
+	var cache *ComponentGetter[T]
+	cacheMap := sys.getGetterCache()
+	c := cacheMap.Get(typ)
+	if c != nil {
+		cache = (*ComponentGetter[T])(c)
 	} else {
-		ret = (*T)((*iface)(unsafe.Pointer(&c)).data)
+		cache = NewComponentGetter[T](sys)
+		cacheMap.Add(typ, unsafe.Pointer(cache))
 	}
-	return ret
+	return cache.Get(entity)
+}
+
+func BindUtility[T UtilityObject, TP UtilityPointer[T]](si SystemInitConstraint) {
+	if si.isValid() {
+		panic("out of initialization stage")
+	}
+	utility := TP(new(T))
+	sys := si.getSystem()
+	utility.setSystem(sys)
+	utility.setWorld(sys.World())
+	sys.setUtility(utility)
+	sys.World().base().utilities[utility.Type()] = utility
+}
+
+func GetUtility[T UtilityObject](getter IUtilityGetter) (*T, bool) {
+	w := getter.getWorld()
+	if w == nil {
+		return nil, false
+	}
+	u, ok := w.getUtilityForT(TypeOf[T]())
+	if !ok {
+		return nil, false
+	}
+	return (*T)(u), true
+}
+
+func TypeOf[T any]() reflect.Type {
+	ins := (*T)(nil)
+	return reflect.TypeOf(ins).Elem()
 }

@@ -5,24 +5,23 @@ import (
 )
 
 type opTask struct {
-	target *EntityInfo
+	target Entity
 	com    IComponent
 	op     CollectionOperate
 	next   *opTask
 }
 
 func (o *opTask) Reset() {
-	o.target = nil
+	o.target = 0
 	o.com = nil
 	o.op = CollectionOperateNone
 	o.next = nil
 }
 
 type opTaskList struct {
-	comType ComponentType
-	len     int
-	head    *opTask
-	tail    *opTask
+	len  int
+	head *opTask
+	tail *opTask
 }
 
 func (o *opTaskList) Len() int {

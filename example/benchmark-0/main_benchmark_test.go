@@ -2,8 +2,7 @@ package main
 
 import (
 	"github.com/zllangct/ecs"
-	"net/http"
-	runtime2 "runtime"
+	"runtime"
 	"testing"
 	"time"
 )
@@ -33,58 +32,62 @@ func BenchmarkNormalParallel(b *testing.B) {
 
 	var delta time.Duration
 	var ts time.Time
-	var frameInterval time.Duration = time.Millisecond * 33
 	for i := 0; i < b.N; i++ {
 		ts = time.Now()
-		game.doFrame(true, uint64(i), frameInterval)
+		game.doFrame(true, uint64(i), delta)
 		delta = time.Since(ts)
-		if frameInterval-delta > 0 {
-			delta = frameInterval
-		}
 	}
 }
 
 func BenchmarkEcs(b *testing.B) {
-	go func() {
-		http.ListenAndServe(":6060", nil)
-	}()
+	//go func() {
+	//	http.ListenAndServe(":6060", nil)
+	//}()
 
 	game := &GameECS{}
 	config := ecs.NewDefaultWorldConfig()
-	config.CollectionVersion = 1
+	config.Debug = false
 	game.init(config)
+
+	game.world.Startup()
 
 	b.ResetTimer()
 
 	var delta time.Duration
+	_ = delta
 	var ts time.Time
 	for i := 0; i < b.N; i++ {
 		ts = time.Now()
 		game.attack()
-		doFrame(game.world, uint64(i), delta)
+		game.world.Update()
 		delta = time.Since(ts)
 	}
 }
 
 func BenchmarkEcsSingleCore(b *testing.B) {
-	go func() {
-		http.ListenAndServe(":6060", nil)
-	}()
+	//go func() {
+	//	http.ListenAndServe(":6060", nil)
+	//}()
+
+	runtime.GOMAXPROCS(1)
 
 	game := &GameECS{}
 	config := ecs.NewDefaultWorldConfig()
+	config.Debug = false
 	config.CollectionVersion = 1
 	game.init(config)
 
-	runtime2.GOMAXPROCS(1)
+	game.world.Startup()
+
 	b.ResetTimer()
 
 	var delta time.Duration
+	_ = delta
 	var ts time.Time
 	for i := 0; i < b.N; i++ {
 		ts = time.Now()
 		game.attack()
-		doFrame(game.world, uint64(i), delta)
+		game.world.Update()
 		delta = time.Since(ts)
 	}
 }

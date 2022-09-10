@@ -8,7 +8,7 @@ import (
 
 var emptyGroup []ISystem
 
-// system tree node
+// Node system tree node
 type Node struct {
 	parent   *Node
 	children []*Node
@@ -16,8 +16,8 @@ type Node struct {
 }
 
 func (p *Node) isFriend(node *Node) bool {
-	for com, r := range p.val.Requirements() {
-		for comTarget, rTarget := range node.val.Requirements() {
+	for com, r := range p.val.GetRequirements() {
+		for comTarget, rTarget := range node.val.GetRequirements() {
 			if comTarget == com {
 				if r.getPermission() == ComponentReadOnly && rTarget.getPermission() == ComponentReadOnly {
 					continue
@@ -47,7 +47,7 @@ func (p *Node) attach(node *Node) {
 	}
 }
 
-// system group ordered by interrelation
+// SystemGroup system group ordered by interrelation
 type SystemGroup struct {
 	lock    sync.Mutex
 	systems []*Node
@@ -75,13 +75,13 @@ func (p *SystemGroup) refCount(rqs map[reflect.Type]IRequirement) int {
 	return ref
 }
 
-//initialise system group iterator
+// initialise system group iterator
 func (p *SystemGroup) reset() {
 	//need resort
 	if !p.ordered {
 		sort.Slice(p.systems, func(i, j int) bool {
-			return p.refCount(p.systems[i].val.Requirements()) >
-				p.refCount(p.systems[j].val.Requirements())
+			return p.refCount(p.systems[i].val.GetRequirements()) >
+				p.refCount(p.systems[j].val.GetRequirements())
 		})
 		if p.root == nil {
 			p.root = &Node{
@@ -107,7 +107,7 @@ func (p *SystemGroup) reset() {
 	p.top = p.root.children
 }
 
-//Pop a batch of independent system array
+// Pop a batch of independent system array
 func (p *SystemGroup) next() []ISystem {
 	if p.top == nil {
 		return emptyGroup
@@ -124,7 +124,16 @@ func (p *SystemGroup) next() []ISystem {
 	return systems
 }
 
-//get all systems
+func (p *SystemGroup) batchCount() int {
+	batch := 0
+	sg := *p
+	for ss := sg.next(); len(ss) > 0; ss = sg.next() {
+		batch++
+	}
+	return batch
+}
+
+// get all systems
 func (p *SystemGroup) all() []ISystem {
 	systems := make([]ISystem, len(p.systems))
 	for i, n := range p.systems {
@@ -133,12 +142,12 @@ func (p *SystemGroup) all() []ISystem {
 	return systems
 }
 
-//insert system
+// insert system
 func (p *SystemGroup) insert(sys ISystem) {
 	//set cluster no ordered
 	p.ordered = false
 	//get system's required components
-	rqs := sys.Requirements()
+	rqs := sys.GetRequirements()
 	if len(rqs) == 0 {
 		//panic("invalid system")
 	}
@@ -158,7 +167,7 @@ func (p *SystemGroup) insert(sys ISystem) {
 	p.systems = append(p.systems, node)
 }
 
-//has system
+// has system
 func (p *SystemGroup) has(sys ISystem) bool {
 	for _, system := range p.systems {
 		if system.val.Type() == sys.Type() {
@@ -168,10 +177,10 @@ func (p *SystemGroup) has(sys ISystem) bool {
 	return false
 }
 
-//remvoe system
+// remove system
 func (p *SystemGroup) remove(sys ISystem) {
 	//get system's required components
-	rqs := sys.Requirements()
+	rqs := sys.GetRequirements()
 	if len(rqs) == 0 {
 		//panic("invalid system")
 	}

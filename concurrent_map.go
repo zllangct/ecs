@@ -192,7 +192,7 @@ func (e *entry[V]) delete() (value V, ok bool) {
 	}
 }
 
-func (m *Map[K, V]) Range(f func(key K, value V) bool) {
+func (m *Map[K, V]) Range(f func(key K, value V) bool) bool {
 	read, _ := m.read.Load().(readOnly[K, V])
 	if read.amended {
 		m.mu.Lock()
@@ -212,9 +212,10 @@ func (m *Map[K, V]) Range(f func(key K, value V) bool) {
 			continue
 		}
 		if !f(k, v) {
-			break
+			return false
 		}
 	}
+	return true
 }
 
 func (m *Map[K, V]) missLocked() {

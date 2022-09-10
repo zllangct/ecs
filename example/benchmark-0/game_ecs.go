@@ -2,23 +2,16 @@ package main
 
 import (
 	"github.com/zllangct/ecs"
-	"time"
 	_ "unsafe"
 )
 
 type GameECS struct {
-	world    ecs.IWorld
+	world    *ecs.SyncWorld
 	entities []ecs.Entity
 }
 
-//go:linkname doFrame github.com/zllangct/ecs.doFrameForBenchmark
-func doFrame(w ecs.IWorld, frame uint64, lastDelta time.Duration)
-
 func (g *GameECS) init(config *ecs.WorldConfig) {
-	ecs.Configure(ecs.NewDefaultRuntimeConfig())
-	ecs.Run()
-
-	g.world = ecs.CreateWorld(config)
+	g.world = ecs.NewSyncWorld(config)
 
 	ecs.RegisterSystem[MoveSystem](g.world)
 	ecs.RegisterSystem[DamageSystem](g.world)
@@ -27,6 +20,11 @@ func (g *GameECS) init(config *ecs.WorldConfig) {
 	ecs.RegisterSystem[Test3System](g.world)
 	ecs.RegisterSystem[Test4System](g.world)
 	ecs.RegisterSystem[Test5System](g.world)
+	ecs.RegisterSystem[Test6System](g.world)
+	ecs.RegisterSystem[Test7System](g.world)
+	ecs.RegisterSystem[Test8System](g.world)
+	ecs.RegisterSystem[Test9System](g.world)
+	ecs.RegisterSystem[Test10System](g.world)
 
 	DataGenerateECS(g)
 }
@@ -36,11 +34,8 @@ func (g *GameECS) attack() {
 		ActionType: 1,
 	}
 	for _, entity := range g.entities {
-		info := ecs.GetEntityInfo(g.world, entity)
-		err := info.Add(act)
-		if err != nil {
-			ecs.Log.Infof("%+v", err)
-		}
+		info, _ := g.world.GetEntityInfo(entity)
+		info.Add(act)
 	}
 }
 
@@ -71,6 +66,7 @@ func DataGenerateECS(game *GameECS) {
 
 		e := game.world.NewEntity()
 		e.Add(p, m, h, f, t1, t2, t3, t4, t5)
+
 		game.entities = append(game.entities, e.Entity())
 	}
 }

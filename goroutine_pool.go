@@ -4,16 +4,22 @@ import (
 	runtime2 "runtime"
 )
 
-//Worker goroutine struct.
+// Worker goroutine struct.
 type Worker struct {
 	p        *Pool
 	jobQueue chan func()
 	stop     chan struct{}
 }
 
-//Start goroutine pool.
+// Start goroutine pool.
 func (w *Worker) Start() {
-	go func() {
+	c := func() (c bool) {
+		//defer func() {
+		//	if r := recover(); r != nil {
+		//		Log.Error(r)
+		//	}
+		//	c = true
+		//}()
 		var job func()
 		for {
 			select {
@@ -22,15 +28,15 @@ func (w *Worker) Start() {
 			case <-w.stop:
 				return
 			}
-			//Try(job, func(err error) {
-			//	Log.Error(err)
-			//})
 			job()
 		}
 	}()
+	if c {
+		go w.Start()
+	}
 }
 
-//Pool is goroutine pool config.
+// Pool is goroutine pool config.
 type Pool struct {
 	size         uint32
 	jobQueueSize uint32
@@ -38,15 +44,15 @@ type Pool struct {
 	workers      []*Worker
 }
 
-//NewPool news goroutine pool
+// NewPool news goroutine pool
 func NewPool(size uint32, jobQueueSize uint32) *Pool {
 	if size == 0 {
 		size = uint32(2 * runtime2.NumCPU())
 	}
 	if jobQueueSize == 0 {
-		jobQueueSize = 20
+		jobQueueSize = uint32(runtime2.NumCPU())
 	}
-	jobQueue := make(chan func(), jobQueueSize)
+	jobQueue := make(chan func(), jobQueueSize*size)
 	workerQueue := make([]*Worker, size)
 
 	pool := &Pool{
@@ -77,12 +83,12 @@ func (p *Pool) Add(job func(), hashKey ...uint32) {
 	p.jobQueue <- job
 }
 
-//Start all workers
+// Start all workers
 func (p *Pool) Start() {
 	var worker *Worker
 	for i := 0; i < cap(p.workers); i++ {
 		worker = p.workers[i]
-		worker.Start()
+		go worker.Start()
 	}
 }
 
@@ -91,7 +97,7 @@ func (p *Pool) Size() uint32 {
 	return p.size
 }
 
-//Release rtStop all workers
+// Release rtStop all workers
 func (p *Pool) Release() {
 	for _, worker := range p.workers {
 		worker.stop <- struct{}{}

@@ -8,41 +8,65 @@ type Event struct {
 }
 
 type InitReceiver interface {
-	Init()
+	Init(initializer SystemInitConstraint)
 }
 
-type PreStartReceiver interface {
-	PreStart(event Event)
+type SyncBeforeStartReceiver interface {
+	SyncBeforeStart(event Event)
 }
 
 type StartReceiver interface {
 	Start(event Event)
 }
 
-type PostStartReceiver interface {
-	PostStart(event Event)
+type SyncAfterStartReceiver interface {
+	SyncAfterStart(event Event)
+}
+
+type SyncBeforePreUpdateReceiver interface {
+	SyncBeforePreUpdate(event Event)
 }
 
 type PreUpdateReceiver interface {
 	PreUpdate(event Event)
 }
 
+type SyncAfterPreUpdateReceiver interface {
+	SyncAfterPreUpdate(event Event)
+}
+
+type SyncBeforeUpdateReceiver interface {
+	SyncBeforeUpdate(event Event)
+}
+
 type UpdateReceiver interface {
 	Update(event Event)
+}
+
+type SyncAfterUpdateReceiver interface {
+	SyncAfterUpdate(event Event)
+}
+
+type SyncBeforePostUpdateReceiver interface {
+	SyncBeforePostUpdate(event Event)
 }
 
 type PostUpdateReceiver interface {
 	PostUpdate(event Event)
 }
 
-type PreDestroyReceiver interface {
-	PreDestroy(event Event)
+type SyncAfterPostUpdateReceiver interface {
+	SyncAfterPostUpdate(event Event)
+}
+
+type SyncBeforeDestroyReceiver interface {
+	SyncBeforeDestroy(event Event)
 }
 
 type DestroyReceiver interface {
 	Destroy(event Event)
 }
 
-type PostDestroyReceiver interface {
-	PostDestroy(event Event)
+type SyncAfterPostDestroyReceiver interface {
+	SyncAfterDestroy(event Event)
 }

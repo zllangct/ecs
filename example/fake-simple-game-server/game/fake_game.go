@@ -18,7 +18,7 @@ type Msg2Client struct {
 
 type FakeGame struct {
 	clients  sync.Map
-	world    ecs.IWorld
+	world    ecs.iWorldBase
 	chatRoom *ChatRoom
 }
 
@@ -50,7 +50,7 @@ func (f *FakeGame) InitEcs() {
 }
 
 func (f *FakeGame) EnterGame(sess *Session) {
-	info := f.world.NewEntity()
+	info := f.world.newEntity()
 	info.Add(&PlayerComponent{
 		SessionID: sess.SessionID,
 	})

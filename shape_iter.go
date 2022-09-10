@@ -1,76 +1,110 @@
 package ecs
 
-type IShapeIterator[T ShapeObject, TP ShapeObjectPointer[T]] interface {
+import "unsafe"
+
+type IShapeIterator[T any] interface {
 	Begin() *T
 	Val() *T
 	Next() *T
 	End() bool
-	Empty() bool
 }
 
-type ShapeIter[T ShapeObject, TP ShapeObjectPointer[T]] struct {
-	shapes []T
-	len    int
-	offset int
-	req    []IRequirement
-	cur    *T
-	end    bool
+type ShapeIter[T any] struct {
+	indices      ShapeIndices
+	maxLen       int
+	offset       int
+	begin        int
+	mainKeyIndex int
+	cur          *T
 }
 
-func EmptyShapeIter[T ShapeObject, TP ShapeObjectPointer[T]]() IShapeIterator[T, TP] {
-	return &ShapeIter[T, TP]{}
+func EmptyShapeIter[T any]() IShapeIterator[T] {
+	return &ShapeIter[T]{}
 }
 
-func NewShapeIterator[T ShapeObject, TP ShapeObjectPointer[T]](shapes []T) IShapeIterator[T, TP] {
-	iter := &ShapeIter[T, TP]{
-		len:    len(shapes),
-		shapes: shapes,
-		offset: 0,
-	}
-
-	if iter.len != 0 {
-		iter.cur = &iter.shapes[0]
+func NewShapeIterator[T any](indices ShapeIndices, mainKeyIndex int) IShapeIterator[T] {
+	iter := &ShapeIter[T]{
+		indices:      indices,
+		maxLen:       indices.containers[mainKeyIndex].Len(),
+		mainKeyIndex: mainKeyIndex,
+		offset:       0,
 	}
 
 	return iter
 }
 
-func (i *ShapeIter[T, TP]) Empty() bool {
-	if i.len == 0 {
+func (s *ShapeIter[T]) tryNext() *T {
+	skip := false
+	find := false
+	var p unsafe.Pointer
+	var ec *EmptyComponent
+	for i := s.offset; i < s.maxLen; i++ {
+		p = s.indices.containers[s.mainKeyIndex].getPointer(int64(s.offset))
+		ec = (*EmptyComponent)(p)
+		if s.indices.readOnly[s.mainKeyIndex] {
+			*(**byte)(unsafe.Add(unsafe.Pointer(s.cur), s.indices.subOffset[s.mainKeyIndex])) = &(*(*byte)(p))
+		} else {
+			*(**byte)(unsafe.Add(unsafe.Pointer(s.cur), s.indices.subOffset[s.mainKeyIndex])) = (*byte)(p)
+		}
+		entity := ec.Owner()
+		skip = false
+		for i := 0; i < len(s.indices.subTypes); i++ {
+			if i == s.mainKeyIndex {
+				continue
+			}
+			subPointer := s.indices.containers[i].getPointerByEntity(entity)
+			if subPointer == nil {
+				skip = true
+				break
+			}
+			if s.indices.readOnly[i] {
+				*(**byte)(unsafe.Add(unsafe.Pointer(s.cur), s.indices.subOffset[i])) = &(*(*byte)(subPointer))
+			} else {
+				*(**byte)(unsafe.Add(unsafe.Pointer(s.cur), s.indices.subOffset[i])) = (*byte)(subPointer)
+			}
+		}
+		if !skip {
+			s.offset = i
+			find = true
+			break
+		}
+	}
+	if !find {
+		s.cur = nil
+	}
+
+	return s.cur
+}
+
+func (s *ShapeIter[T]) End() bool {
+	if s.cur == nil {
 		return true
 	}
 	return false
 }
 
-func (i *ShapeIter[T, TP]) End() bool {
-	if i.offset > i.len-1 || i.len == 0 {
-		return true
+func (s *ShapeIter[T]) Begin() *T {
+	if s.maxLen != 0 {
+		s.offset = 0
+		s.cur = new(T)
+		s.tryNext()
 	}
-	return false
+	return s.cur
 }
 
-func (i *ShapeIter[T, TP]) Begin() *T {
-	if i.len != 0 {
-		i.offset = 0
-		i.cur = &i.shapes[i.offset]
+func (s *ShapeIter[T]) Val() *T {
+	if s.cur == nil || !s.End() {
+		s.Begin()
 	}
-	return i.cur
+	return s.cur
 }
 
-func (i *ShapeIter[T, TP]) Val() *T {
-	return i.cur
-}
-
-func (i *ShapeIter[T, TP]) Next() *T {
-	i.offset++
-	if !i.End() {
-		i.cur = &i.shapes[i.offset]
+func (s *ShapeIter[T]) Next() *T {
+	s.offset++
+	if !s.End() {
+		s.tryNext()
 	} else {
-		i.cur = nil
+		s.cur = nil
 	}
-	return i.cur
-}
-
-func (i *ShapeIter[T, TP]) Len() int {
-	return i.len
+	return s.cur
 }

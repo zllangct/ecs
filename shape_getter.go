@@ -1,110 +1,171 @@
 package ecs
 
 import (
-	"errors"
 	"reflect"
-	"sync"
+	"unsafe"
 )
 
-type IShapeGetter interface {
-	base() *getterBase
+type IShape interface {
+	base() *shapeBase
 	getType() reflect.Type
 }
 
-type getterBase struct {
+type shapeBase struct {
 	sys        ISystem
 	executeNum int64
 	typ        reflect.Type
-	req        []IRequirement
 }
 
-func (s *getterBase) base() *getterBase {
+func (s *shapeBase) base() *shapeBase {
 	return s
 }
 
-func (s *getterBase) init(typ reflect.Type, getter IShapeGetter) {
+func (s *shapeBase) init(typ reflect.Type, getter IShape) {
 	opt := s.sys.getOptimizer()
 	if _, ok := opt.shapeUsage[typ]; !ok {
 		opt.shapeUsage[typ] = getter
 	}
 }
 
-var shapeCaches = sync.Map{}
-
-type ShapeGetter[T ShapeObject, TP ShapeObjectPointer[T]] struct{ getterBase }
-
-func NewShapeGetter[T ShapeObject, TP ShapeObjectPointer[T]](sys ISystem) (*ShapeGetter[T, TP], error) {
-	getter := &ShapeGetter[T, TP]{getterBase{sys: sys}}
-	typ := reflect.TypeOf(getter)
-	getter.init(typ, getter)
-	var temp T
-	var req []IRequirement
-	sysReq := sys.Requirements()
-	for _, t := range TP(&temp).eleTypes() {
-		if r, ok := sysReq[t]; ok {
-			req = append(req, r)
-		} else {
-			return nil, errors.New("component not interested")
-		}
-	}
-	getter.req = req
-	return getter, nil
+type ShapeIndices struct {
+	subTypes   []uint16
+	subOffset  []uintptr
+	containers []IComponentSet
+	readOnly   []bool
 }
 
-func (s *ShapeGetter[T, TP]) getType() reflect.Type {
+type Shape[T any] struct {
+	shapeBase
+	initializer  SystemInitConstraint
+	mainKeyIndex int
+	subTypes     []uint16
+	subOffset    []uintptr
+	containers   []IComponentSet
+	readOnly     []bool
+	cur          *T
+	valid        bool
+}
+
+func NewShape[T any](initializer SystemInitConstraint) *Shape[T] {
+	if initializer.isValid() {
+		panic("out of initialization stage")
+	}
+	sys := initializer.getSystem()
+	getter := &Shape[T]{
+		shapeBase:   shapeBase{sys: sys},
+		initializer: initializer,
+	}
+
+	typ := reflect.TypeOf(getter)
+	getter.init(typ, getter)
+
+	sysReq := sys.GetRequirements()
+	if sysReq == nil {
+		return nil
+	}
+
+	getter.cur = new(T)
+	typIns := reflect.TypeOf(*getter.cur)
+	for i := 0; i < typIns.NumField(); i++ {
+		field := typIns.Field(i)
+		if !field.Type.Implements(reflect.TypeOf((*IComponent)(nil)).Elem()) || !sys.isRequire(field.Type.Elem()) {
+			continue
+		}
+		if r, ok := sysReq[field.Type.Elem()]; ok {
+			if r.getPermission() == ComponentReadOnly {
+				getter.readOnly = append(getter.readOnly, true)
+			} else {
+				getter.readOnly = append(getter.readOnly, false)
+			}
+		}
+		meta := sys.World().getComponentMetaInfoByType(field.Type.Elem())
+		getter.subTypes = append(getter.subTypes, meta.it)
+		getter.subOffset = append(getter.subOffset, field.Offset)
+	}
+
+	getter.containers = make([]IComponentSet, len(getter.subTypes))
+
+	if len(getter.subTypes) == 0 {
+		return nil
+	}
+
+	getter.valid = true
+
+	return getter
+}
+
+func (s *Shape[T]) IsValid() bool {
+	return s.valid
+}
+
+func (s *Shape[T]) getType() reflect.Type {
 	if s.typ == nil {
-		s.typ = TypeOf[ShapeGetter[T, TP]]()
+		s.typ = TypeOf[Shape[T]]()
 	}
 	return s.typ
 }
 
-func (s *ShapeGetter[T, TP]) Get() IShapeIterator[T, TP] {
+func (s *Shape[T]) Get() IShapeIterator[T] {
 	s.executeNum++
-	var min ICollection
-	for _, r := range s.req {
-		c := s.sys.World().getComponents(r.Type())
+
+	if !s.valid {
+		return EmptyShapeIter[T]()
+	}
+
+	var mainComponent ICollection
+	var mainKeyIndex int
+	for i := 0; i < len(s.subTypes); i++ {
+		c := s.sys.World().getComponentSetByIntType(s.subTypes[i])
 		if c == nil || c.Len() == 0 {
-			return EmptyShapeIter[T, TP]()
+			return EmptyShapeIter[T]()
 		}
-		if min == nil || min.Len() > c.Len() {
-			min = c
+		if mainComponent == nil || mainComponent.Len() > c.Len() {
+			mainComponent = c
+			mainKeyIndex = i
 		}
+		s.containers[i] = c
 	}
 
-	if min.Len() == 0 {
-		return EmptyShapeIter[T, TP]()
+	if s.mainKeyIndex == 0 {
+		mainKeyIndex = s.mainKeyIndex
+		mainComponent = s.containers[mainKeyIndex]
 	}
 
-	var cache []T
-	obj, ok := shapeCaches.Load(TypeOf[T]())
-	if ok {
-		cache = obj.([]T)
-	} else {
-		cache, ok = s.cache(min)
-		shapeCaches.LoadOrStore(TypeOf[T](), cache)
-	}
-
-	return NewShapeIterator[T, TP](cache)
+	return NewShapeIterator[T](
+		ShapeIndices{
+			subTypes:   s.subTypes,
+			subOffset:  s.subOffset,
+			containers: s.containers,
+			readOnly:   s.readOnly,
+		},
+		mainKeyIndex)
 }
 
-func (s *ShapeGetter[T, TP]) cache(guide ICollection) ([]T, bool) {
-	var cache []T = make([]T, guide.Len())
-	var err error = nil
-	index := 0
-	guide.Range(func(ele any) bool {
-		c, ok := ele.(IComponent)
-		if !ok {
-			err = errors.New("element not component")
-			return false
-		}
-		ok = TP(&cache[index]).parse(c.Owner(), s.req)
-		if ok {
-			index++
-		}
-		return true
-	})
-	if err != nil {
-		return nil, false
+func (s *Shape[T]) GetSpecific(entity Entity) (*T, bool) {
+	if !s.valid {
+		return s.cur, false
 	}
-	return cache[:index], true
+	for i := 0; i < len(s.subTypes); i++ {
+		subPointer := s.containers[i].getPointerByEntity(entity)
+		if subPointer == nil {
+			return s.cur, false
+		}
+		if s.readOnly[i] {
+			*(**byte)(unsafe.Add(unsafe.Pointer(s.cur), s.subOffset[i])) = &(*(*byte)(subPointer))
+		} else {
+			*(**byte)(unsafe.Add(unsafe.Pointer(s.cur), s.subOffset[i])) = (*byte)(subPointer)
+		}
+	}
+	return s.cur, true
+}
+
+func (s *Shape[T]) SetGuide(component IComponent) *Shape[T] {
+	meta := s.initializer.getSystem().World().getComponentMetaInfoByType(component.Type())
+	for i, r := range s.subTypes {
+		if r == meta.it {
+			s.mainKeyIndex = i
+			return s
+		}
+	}
+	return s
 }

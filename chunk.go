@@ -12,7 +12,7 @@ const (
 	ChunkAddCodeInvalidElement
 )
 
-type Chunk[T ComponentObject, TP ComponentPointer[T]] struct {
+type Chunk[T ComponentObject] struct {
 	data    []T
 	ids     map[int64]int64
 	idx2id  map[int64]int64
@@ -20,14 +20,14 @@ type Chunk[T ComponentObject, TP ComponentPointer[T]] struct {
 	max     int64
 	eleSize uintptr
 	pend    uintptr
-	pre     *Chunk[T, TP]
-	next    *Chunk[T, TP]
+	pre     *Chunk[T]
+	next    *Chunk[T]
 }
 
-func NewChunk[T ComponentObject, TP ComponentPointer[T]]() *Chunk[T, TP] {
+func NewChunk[T ComponentObject]() *Chunk[T] {
 	size := TypeOf[T]().Size()
 	max := ChunkSize / size
-	c := &Chunk[T, TP]{
+	c := &Chunk[T]{
 		data:    make([]T, max, max),
 		eleSize: size,
 		max:     int64(max),
@@ -37,7 +37,7 @@ func NewChunk[T ComponentObject, TP ComponentPointer[T]]() *Chunk[T, TP] {
 	return c
 }
 
-func (c *Chunk[T, TP]) Add(element *T, id int64) (*T, int) {
+func (c *Chunk[T]) Add(element *T, id int64) (*T, int) {
 	if uintptr(len(c.data)) >= c.pend+c.eleSize {
 		c.data[c.pend+1] = *element
 	} else {
@@ -52,7 +52,7 @@ func (c *Chunk[T, TP]) Add(element *T, id int64) (*T, int) {
 	return real, ChunkAddCodeSuccess
 }
 
-func (c *Chunk[T, TP]) Remove(id int64) {
+func (c *Chunk[T]) Remove(id int64) {
 	if id < 0 {
 		return
 	}
@@ -72,7 +72,7 @@ func (c *Chunk[T, TP]) Remove(id int64) {
 	c.len--
 }
 
-func (c *Chunk[T, TP]) RemoveAndReturn(id int64) *T {
+func (c *Chunk[T]) RemoveAndReturn(id int64) *T {
 	if id < 0 {
 		return nil
 	}
@@ -94,7 +94,7 @@ func (c *Chunk[T, TP]) RemoveAndReturn(id int64) *T {
 	return r
 }
 
-func (c *Chunk[T, TP]) MoveTo(target *Chunk[T, TP]) []int64 {
+func (c *Chunk[T]) MoveTo(target *Chunk[T]) []int64 {
 	moveSize := uintptr(0)
 	if c.len < c.max {
 		moveSize = uintptr(c.len)
@@ -118,7 +118,7 @@ func (c *Chunk[T, TP]) MoveTo(target *Chunk[T, TP]) []int64 {
 	return moved
 }
 
-func (c *Chunk[T, TP]) Get(id int64) *T {
+func (c *Chunk[T]) Get(id int64) *T {
 	idx, ok := c.ids[id]
 	if !ok {
 		return nil
@@ -126,13 +126,13 @@ func (c *Chunk[T, TP]) Get(id int64) *T {
 	return &(c.data[idx])
 }
 
-func (c *Chunk[T, TP]) GetByIndex(idx int64) *T {
+func (c *Chunk[T]) GetByIndex(idx int64) *T {
 	if idx < 0 || idx >= c.len {
 		return nil
 	}
 	return &(c.data[idx])
 }
 
-func (c *Chunk[T, TP]) Len() int64 {
+func (c *Chunk[T]) Len() int64 {
 	return c.len
 }

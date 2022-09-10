@@ -11,16 +11,16 @@ type MoveSystemData struct {
 }
 
 type MoveSystem struct {
-	ecs.System[MoveSystem, *MoveSystem]
+	ecs.System[MoveSystem]
 	timeScale float64
 	deltaTime time.Duration
-	getter    *ecs.ShapeGetter[ecs.Shape2[Movement, Position], *ecs.Shape2[Movement, Position]]
+	getter    *ecs.Shape[ecs.Shape2[Movement, Position], *ecs.Shape2[Movement, Position]]
 }
 
-func (m *MoveSystem) Init() {
-	m.SetRequirements(&Position{}, &Movement{})
+func (m *MoveSystem) Init(si ecs.SystemInitConstraint) {
+	m.SetRequirements(si, &Position{}, &Movement{})
 	m.EventRegister("UpdateTimeScale", m.UpdateTimeScale)
-	getter, err := ecs.NewShapeGetter[ecs.Shape2[Movement, Position]](m)
+	getter, err := ecs.NewShape[ecs.Shape2[Movement, Position]](m)
 	if err != nil {
 		ecs.Log.Error(err)
 	}

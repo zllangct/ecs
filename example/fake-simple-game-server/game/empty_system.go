@@ -3,13 +3,13 @@ package game
 import "github.com/zllangct/ecs"
 
 type EmptySystem struct {
-	ecs.System[EmptySystem, *EmptySystem]
+	ecs.System[EmptySystem]
 	isPreStart  bool
 	isStart     bool
 	isPostStart bool
 }
 
-func (e *EmptySystem) Init() {
+func (e *EmptySystem) Init(si ecs.SystemInitConstraint) {
 	ecs.Log.Info("empty system init")
 }
 
