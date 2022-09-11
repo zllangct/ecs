@@ -543,7 +543,7 @@ type Shape1 struct {
 
 type TestSystem1 struct {
     ecs.System[TestSystem1]
-	shp 
+	shp *ecs.Shape[Shape1]
 }
 
 func (s *TestSystem1) Init(si SystemInitConstraint) {
