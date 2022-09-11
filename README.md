@@ -2,73 +2,74 @@
 这是一个ECS（Entity-Component-System）Go语言版本的实现，它聚焦于游戏领域的应用，帮助你快速构建一个高内聚、低耦合、易扩展、高性能的并行化游戏世界。
 ## Contents
 * [快速开始](#快速开始)
-    + [安装](#--)
-    + [简单示例](#----)
-* [快速了解](#----)
-    + [什么是ECS？](#---ecs-)
-    + [游戏领域为什么需要ECS？](#---------ecs-)
-    + [基本概念](#----)
-        - [World](#world)
-        - [Entity](#entity)
-        - [Component](#component)
-        - [System](#system)
-        - [Utility](#utility)
-        - [Shape](#shape)
-        - [FixedString](#fixedstring)
-        - [“下一帧生效"](#-------)
-    + [设计思路](#----)
-* [使用教程](#----)
-    + [创建一个World](#----world)
-        - [SyncWorld](#syncworld)
-        - [AsyncWorld](#asyncworld)
-        - [创建一个Entity](#----entity)
-        - [创建一个Component](#----component)
-        - [创建一个System](#----system)
-            * [支持的阶段事件：](#--------)
-            * [阶段事件特征：](#-------)
-    + [使用Utility与System交互](#--utility-system--)
-    + [ECS与外围系统交互](#ecs-------)
-        - [SyncWorld](#syncworld-1)
-        - [AsyncWorld](#asyncworld-1)
-    + [如何处理System的执行顺序](#----system-----)
-    + [如何选择不同类型的Component](#---------component)
-        - [常规组件](#----)
-        - [Free组件](#free--)
-        - [Disposable组件](#disposable--)
-        - [FreeDisposable组件](#freedisposable--)
-    + [系统中获取组件的方式](#----------)
-    + [系统间的数据流动](#--------)
-    + [一个完整的例子](#-------)
-* [Benchmark](#benchmark)
-    + [测试用的代码](#------)
-    + [测试结果](#----)
-    + [结论](#--)
-* [API文档](#api--)
-* [设计细节](#----)
-    + [架构](#--)
-    + [日志](#--)
-    + [World](#world-1)
-    + [Entity](#entity-1)
-    + [Component](#component-1)
-    + [System](#system-1)
-    + [Utility](#utility-1)
-    + [Shape](#shape-1)
-    + [Compound](#compound)
-    + [一次Update的执行流程](#--update-----)
-    + [从添加Component到生效](#---component---)
-    + [容器](#--)
-    + [迭代器](#---)
-    + [协程池](#---)
-    + [ECS序列化和反序列化](#ecs--------)
-    + [ECS中的并行](#ecs----)
-    + [Entity ID的管理](#entity-id---)
-    + [如何行为限制](#------)
-    + [优化器](#---)
-    + [统计器](#---)
-* [特别注意](#----)
-* [存在的一些问题](#-------)
-* [写在最后](#----)
-* [TODO](#todo)
+    + [安装](#安装)
+    + [简单示例](#简单示例)
+* [快速了解](#快速了解)
+    + [什么是ECS？](#什么是ECS？)
+    + [游戏领域为什么需要ECS？](#游戏领域为什么需要ECS？)
+    + [基本架构](#基本架构)
+    + [基本概念](#基本概念)
+        - [World](#World)
+        - [Entity](#Entity)
+        - [Component](#Component)
+        - [System](#System)
+        - [Utility](#Utility)
+        - [Shape](#Shape)
+        - [FixedString](#FixedString)
+        - [“下一帧生效"](#“下一帧生效")
+    + [设计思路](#设计思路)
+* [使用教程](#使用教程)
+    + [创建一个World](#创建一个World)
+        - [SyncWorld](#SyncWorld)
+        - [AsyncWorld](#AsyncWorld)
+    - [创建一个Entity](#创建一个Entity)
+    - [创建一个Component](#创建一个Component)
+    - [创建一个System](#创建一个System)
+        * [阶段事件](#阶段事件)
+        * [阶段特征](#阶段特征)
+    + [使用Utility与System交互](#使用Utility与System交互)
+    + [ECS与外围系统交互](#ECS与外围系统交互)
+        - [SyncWorld](#SyncWorld)
+        - [AsyncWorld](#AsyncWorld)
+    + [如何处理System的执行顺序](#如何处理System的执行顺序)
+    + [如何选择不同类型的Component](#如何选择不同类型的Component)
+        - [常规组件](#常规组件)
+        - [Free组件](#Free组件)
+        - [Disposable组件](#Disposable组件)
+        - [FreeDisposable组件](#FreeDisposable组件)
+    + [系统中获取组件的方式](#系统中获取组件的方式)
+    + [系统间的数据流动](#系统间的数据流动)
+    + [一个完整的例子](#一个完整的例子)
+* [Benchmark](#Benchmark)
+    + [测试用的代码](#测试用的代码)
+    + [测试结果](#测试结果)
+    + [结论](#结论)
+* [API文档](#API文档)
+* [设计细节](#设计细节)
+    + [架构](#架构)
+    + [日志](#日志)
+    + [World](#World)
+    + [Entity](#Entity)
+    + [Component](#Component)
+    + [System](#System)
+    + [Utility](#Utility)
+    + [Shape](#Shape)
+    + [Compound](#Compound)
+    + [一次Update的执行流程](#一次Update的执行流程)
+    + [从添加Component到生效](#从添加Component到生效)
+    + [容器](#容器)
+    + [迭代器](#迭代器)
+    + [协程池](#协程池)
+    + [ECS序列化和反序列化](#ECS序列化和反序列化)
+    + [ECS中的并行](#ECS中的并行)
+    + [Entity ID的管理](#Entity ID的管理)
+    + [如何行为限制](#如何行为限制)
+    + [优化器](#优化器)
+    + [统计器](#统计器)
+* [特别注意](#特别注意)
+* [存在的一些问题](#存在的一些问题)
+* [写在最后](#写在最后)
+* [TODO](#TODO)
 ## 快速开始
 ### 安装
 ```shell
@@ -243,13 +244,13 @@ world := ecs.NewSyncWorld()
 ```go
 world := ecs.NewAsyncWorld()
 ```
-#### 创建一个Entity
+### 创建一个Entity
 ```go
 // NewEntity() 创建的是一个EntityInfo类型
 info := world.NewEntity()
 entity := info.Entity()
 ```
-#### 创建一个Component
+### 创建一个Component
 ```go
 // 创建Component时需要嵌套Component[T], T为Component的实际类型，如下面的TestComponent
 type TestComponent struct {
@@ -258,7 +259,7 @@ type TestComponent struct {
     Field2 int
 }
 ```
-#### 创建一个System
+### 创建一个System
 ```go
 type TestSystem struct {
 	ecs.System[TestSystem]
@@ -286,7 +287,7 @@ func (w *TestSystem) PostUpdate(event Event) {}
 
 ```
 我们的ECS是阶段化的执行流程，提供了丰富的阶段性事件，当然最常用的是Update事件，当需要额外控制System先后顺序的时候，可以选择合适的事件混合使用。  
-##### 支持的阶段事件：
+#### 阶段事件
 * Init
 * SyncBeforeStart
 * Start
@@ -303,7 +304,7 @@ func (w *TestSystem) PostUpdate(event Event) {}
 * SyncBeforeDestroy
 * Destroy
 * SyncAfterDestroy
-##### 阶段事件特征：
+#### 阶段特征
 | 阶段事件 | 执行次数 | 执行时机              | 同步 | 异步 |
 | --- |------|-------------------| --- |---|
 | Init | 1    | World Init阶段      | √      | × |
@@ -322,7 +323,6 @@ func (w *TestSystem) PostUpdate(event Event) {}
 | SyncBeforeDestroy | 1    | World Destroy阶段    | √          | × |
 | Destroy | 1    | World Destroy阶段    | ×          | √ |
 | SyncAfterDestroy | 1    | World Destroy阶段    | √          | × |
-
 
 ### 使用Utility与System交互
 “Component中只有数据，System只有逻辑，只有System可以操作Component”这是我们ECS设计的指导思路，当所有的输入都来源于ECS的内部，所有系统之间
