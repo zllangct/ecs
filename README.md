@@ -403,7 +403,6 @@ func main() {
         u.ChangeName(entities[0], "name2")
     })
 	
-    // 持续更新你的世界
     for {
         time.Sleep(time.Second)
     }
@@ -570,7 +569,320 @@ func (s *TestSystem1) Update(event Event) {
 ### 一个完整的例子
 （努力完善中）
 ## Benchmark
-（努力完善中）
+性能测试是评价ECS框架优良最重要的指标之一，设计完善的对比方案尤为重要，尽可能遵循单一变量原则，我们的框架目前欠缺完善的性能对比体系，
+我们会在后续的开发中逐渐的完善。我们会首先通过一些简单的性能测试用例来说明一些问题。  
+&emsp;&emsp;首先确定我们的对比思路，我们会使用OOP的方式写一段足够简单的逻辑作为负载，使用ECS的方式重写同样的逻辑，尽可能保证
+处理负载的一致性。首先我们简单展示一下两种不同方式的主要代码逻辑，确保测试用例的正确的。
+### 测试用的代码
+
+首先我们先看看数据层的抽象，我们定义了Player对象，其中包含了一些基本的属性，比如生命值，攻击力，防御力等，以及一些
+测试变量Test1-Test10, 在ECS中我们将这些基本属性抽象为Component。
+```go
+// OOP
+type Player struct {
+    ID int64
+    X                  int
+    Y                  int
+    Z                  int
+    V                  int
+    Dir                [3]int
+    HP                 int
+    AttackRange        int
+    PhysicalBaseAttack int
+    Strength           int
+    CriticalChange     int
+    CriticalMultiple   int
+    ActionType         int
+    Test1              int
+    Test2              int
+	
+	...
+	
+    Test10             int
+}
+// ECS
+type Position struct {
+    ecs.Component[Position]
+    X int
+    Y int
+    Z int
+}
+
+type Movement struct {
+    ecs.Component[Movement]
+    V   int
+    Dir [3]int
+}
+
+type HealthPoint struct {
+    ecs.Component[HealthPoint]
+    HP int
+}
+
+type Force struct {
+    ecs.Component[Force]
+    AttackRange        int
+    PhysicalBaseAttack int
+    Strength           int
+    CriticalChange     int
+    CriticalMultiple   int
+}
+
+type Action struct {
+    ecs.DisposableComponent[Action]
+    ActionType int
+}
+
+type Test1 struct {
+    ecs.Component[Test1]
+    Test1 int
+}
+
+    ...
+
+type Test10 struct {
+    ecs.Component[Test10]
+    Test10 int
+}
+```
+接着我们看看我们的一些数据的处理逻辑。
+```go
+// 1. 处理玩家的移动
+// OOP
+func (g *GameNormal) DoMove(delta time.Duration) {
+    for _, p := range g.players {
+        p.X = p.X + int(float64(p.Dir[0]*p.V)*delta.Seconds())
+        p.Y = p.Y + int(float64(p.Dir[1]*p.V)*delta.Seconds())
+        p.Z = p.Z + int(float64(p.Dir[2]*p.V)*delta.Seconds())
+    }
+}
+// ECS
+func (m *MoveSystem) Update(event ecs.Event) {
+    delta := event.Delta
+    iter := ecs.GetComponentAll[Movement](m)
+    for move := iter.Begin(); !iter.End(); move = iter.Next() {
+        entity := move.Owner()
+        pos := ecs.GetRelated[Position](m, entity)
+        if pos == nil {
+            continue
+        }
+        pos.X = pos.X + int(float64(move.Dir[0]*move.V)*delta.Seconds())
+        pos.Y = pos.Y + int(float64(move.Dir[1]*move.V)*delta.Seconds())
+        pos.Z = pos.Z + int(float64(move.Dir[2]*move.V)*delta.Seconds())
+    }
+}
+
+// 2. 处理玩家的互相攻击行为，这里我们假设玩家每帧互相攻击一次
+// OOP
+func (g *GameNormal) DoDamage() {
+    for _, caster := range g.players {
+        for _, target := range g.players {
+            if caster.ID == target.ID {
+                continue
+            }
+
+            //计算距离
+            distance := (caster.X-target.X)*(caster.X-target.X) + (caster.Y-target.Y)*(caster.Y-target.Y)
+            if distance > caster.AttackRange*caster.AttackRange {
+                continue
+            }
+
+            //伤害公式：伤害=（基础攻击+力量）+ 暴击伤害， 暴击伤害=基础攻击 * 2
+            damage := caster.PhysicalBaseAttack + caster.Strength
+            critical := 0
+            if rand.Intn(100) < caster.CriticalChange {
+                critical = caster.PhysicalBaseAttack * caster.CriticalMultiple
+            }
+            damage = damage + critical
+            target.HP -= damage
+            if target.HP < 0 {
+                target.HP = 0
+            }
+        }
+    }
+}
+//ECS
+func (d *DamageSystem) Update(event ecs.Event) {
+    casterIter := d.casterGetter.Get()
+    targetIter := d.targetGetter.Get()
+    count := 0
+    for caster := casterIter.Begin(); !casterIter.End(); caster = casterIter.Next() {
+        count++
+        for target := targetIter.Begin(); !targetIter.End(); target = targetIter.Next() {
+            if caster.Action.Owner() == target.HealthPoint.Owner() {
+                continue
+            }
+
+            //计算距离
+            distance := (caster.Position.X-target.Position.X)*(caster.Position.X-target.Position.X) +
+            (caster.Position.Y-target.Position.Y)*(caster.Position.Y-target.Position.Y)
+            if distance > caster.Force.AttackRange*caster.Force.AttackRange {
+                continue
+            }
+
+            //伤害公式：伤害=（基础攻击+力量）+ 暴击伤害， 暴击伤害=基础攻击 * 2
+            damage := caster.Force.PhysicalBaseAttack + caster.Force.Strength
+            critical := 0
+            if rand.Intn(100) < caster.Force.CriticalChange {
+                critical = caster.Force.PhysicalBaseAttack * caster.Force.CriticalMultiple
+            }
+            damage = damage + critical
+            target.HealthPoint.HP -= damage
+            if target.HealthPoint.HP < 0 {
+                target.HealthPoint.HP = 0
+            }
+        }
+    }
+}
+
+// 3. 模拟的一些其他负载， 1-10, 省略无差别的多个
+// OOP
+func (g *GameNormal) SimuLoad1() {
+    for _, p := range g.players {
+        for i := 0; i < DummyMaxFor; i++ {
+            p.Test1 += 1
+        }
+    }
+}
+// ECS
+func (t *Test1System) Update(event ecs.Event) {
+    iter := ecs.GetComponentAll[Test1](t)
+    for c := iter.Begin(); !iter.End(); c = iter.Next() {
+        for i := 0; i < DummyMaxFor; i++ {
+            c.Test1 += i
+        }
+    }
+}
+```
+上面是列举的OOP和ECS的数据模型和处理逻辑，我们可以看到，OOP模式下是单线程模型，而ECS是多线的，
+所以我们再次添加了OOP的多线程版本，有数据读写竞争的部分我们使用互斥锁保证线程安全，没有数据竞争的部分
+我们不使用锁，尽可能模拟真实场景下对多线程的优化。另外我们也希望看到单线程下ECS的表现，所以另一测试用例中
+我们会使用```runtime.GOMAXPROCS(1)```来限制线程的数量，模拟单线程环境。看看我们的测试用例：
+```go
+func BenchmarkNormal(b *testing.B) {
+	game := &GameNormal{
+		players: make(map[int64]*Player),
+	}
+	game.init()
+	
+	b.ResetTimer()
+
+	var delta time.Duration
+	var ts time.Time
+	for i := 0; i < b.N; i++ {
+		ts = time.Now()
+		game.doFrame(false, uint64(i), delta)
+		delta = time.Since(ts)
+	}
+}
+
+func BenchmarkNormalParallel(b *testing.B) {
+	game := &GameNormal{
+		players: make(map[int64]*Player),
+	}
+	game.init()
+	
+	b.ResetTimer()
+
+	var delta time.Duration
+	var ts time.Time
+	for i := 0; i < b.N; i++ {
+		ts = time.Now()
+		game.doFrame(true, uint64(i), delta)
+		delta = time.Since(ts)
+	}
+}
+
+func BenchmarkEcs(b *testing.B) {
+	game := &GameECS{}
+	config := ecs.NewDefaultWorldConfig()
+	config.Debug = false
+	game.init(config)
+	game.world.Startup()
+
+	b.ResetTimer()
+
+	var delta time.Duration
+	_ = delta
+	var ts time.Time
+	for i := 0; i < b.N; i++ {
+		ts = time.Now()
+		game.attack()
+		game.world.Update()
+		delta = time.Since(ts)
+	}
+}
+
+func BenchmarkEcsSingleCore(b *testing.B) {
+	// 设置使用单核心
+	runtime.GOMAXPROCS(1)
+
+	game := &GameECS{}
+	config := ecs.NewDefaultWorldConfig()
+	config.Debug = false
+	config.CollectionVersion = 1
+	game.init(config)
+	game.world.Startup()
+
+	b.ResetTimer()
+
+	var delta time.Duration
+	_ = delta
+	var ts time.Time
+	for i := 0; i < b.N; i++ {
+		ts = time.Now()
+		game.attack()
+		game.world.Update()
+		delta = time.Since(ts)
+	}
+}
+```
+### 测试结果
+我们可以从测试代码中看到代码的时间复杂度是O(n^2)，随着玩家数量的增加，各个系统的耗时也会呈指数级增长，
+我们希望看到随着玩家数量的增加，OOP和ECS的性能表现。下面我们先设置参数为```	PlayerCount = 500
+DummyMaxFor = 100```，初步看看他们的表现：
+```go
+goos: windows
+goarch: amd64
+pkg: test_ecs_m_d
+cpu: Intel(R) Xeon(R) W-2133 CPU @ 3.60GHz
+BenchmarkNormal
+BenchmarkNormal-12                   100          10050211 ns/op
+BenchmarkNormalParallel
+BenchmarkNormalParallel-12            57          19144577 ns/op
+BenchmarkEcs
+BenchmarkEcs-12                     6835            176121 ns/op
+BenchmarkEcsSingleCore
+BenchmarkEcsSingleCore-12           2406            528690 ns/op
+testing: BenchmarkEcsSingleCore-12 left GOMAXPROCS set to 1
+PASS
+```
+上面的结果是Go语言Benchmark给出的结果，其中主要的结论数据是我们测试用例统计的每帧耗时。暂时先不做分析，仅仅是有个直观的感受。
+下面我们会调整参数```PlayerCount```, 使它从0开始递增，得到对应的原始数据：
+
+![img.png](res/img2.png)
+
+为了方便的对比分析，我们将结果数据曲线化：
+
+![img.png](res/img.png)
+
+这是玩家数量从0-2500得到的曲线，OOP的方式是指数级增长，但是ECS已经无法肉眼分辨其趋势，我们单独看看ECS的曲线：
+
+![img.png](res/img1.png)
+
+可以看到ECS仍是增长趋势，很难看出其指数趋势，接近于线性增长。曲线中无法看到玩家数量较低的性能情况，我们看看0-50区间的曲线：
+
+![img.png](res/img3.png)
+
+### 结论
+所有结论均基于上面的数据，我们可以得出以下让人惊喜的结论：
+* 整体上，我们ECS性能远远大于OOP的方式，玩家数量越多，性能差距越大，玩家数据达到1000后，ECS的性能高出OOP的2个数量级(k x 100)。
+* ECSCore-1 与 Normal 对比， 同为单线程，玩家数量1000时，ECSCore-1的性能高出Normal的1个数量级(k x 10)。
+* 同为OOP方式，单线程下性能高于多线程，其原因是多线程下，需要频繁的加锁解锁，导致性能下降，这也是游戏后台通常采用单线程的原因之一。
+* 当玩家数量为0时，ECS的耗时远高于OOP方式，说明ECS框架的框架部分消耗大于OOP方式，但是随着玩家数量的增加，这个框架耗时并未增加，
+说明框架的消耗是一个固定值。
+* 0-50区间，由于ECS的固定系统消耗，0-25区间ECS性能低于OOP方式，25以后ECS性能大于OOP方式，但注意“25”不是固定阈值，应该是由测试代码
+执行环境的物理机性能决定。
 
 ## API文档
 （努力完善中）

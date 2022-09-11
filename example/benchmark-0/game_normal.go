@@ -210,92 +210,72 @@ func (g *GameNormal) SimuLoad10() {
 
 func (g *GameNormal) SimuLoadParallel1() {
 	for _, p := range g.players {
-		p.rw.Lock()
 		for i := 0; i < DummyMaxFor; i++ {
 			p.Test1 += 1
 		}
-		p.rw.Unlock()
 	}
 }
 func (g *GameNormal) SimuLoadParallel2() {
 	for _, p := range g.players {
-		p.rw.Lock()
 		for i := 0; i < DummyMaxFor; i++ {
 			p.Test2 += 1
 		}
-		p.rw.Unlock()
 	}
 }
 func (g *GameNormal) SimuLoadParallel3() {
 	for _, p := range g.players {
-		p.rw.Lock()
 		for i := 0; i < DummyMaxFor; i++ {
 			p.Test3 += 1
 		}
-		p.rw.Unlock()
 	}
 }
 func (g *GameNormal) SimuLoadParallel4() {
 	for _, p := range g.players {
-		p.rw.Lock()
 		for i := 0; i < DummyMaxFor; i++ {
 			p.Test4 += 1
 		}
-		p.rw.Unlock()
 	}
 }
 func (g *GameNormal) SimuLoadParallel5() {
 	for _, p := range g.players {
-		p.rw.Lock()
 		for i := 0; i < DummyMaxFor; i++ {
 			p.Test5 += 1
 		}
-		p.rw.Unlock()
 	}
 }
 func (g *GameNormal) SimuLoadParallel6() {
 	for _, p := range g.players {
-		p.rw.Lock()
 		for i := 0; i < DummyMaxFor; i++ {
 			p.Test6 += 1
 		}
-		p.rw.Unlock()
 	}
 }
 func (g *GameNormal) SimuLoadParallel7() {
 	for _, p := range g.players {
-		p.rw.Lock()
 		for i := 0; i < DummyMaxFor; i++ {
 			p.Test7 += 1
 		}
-		p.rw.Unlock()
 	}
 }
 func (g *GameNormal) SimuLoadParallel8() {
 	for _, p := range g.players {
-		p.rw.Lock()
 		for i := 0; i < DummyMaxFor; i++ {
 			p.Test8 += 1
 		}
-		p.rw.Unlock()
 	}
 }
 func (g *GameNormal) SimuLoadParallel9() {
 	for _, p := range g.players {
-		p.rw.Lock()
 		for i := 0; i < DummyMaxFor; i++ {
 			p.Test9 += 1
 		}
-		p.rw.Unlock()
 	}
 }
 func (g *GameNormal) SimuLoadParallel10() {
 	for _, p := range g.players {
-		p.rw.Lock()
 		for i := 0; i < DummyMaxFor; i++ {
 			p.Test10 += 1
 		}
-		p.rw.Unlock()
 	}
 }
 
@@ -309,11 +289,9 @@ func (g *GameNormal) DoMove(delta time.Duration) {
 
 func (g *GameNormal) DoMoveParallel(delta time.Duration) {
 	for _, p := range g.players {
-		p.rw.Lock()
 		p.X = p.X + int(float64(p.Dir[0]*p.V)*delta.Seconds())
 		p.Y = p.Y + int(float64(p.Dir[1]*p.V)*delta.Seconds())
 		p.Z = p.Z + int(float64(p.Dir[2]*p.V)*delta.Seconds())
-		p.rw.Unlock()
 	}
 }
 
