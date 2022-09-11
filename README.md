@@ -1,5 +1,74 @@
 # ECS
 这是一个ECS（Entity-Component-System）Go语言版本的实现，它聚焦于游戏领域的应用，帮助你快速构建一个高内聚、低耦合、易扩展、高性能的并行化游戏世界。
+## Contents
+* [快速开始](#快速开始)
+    + [安装](#--)
+    + [简单示例](#----)
+* [快速了解](#----)
+    + [什么是ECS？](#---ecs-)
+    + [游戏领域为什么需要ECS？](#---------ecs-)
+    + [基本概念](#----)
+        - [World](#world)
+        - [Entity](#entity)
+        - [Component](#component)
+        - [System](#system)
+        - [Utility](#utility)
+        - [Shape](#shape)
+        - [FixedString](#fixedstring)
+        - [“下一帧生效"](#-------)
+    + [设计思路](#----)
+* [使用教程](#----)
+    + [创建一个World](#----world)
+        - [SyncWorld](#syncworld)
+        - [AsyncWorld](#asyncworld)
+        - [创建一个Entity](#----entity)
+        - [创建一个Component](#----component)
+        - [创建一个System](#----system)
+            * [支持的阶段事件：](#--------)
+            * [阶段事件特征：](#-------)
+    + [使用Utility与System交互](#--utility-system--)
+    + [ECS与外围系统交互](#ecs-------)
+        - [SyncWorld](#syncworld-1)
+        - [AsyncWorld](#asyncworld-1)
+    + [如何处理System的执行顺序](#----system-----)
+    + [如何选择不同类型的Component](#---------component)
+        - [常规组件](#----)
+        - [Free组件](#free--)
+        - [Disposable组件](#disposable--)
+        - [FreeDisposable组件](#freedisposable--)
+    + [系统中获取组件的方式](#----------)
+    + [系统间的数据流动](#--------)
+    + [一个完整的例子](#-------)
+* [Benchmark](#benchmark)
+    + [测试用的代码](#------)
+    + [测试结果](#----)
+    + [结论](#--)
+* [API文档](#api--)
+* [设计细节](#----)
+    + [架构](#--)
+    + [日志](#--)
+    + [World](#world-1)
+    + [Entity](#entity-1)
+    + [Component](#component-1)
+    + [System](#system-1)
+    + [Utility](#utility-1)
+    + [Shape](#shape-1)
+    + [Compound](#compound)
+    + [一次Update的执行流程](#--update-----)
+    + [从添加Component到生效](#---component---)
+    + [容器](#--)
+    + [迭代器](#---)
+    + [协程池](#---)
+    + [ECS序列化和反序列化](#ecs--------)
+    + [ECS中的并行](#ecs----)
+    + [Entity ID的管理](#entity-id---)
+    + [如何行为限制](#------)
+    + [优化器](#---)
+    + [统计器](#---)
+* [特别注意](#----)
+* [存在的一些问题](#-------)
+* [写在最后](#----)
+* [TODO](#todo)
 ## 快速开始
 ### 安装
 ```shell
@@ -123,6 +192,8 @@ API指间需要访问的数据间有大量的耦合，我们根本无法很好�
 一个特定的buff可以抽象为一个Component，buff的产生和实效可以抽象为ECS中的Component的创建和销毁，非常方便。ECS提倡“组合优于继承”的设计理念，“组合”这个概念在游戏世界中也非常常见，比如，移动组件、伤害组件、敌人标签组件就
 可以组合成一个简单的敌对小兵，稍作改变，我们把敌人标签换成队友标签，那么我们可以得到一个为你战斗的队友，ECS中Component的删除和新增是一个基础特性，所以你可以很轻易的完成这种基于组合的创造，而不用书写多余的逻辑。此外，
 游戏世界中也是具有明显的隔离特性。至此我们可以总结一下游戏世界与ECS的显著契合点, 当然列举的可能并不全面：1、大量对象 2、频繁创建销毁 3、共性行为，比如移动、伤害、buff机制 4、组合在游戏中的抽象优势 5、明确的数据隔离特性
+### 基本架构
+![img.png](res/img4.png)
 ### 基本概念
 ECS的整体方向是明确的，但是根据不同的ECS实现，会有一些细节上的差异，比如，命名上的差异，Component存储结构上的差异，甚至可能会根据实际的需要或者开发语言的原因妥协一些特性或者添加一下新的特性，下面会介绍一下，我们当前框架下
 的一些基本概念。
@@ -151,7 +222,7 @@ Shape是ECS中的辅助单元，用来描述一组同属同一Entity的Component
 FixedString是一个固定长度的字符串，适用于Component中的字符串，语言内置string是引用类型，如果内存的方式转移组件，那么内置string会带来一些问题。
 #### “下一帧生效"
 这是一个非常重要的概念，我们的ECS框架中，对Entity的Component创建、删除操作都会在下一帧生效。
-### 设计思路
+### 设计目标
 * 组件使用连续内存结构，减少cpu cache-miss
 * 快速索引，无遍历获取兄弟组件
 * 无锁化开发流程，开发者无需考虑并发安全问题
@@ -580,7 +651,7 @@ func (s *TestSystem1) Update(event Event) {
 ```go
 // OOP
 type Player struct {
-    ID int64
+    ID                 int64
     X                  int
     Y                  int
     Z                  int
@@ -957,7 +1028,7 @@ PASS
 ## 写在最后
 欢迎大家提出宝贵意见，帮助完善ecs框架，这是一个长期和持续的过程，有不足或错误的地方，欢迎指正，欢迎PR。
 
-### TODO
+## TODO
 * [ ] 优化器实现
 * [ ] 统计器完善
 * [ ] 代码覆盖率
