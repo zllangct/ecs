@@ -1,7 +1,6 @@
 package ecs
 
 import (
-	"fmt"
 	"testing"
 )
 
@@ -55,8 +54,8 @@ func (p *__systemGroup_Test_S_1) Call(label int) interface{} {
 	return nil
 }
 
-func TestNewSystemGroup(t *testing.T) {
-	tests := []ISystem{
+func newSystemGroupTestSystem() []ISystem {
+	return []ISystem{
 		NewTestSystem(1, &__systemGroup_Test_C_1{}, &__systemGroup_Test_C_2{}),
 		NewTestSystem(2, &ReadOnly[__systemGroup_Test_C_1]{}, &__systemGroup_Test_C_3{}),
 		NewTestSystem(3, &__systemGroup_Test_C_2{}, &__systemGroup_Test_C_5{}),
@@ -69,18 +68,85 @@ func TestNewSystemGroup(t *testing.T) {
 		NewTestSystem(10, &__systemGroup_Test_C_7{}, &__systemGroup_Test_C_5{}),
 		NewTestSystem(11, &ReadOnly[__systemGroup_Test_C_1]{}),
 	}
+}
+
+func TestNewSystemGroupIterEmpty(t *testing.T) {
+	sg := NewSystemGroup()
+	sg.resort()
+
+	Log.Infof("========== system count %d, Batch count: %d, Max peer Batch: %d:", sg.systemCount(), sg.batchCount(), sg.maxSystemCountPeerBatch())
+
+	iter := sg.iter()
+	for ss := iter.Begin(); !iter.End(); ss = iter.Next() {
+		Log.Info("========== batch:")
+		for _, s := range ss {
+			Log.Infof("%s\n", ObjectToString(s))
+		}
+	}
+}
+
+func TestNewSystemGroupIter(t *testing.T) {
+	tests := newSystemGroupTestSystem()
 	sg := NewSystemGroup()
 	for _, test := range tests {
 		sg.insert(test)
 	}
 
-	sg.reset()
+	sg.resort()
 
-	for ss := sg.next(); len(ss) > 0; ss = sg.next() {
-		println("========== batch:")
+	Log.Infof("========== system count %d, Batch count: %d, Max peer Batch: %d:", sg.systemCount(), sg.batchCount(), sg.maxSystemCountPeerBatch())
+
+	iter := sg.iter()
+	for ss := iter.Begin(); !iter.End(); ss = iter.Next() {
+		Log.Info("========== batch:")
 		for _, s := range ss {
-			fmt.Printf("%s\n", ObjectToString(s))
+			Log.Infof("%s\n", ObjectToString(s))
+		}
+	}
+}
+
+func TestNewSystemGroupIterTemp(t *testing.T) {
+	tests := newSystemGroupTestSystem()
+	sg := NewSystemGroup()
+	for _, test := range tests {
+		sg.insert(test)
+	}
+
+	sg.resort()
+
+	Log.Infof("========== system count %d, Batch count: %d, Max peer Batch: %d:", sg.systemCount(), sg.batchCount(), sg.maxSystemCountPeerBatch())
+
+	iter := sg.iter(true)
+	for ss := iter.Begin(); !iter.End(); ss = iter.Next() {
+		Log.Info("========== batch:")
+		for _, s := range ss {
+			Log.Infof("%s\n", ObjectToString(s))
 		}
 	}
 
+	iter = sg.iter(true)
+	for ss := iter.Begin(); !iter.End(); ss = iter.Next() {
+		Log.Info("========== batch:")
+		for _, s := range ss {
+			Log.Infof("%s\n", ObjectToString(s))
+		}
+	}
+}
+
+func BenchmarkSystemGroupIter(b *testing.B) {
+	tests := newSystemGroupTestSystem()
+	sg := NewSystemGroup()
+	for _, test := range tests {
+		sg.insert(test)
+	}
+
+	sg.resort()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		iter := sg.iter()
+		for ss := iter.Begin(); !iter.End(); ss = iter.Next() {
+			_ = ss
+		}
+	}
 }

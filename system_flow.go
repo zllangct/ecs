@@ -120,8 +120,8 @@ func (p *systemFlow) eventDispatch() {
 	for _, period := range p.stageList {
 		sq = p.stages[period]
 		for _, sl := range sq {
-			sl.reset()
-			for ss := sl.next(); len(ss) > 0; ss = sl.next() {
+			iter := sl.iter(true)
+			for ss := iter.Begin(); !iter.End(); ss = iter.Next() {
 				if systemCount := len(ss); systemCount != 0 {
 					for i := 0; i < systemCount; i++ {
 						fn := ss[i].eventsAsyncExecute
@@ -140,8 +140,8 @@ func (p *systemFlow) eventDispatch() {
 	for _, period := range p.stageList {
 		sq = p.stages[period]
 		for _, sl := range sq {
-			sl.reset()
-			for ss := sl.next(); len(ss) > 0; ss = sl.next() {
+			iter := sl.iter(true)
+			for ss := iter.Begin(); !iter.End(); ss = iter.Next() {
 				if systemCount := len(ss); systemCount != 0 {
 					for i := 0; i < systemCount; i++ {
 						fn := ss[i].eventsAsyncExecute
@@ -162,8 +162,11 @@ func (p *systemFlow) systemUpdate(event Event) {
 	for _, period := range p.stageList {
 		sq = p.stages[period]
 		for _, sl := range sq {
-			sl.reset()
-			for ss := sl.next(); len(ss) > 0; ss = sl.next() {
+			if sl.systemCount() == 0 {
+				continue
+			}
+			iter := sl.iter(true)
+			for ss := iter.Begin(); !iter.End(); ss = iter.Next() {
 				if systemCount := len(ss); systemCount != 0 {
 					for i := 0; i < systemCount; i++ {
 						sys = ss[i]
@@ -317,10 +320,6 @@ func (p *systemFlow) run(event Event) {
 	reporter := p.world.metrics.NewReporter("system_flow_run")
 	reporter.Start()
 
-	//Log.Info("system flow # Clear Disposable #")
-	p.world.components.clearDisposable()
-	reporter.Sample("Clear Disposable")
-
 	//Log.Info("system flow # Temp Task Execute #")
 	p.flushTempTask()
 	reporter.Sample("Temp Task Execute")
@@ -335,6 +334,13 @@ func (p *systemFlow) run(event Event) {
 	//Log.Info("system flow # Logic #")
 	p.systemUpdate(event)
 	reporter.Sample("system execute")
+
+	//Log.Info("system flow # Clear Disposable #")
+	p.world.components.clearDisposable()
+	reporter.Sample("Clear Disposable")
+
+	p.flushTempTask()
+	reporter.Sample("Temp Task Execute")
 
 	reporter.Stop()
 	reporter.Print()
@@ -351,7 +357,7 @@ func (p *systemFlow) register(system ISystem) {
 
 	order := system.Order()
 	if order > OrderAppend {
-		Log.Errorf("system order must less then %d, reset order to %d", OrderAppend+1, OrderAppend)
+		Log.Errorf("system order must less then %d, resort order to %d", OrderAppend+1, OrderAppend)
 		order = OrderAppend
 	}
 
@@ -458,11 +464,12 @@ func (p *systemFlow) SystemInfoPrint() {
 		var slContent []string
 		sq = p.stages[period]
 		for i, sl := range sq {
-			sl.reset()
+			sl.resort()
 			batchTotal := sl.batchCount()
 			batch := 0
 			var batchContent []string
-			for ss := sl.next(); len(ss) > 0; ss = sl.next() {
+			iter := sl.iter()
+			for ss := iter.Begin(); !iter.End(); ss = iter.Next() {
 				if systemCount := len(ss); systemCount != 0 {
 
 					str := "│     │  └─ "

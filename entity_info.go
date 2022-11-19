@@ -18,8 +18,8 @@ func (e *EntityInfo) Entity() Entity {
 }
 
 func (e *EntityInfo) Add(components ...IComponent) {
-	if mainThreadDebug {
-		checkMainThread()
+	if e.world.config.MainThreadCheck {
+		e.world.checkMainThread()
 	}
 	for _, c := range components {
 		if !e.compound.Exist(e.world.getComponentMetaInfoByType(c.Type()).it) {
@@ -55,8 +55,8 @@ func (e *EntityInfo) removeFromCompound(it uint16) {
 }
 
 func (e *EntityInfo) Remove(components ...IComponent) {
-	if mainThreadDebug {
-		checkMainThread()
+	if e.world.config.MainThreadCheck {
+		e.world.checkMainThread()
 	}
 	for _, c := range components {
 		if e.compound.Exist(e.world.getComponentMetaInfoByType(c.Type()).it) {

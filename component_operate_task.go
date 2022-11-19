@@ -24,6 +24,11 @@ type opTaskList struct {
 	tail *opTask
 }
 
+func (o *opTaskList) Clone() *opTaskList {
+	clone := *o
+	return &clone
+}
+
 func (o *opTaskList) Len() int {
 	return o.len
 }

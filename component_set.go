@@ -6,13 +6,17 @@ import (
 )
 
 type IComponentSet interface {
-	ICollection
+	Len() int
+	Range(fn func(com IComponent) bool)
+	Clear()
 	GetByEntity(entity Entity) any
 	GetElementMeta() *ComponentMetaInfo
 	GetComponent(entity Entity) IComponent
+	GetComponentRaw(entity Entity) unsafe.Pointer
 	Remove(entity Entity)
 	Sort()
 
+	getPointerByIndex(index int64) unsafe.Pointer
 	changeCount() int64
 	changeReset()
 	pointer() unsafe.Pointer
@@ -73,6 +77,10 @@ func (c *ComponentSet[T]) GetByEntity(entity Entity) any {
 	return c.getByEntity(entity)
 }
 
+func (c *ComponentSet[T]) Get(entity Entity) *T {
+	return c.getByEntity(entity)
+}
+
 func (c *ComponentSet[T]) pointer() unsafe.Pointer {
 	return unsafe.Pointer(c)
 }
@@ -105,7 +113,7 @@ func (c *ComponentSet[T]) Sort() {
 	})
 	for i := int32(0); i < int32(c.Len()); i++ {
 		cp = (*Component[T])(unsafe.Pointer(&(c.data[i])))
-		c.indices[cp.owner.ToRealID().index] = i
+		c.indices[cp.owner.ToRealID().index] = i + 1
 	}
 	c.changeReset()
 }
@@ -114,13 +122,27 @@ func (c *ComponentSet[T]) GetComponent(entity Entity) IComponent {
 	return c.GetByEntity(entity).(IComponent)
 }
 
+func (c *ComponentSet[T]) GetComponentRaw(entity Entity) unsafe.Pointer {
+	return unsafe.Pointer(c.getByEntity(entity))
+}
+
+func (c *ComponentSet[T]) getPointerByIndex(index int64) unsafe.Pointer {
+	return unsafe.Pointer(c.SparseArray.UnorderedCollection.Get(index))
+}
+
 func (c *ComponentSet[T]) GetElementMeta() *ComponentMetaInfo {
 	return c.meta
 }
 
+func (c *ComponentSet[T]) Range(fn func(com IComponent) bool) {
+	c.SparseArray.Range(func(com *T) bool {
+		return fn(any(com).(IComponent))
+	})
+}
+
 func NewComponentSetIterator[T ComponentObject](collection *ComponentSet[T], readOnly ...bool) Iterator[T] {
 	iter := &Iter[T]{
-		data:    collection.getData(),
+		data:    collection.data,
 		len:     collection.Len(),
 		eleSize: collection.eleSize,
 		offset:  0,

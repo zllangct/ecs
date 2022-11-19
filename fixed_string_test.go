@@ -8,6 +8,7 @@ import (
 )
 
 func TestFixedString_Generate(t *testing.T) {
+	return
 	filePath := "./fixed_string_utils.go"
 	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE, 0666)
 	if err != nil {

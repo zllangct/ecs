@@ -112,7 +112,7 @@ func (s *Shape[T]) Get() IShapeIterator[T] {
 		return EmptyShapeIter[T]()
 	}
 
-	var mainComponent ICollection
+	var mainComponent IComponentSet
 	var mainKeyIndex int
 	for i := 0; i < len(s.subTypes); i++ {
 		c := s.sys.World().getComponentSetByIntType(s.subTypes[i])

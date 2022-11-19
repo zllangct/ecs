@@ -12,8 +12,6 @@ import (
 )
 
 func TestFrame(t *testing.T) {
-	ecs.EnableMainThreadDebug()
-
 	game := &GameECS{}
 	game.init(ecs.NewDefaultWorldConfig())
 
@@ -32,8 +30,6 @@ func TestFrame(t *testing.T) {
 }
 
 func TestEcsOptimizer(t *testing.T) {
-	ecs.EnableMainThreadDebug()
-
 	game := &GameECS{}
 	game.init(ecs.NewDefaultWorldConfig())
 

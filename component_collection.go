@@ -47,6 +47,8 @@ func NewComponentCollection(world *worldBase, k int) *ComponentCollection {
 		}
 	}
 
+	cc.bucket = 0
+
 	cc.locks = make([]sync.RWMutex, cc.bucket+1)
 	for i := int64(0); i < cc.bucket+1; i++ {
 		cc.locks[i] = sync.RWMutex{}
@@ -126,14 +128,35 @@ func (c *ComponentCollection) deleteOperate(op CollectionOperate, entity Entity,
 func (c *ComponentCollection) clearDisposable() {
 	disposable := c.world.componentMeta.GetDisposableTypes()
 	for r, _ := range disposable {
-		c.removeAllByType(r)
+		meta := c.world.getComponentMetaInfoByType(r)
+		if meta.componentType&ComponentTypeFreeMask > 0 {
+			continue
+		}
+		set := c.collections.Get(meta.it)
+		if set == nil {
+			return
+		}
+		(*set).Range(func(com IComponent) bool {
+			info, ok := c.world.entities.GetEntityInfo(com.Owner())
+			if ok {
+				info.removeFromCompound(meta.it)
+			}
+			return true
+		})
+
+		(*set).Clear()
 	}
 }
 
 func (c *ComponentCollection) clearFree() {
-	disposable := c.world.componentMeta.GetDisposableTypes()
-	for r, _ := range disposable {
-		c.removeAllByType(r)
+	free := c.world.componentMeta.GetFreeTypes()
+	for r, _ := range free {
+		meta := c.world.getComponentMetaInfoByType(r)
+		set := c.collections.Get(meta.it)
+		if set == nil {
+			return
+		}
+		(*set).Clear()
 	}
 }
 
@@ -149,16 +172,20 @@ func (c *ComponentCollection) getTempTasks() []func() {
 			if _, ok := combination[typ]; ok {
 				combination[typ].Combine(list)
 			} else {
-				combination[typ] = list
+				combination[typ] = list.Clone()
 			}
+			list.Reset()
 		}
-		c.opLog[i] = make(map[reflect.Type]*opTaskList)
+
 		c.locks[i].RUnlock()
 	}
 
 	var tasks []func()
 	for typ, list := range combination {
 		taskList := list
+		if taskList.Len() == 0 {
+			continue
+		}
 		meta := c.world.getComponentMetaInfoByType(typ)
 		setp := c.collections.Get(meta.it)
 		if setp == nil {
@@ -247,13 +274,4 @@ func (c *ComponentCollection) checkSet(com IComponent) {
 		set := com.newCollection(meta)
 		c.collections.Add(set.GetElementMeta().it, &set)
 	}
-}
-
-func (c *ComponentCollection) removeAllByType(typ reflect.Type) {
-	meta := c.world.getComponentMetaInfoByType(typ)
-	set := c.collections.Get(meta.it)
-	if set == nil {
-		return
-	}
-	(*set).Clear()
 }

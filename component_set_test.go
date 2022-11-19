@@ -12,7 +12,8 @@ func TestComponentSet_Sort(t *testing.T) {
 	for i := 0; i < caseCount; i++ {
 		srcList = append(srcList, __unorderedCollection_Test_item{
 			Component: Component[__unorderedCollection_Test_item]{
-				seq: uint32(caseCount - i),
+				seq:   uint32(caseCount - i),
+				owner: Entity(i),
 			},
 			ItemID: int64(i),
 			Arr:    [3]int{1, 2, 3},
@@ -24,24 +25,37 @@ func TestComponentSet_Sort(t *testing.T) {
 
 	//添加数据
 	for i := 0; i < caseCount; i++ {
-		_ = c.Add(&srcList[i], Entity(srcList[i].ItemID))
+		_ = c.Add(&srcList[i], srcList[i].Owner())
 	}
+
+	i := 0
+	c.Range(func(item IComponent) bool {
+		if item.(*__unorderedCollection_Test_item).seq != uint32(caseCount-i) {
+			t.Errorf("sort error, want %d, got %d", caseCount, item.(*__unorderedCollection_Test_item).seq)
+			return false
+		}
+		i++
+		return true
+	})
 
 	//排序
 	c.Sort()
 
 	//验证
-	for i := 0; i < caseCount; i++ {
-		if c.Get(int32(i)).ItemID != int64(caseCount-i-1) {
-			t.Error("sort error")
-			break
+	i = 1
+	c.Range(func(item IComponent) bool {
+		if item.(*__unorderedCollection_Test_item).seq != uint32(i) {
+			t.Errorf("sort error, want %d, got %d", i, item.(*__unorderedCollection_Test_item).seq)
+			return false
 		}
-	}
+		i++
+		return true
+	})
 }
 
 func TestNewComponentSet(t *testing.T) {
 	cs := NewComponentSet[__unorderedCollection_Test_item](&ComponentMetaInfo{})
-	if cs.GetElementMeta().it == 0 {
+	if cs.GetElementMeta().it != 0 {
 		t.Error("element meta error")
 	}
 }
@@ -73,12 +87,12 @@ func BenchmarkComponentSet_Read(b *testing.B) {
 
 	b.Run("sequence", func(b *testing.B) {
 		for n := 0; n < b.N; n++ {
-			_ = c.Get(int32(seq[n%total]))
+			_ = c.Get(Entity(seq[n%total]))
 		}
 	})
 	b.Run("random", func(b *testing.B) {
 		for n := 0; n < b.N; n++ {
-			_ = c.Get(int32(r[n%total]))
+			_ = c.Get(Entity(r[n%total]))
 		}
 	})
 }

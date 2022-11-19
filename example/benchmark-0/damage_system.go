@@ -25,9 +25,12 @@ type DamageSystem struct {
 func (d *DamageSystem) Init(si ecs.SystemInitConstraint) {
 	d.SetRequirements(
 		si,
-		&ecs.ReadOnly[Position]{},
-		&ecs.ReadOnly[Force]{},
-		&ecs.ReadOnly[Action]{},
+		//&ecs.ReadOnly[Position]{},
+		//&ecs.ReadOnly[Force]{},
+		//&ecs.ReadOnly[Action]{},
+		&Position{},
+		&Force{},
+		&Action{},
 		&HealthPoint{})
 	d.casterGetter = ecs.NewShape[Caster](si).SetGuide(&Action{})
 	d.targetGetter = ecs.NewShape[Target](si)
@@ -48,7 +51,7 @@ func (d *DamageSystem) Update(event ecs.Event) {
 	targetIter := d.targetGetter.Get()
 	count := 0
 	for caster := casterIter.Begin(); !casterIter.End(); caster = casterIter.Next() {
-		count++
+		//count++
 		for target := targetIter.Begin(); !targetIter.End(); target = targetIter.Next() {
 			if caster.Action.Owner() == target.HealthPoint.Owner() {
 				continue
@@ -73,6 +76,13 @@ func (d *DamageSystem) Update(event ecs.Event) {
 			if target.HealthPoint.HP < 0 {
 				target.HealthPoint.HP = 0
 			}
+			count++
 		}
 	}
+
+	if count < (PlayerCount)*(PlayerCount-1) {
+		//panic("count error")
+	}
+
+	//ecs.Log.Infof("DamageSystem count:%v, frame:%v", count, event.Frame)
 }

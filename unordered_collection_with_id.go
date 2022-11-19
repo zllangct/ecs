@@ -3,7 +3,9 @@ package ecs
 import "unsafe"
 
 type ICollectionWithID interface {
-	ICollection
+	Len() int
+	Clear()
+	Range(func(v *any) bool)
 	GetByIndex(idx int64) any
 	GetByID(id int64) any
 }

@@ -22,6 +22,10 @@ func (w *SyncWorld) Update() {
 
 func (w *SyncWorld) Optimize(t time.Duration, force bool) {}
 
+func (w *SyncWorld) Stop() {
+	w.stop()
+}
+
 func (w *SyncWorld) NewEntity() *EntityInfo {
 	return w.newEntity()
 }

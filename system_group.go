@@ -3,10 +3,9 @@ package ecs
 import (
 	"reflect"
 	"sort"
-	"sync"
 )
 
-var emptyGroup []ISystem
+var emptySystemGroupIterator = &SystemGroupIterator{}
 
 // Node system tree node
 type Node struct {
@@ -49,21 +48,26 @@ func (p *Node) attach(node *Node) {
 
 // SystemGroup system group ordered by interrelation
 type SystemGroup struct {
-	lock    sync.Mutex
-	systems []*Node
-	ref     map[reflect.Type]int
-	top     []*Node
-	root    *Node
-	ordered bool
-	order   Order
+	systems      []*Node
+	ref          map[reflect.Type]int
+	root         *Node
+	order        Order
+	batchTotal   int
+	maxPeerBatch int
+	ordered      bool
+	iterTemp     *SystemGroupIterator
 }
 
 func NewSystemGroup() *SystemGroup {
 	return &SystemGroup{
-		lock:    sync.Mutex{},
 		systems: make([]*Node, 0),
 		ref:     map[reflect.Type]int{},
 		ordered: true,
+		root: &Node{
+			parent:   nil,
+			children: []*Node{},
+			val:      nil,
+		},
 	}
 }
 
@@ -75,62 +79,82 @@ func (p *SystemGroup) refCount(rqs map[reflect.Type]IRequirement) int {
 	return ref
 }
 
-// initialise system group iterator
-func (p *SystemGroup) reset() {
-	//need resort
-	if !p.ordered {
-		sort.Slice(p.systems, func(i, j int) bool {
-			return p.refCount(p.systems[i].val.GetRequirements()) >
-				p.refCount(p.systems[j].val.GetRequirements())
-		})
-		if p.root == nil {
-			p.root = &Node{
-				parent:   nil,
-				children: []*Node{},
-				val:      nil,
-			}
-		}
-
-		p.root.children = []*Node{}
-		for _, node := range p.systems {
-			node.children = []*Node{}
-			p.root.attach(node)
-		}
-		p.ordered = true
-	}
-
-	if len(p.systems) == 0 {
+func (p *SystemGroup) resort() {
+	if p.ordered {
 		return
 	}
+	sort.Slice(p.systems, func(i, j int) bool {
+		return p.refCount(p.systems[i].val.GetRequirements()) >
+			p.refCount(p.systems[j].val.GetRequirements())
+	})
 
-	// initialise the iterator
-	p.top = p.root.children
+	p.root.children = []*Node{}
+	for _, node := range p.systems {
+		node.children = []*Node{}
+		p.root.attach(node)
+	}
+	p.ordered = true
+
+	p.batchTotal = 0
+	p.maxPeerBatch = 0
+
+	var top []*Node = p.root.children
+	for len(top) > 0 {
+		count := 0
+		temp := top
+		top = make([]*Node, 0)
+		for _, node := range temp {
+			count++
+			top = append(top, node.children...)
+		}
+		if count > p.maxPeerBatch {
+			p.maxPeerBatch = count
+		}
+		p.batchTotal++
+	}
+
+	p.iterTemp = nil
 }
 
-// Pop a batch of independent system array
-func (p *SystemGroup) next() []ISystem {
-	if p.top == nil {
-		return emptyGroup
+func (p *SystemGroup) iter(useTemp ...bool) *SystemGroupIterator {
+	if !p.ordered {
+		p.resort()
 	}
-	systems := make([]ISystem, 0)
-	temp := p.top
-	p.top = make([]*Node, 0)
-	for _, s := range temp {
-		systems = append(systems, s.val)
-		for _, n := range s.children {
-			p.top = append(p.top, n)
+
+	if p.maxPeerBatch == 0 {
+		return emptySystemGroupIterator
+	}
+
+	if len(useTemp) > 0 && useTemp[0] {
+		if p.iterTemp == nil {
+			p.iterTemp = &SystemGroupIterator{
+				group:   p,
+				top:     make([]*Node, p.maxPeerBatch),
+				topTemp: make([]*Node, p.maxPeerBatch),
+				buffer:  make([]ISystem, p.maxPeerBatch),
+			}
 		}
+		return p.iterTemp
 	}
-	return systems
+
+	return &SystemGroupIterator{
+		group:   p,
+		top:     make([]*Node, p.maxPeerBatch),
+		topTemp: make([]*Node, p.maxPeerBatch),
+		buffer:  make([]ISystem, p.maxPeerBatch),
+	}
+}
+
+func (p *SystemGroup) systemCount() int {
+	return len(p.systems)
 }
 
 func (p *SystemGroup) batchCount() int {
-	batch := 0
-	sg := *p
-	for ss := sg.next(); len(ss) > 0; ss = sg.next() {
-		batch++
-	}
-	return batch
+	return p.batchTotal
+}
+
+func (p *SystemGroup) maxSystemCountPeerBatch() int {
+	return p.maxPeerBatch
 }
 
 // get all systems
@@ -144,8 +168,6 @@ func (p *SystemGroup) all() []ISystem {
 
 // insert system
 func (p *SystemGroup) insert(sys ISystem) {
-	//set cluster no ordered
-	p.ordered = false
 	//get system's required components
 	rqs := sys.GetRequirements()
 	if len(rqs) == 0 {
@@ -165,6 +187,8 @@ func (p *SystemGroup) insert(sys ISystem) {
 		val:      sys,
 	}
 	p.systems = append(p.systems, node)
+	//set unordered
+	p.ordered = false
 }
 
 // has system
@@ -181,9 +205,6 @@ func (p *SystemGroup) has(sys ISystem) bool {
 func (p *SystemGroup) remove(sys ISystem) {
 	//get system's required components
 	rqs := sys.GetRequirements()
-	if len(rqs) == 0 {
-		//panic("invalid system")
-	}
 	has := false
 	for i, system := range p.systems {
 		if system.val.ID() == sys.ID() {
@@ -195,16 +216,60 @@ func (p *SystemGroup) remove(sys ISystem) {
 	if !has {
 		return
 	}
-	//set cluster no ordered
-	p.ordered = false
 	//reference count
 	for com, _ := range rqs {
 		if _, ok := p.ref[com]; ok {
 			p.ref[com] -= 1
 		} else {
-			println("component ref wrong")
+			panic("component ref wrong")
 		}
 	}
+	//set unordered
+	p.ordered = false
+}
 
-	p.reset()
+type SystemGroupIterator struct {
+	group   *SystemGroup
+	top     []*Node
+	topTemp []*Node
+	buffer  []ISystem
+	topSize int
+	size    int
+}
+
+func (s *SystemGroupIterator) Begin() []ISystem {
+	if s.group == nil {
+		return nil
+	}
+	copy(s.top, s.group.root.children)
+	s.topSize = len(s.group.root.children)
+	return s.Next()
+}
+
+func (s *SystemGroupIterator) Next() []ISystem {
+	if s.topSize == 0 {
+		s.size = 0
+		return nil
+	}
+	s.topTemp, s.top = s.top, s.topTemp
+	tempSize := s.topSize
+	s.topSize = 0
+	s.size = 0
+	for i := 0; i < tempSize; i++ {
+		s.buffer[s.size] = s.topTemp[i].val
+		s.size++
+		for j := 0; j < len(s.topTemp[i].children); j++ {
+			s.top[s.topSize+j] = s.topTemp[i].children[j]
+		}
+		s.topSize += len(s.topTemp[i].children)
+	}
+
+	if s.size == 0 {
+		return nil
+	}
+	return s.buffer[:s.size]
+}
+
+func (s *SystemGroupIterator) End() bool {
+	return s.size == 0
 }

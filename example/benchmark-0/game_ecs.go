@@ -63,9 +63,14 @@ func DataGenerateECS(game *GameECS) {
 		t3 := &Test3{}
 		t4 := &Test4{}
 		t5 := &Test5{}
+		t6 := &Test6{}
+		t7 := &Test7{}
+		t8 := &Test8{}
+		t9 := &Test9{}
+		t10 := &Test10{}
 
 		e := game.world.NewEntity()
-		e.Add(p, m, h, f, t1, t2, t3, t4, t5)
+		e.Add(p, m, h, f, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10)
 
 		game.entities = append(game.entities, e.Entity())
 	}

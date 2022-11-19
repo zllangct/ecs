@@ -17,48 +17,33 @@ const (
 	WorldStatusStop
 )
 
-var mainThreadDebug = false
-var mainThreadID int64 = -1
-
-func EnableMainThreadDebug() {
-	mainThreadDebug = true
-}
-
-var metaInfoDebug = false
-
-func EnableMetaInfoDebug() {
-	metaInfoDebug = true
-}
-
-func checkMainThread() {
-	if id := atomic.LoadInt64(&mainThreadID); id != goroutineID() && id > 0 {
-		panic("not main thread")
-	}
-}
-
 type WorldConfig struct {
-	Debug             bool //Debug模式
-	IsMetrics         bool
-	IsMetricsPrint    bool
-	CpuNum            int    //使用的最大cpu数量
-	MaxPoolThread     uint32 //线程池最大线程数量
-	MaxPoolJobQueue   uint32 //线程池最大任务队列长度
-	HashCount         int    //容器桶数量
-	CollectionVersion int
-	FrameInterval     time.Duration //帧间隔
-	StopCallback      func(world *worldBase)
+	Debug              bool //Debug模式
+	MetaInfoDebugPrint bool
+	MainThreadCheck    bool
+	IsMetrics          bool
+	IsMetricsPrint     bool
+	CpuNum             int    //使用的最大cpu数量
+	MaxPoolThread      uint32 //线程池最大线程数量
+	MaxPoolJobQueue    uint32 //线程池最大任务队列长度
+	HashCount          int    //容器桶数量
+	CollectionVersion  int
+	FrameInterval      time.Duration //帧间隔
+	StopCallback       func(world *worldBase)
 }
 
 func NewDefaultWorldConfig() *WorldConfig {
 	return &WorldConfig{
-		Debug:           true,
-		IsMetrics:       true,
-		IsMetricsPrint:  false,
-		CpuNum:          runtime.NumCPU(),
-		MaxPoolThread:   uint32(runtime.NumCPU() * 2),
-		MaxPoolJobQueue: 10,
-		HashCount:       runtime.NumCPU() * 4,
-		FrameInterval:   time.Millisecond * 33,
+		Debug:              true,
+		MetaInfoDebugPrint: true,
+		MainThreadCheck:    true,
+		IsMetrics:          true,
+		IsMetricsPrint:     false,
+		CpuNum:             runtime.NumCPU(),
+		MaxPoolThread:      uint32(runtime.NumCPU() * 2),
+		MaxPoolJobQueue:    10,
+		HashCount:          runtime.NumCPU() * 4,
+		FrameInterval:      time.Millisecond * 33,
 	}
 }
 
@@ -105,6 +90,7 @@ type worldBase struct {
 	ts              time.Time
 	delta           time.Duration
 	pureUpdateDelta time.Duration
+	mainThreadID    int64
 }
 
 func (w *worldBase) init(config *WorldConfig) *worldBase {
@@ -126,7 +112,7 @@ func (w *worldBase) init(config *WorldConfig) *worldBase {
 
 	w.idGenerator = NewEntityIDGenerator(1024, 10)
 
-	w.componentMeta = NewComponentMeta()
+	w.componentMeta = NewComponentMeta(w)
 	w.utilities = make(map[reflect.Type]IUtility)
 
 	w.metrics = NewMetrics(w.config.IsMetrics, w.config.IsMetricsPrint)
@@ -159,7 +145,7 @@ func (w *worldBase) getID() int64 {
 }
 
 func (w *worldBase) SwitchMainThread() {
-	atomic.StoreInt64(&mainThreadID, goroutineID())
+	atomic.StoreInt64(&w.mainThreadID, goroutineID())
 }
 
 func (w *worldBase) startup() {
@@ -167,7 +153,7 @@ func (w *worldBase) startup() {
 		panic("world is not initialized or already running.")
 	}
 
-	if metaInfoDebug || w.config.Debug {
+	if w.config.MetaInfoDebugPrint || w.config.Debug {
 		w.systemFlow.SystemInfoPrint()
 		w.componentMeta.ComponentMetaInfoPrint()
 	}
@@ -178,8 +164,8 @@ func (w *worldBase) startup() {
 }
 
 func (w *worldBase) update() {
-	if mainThreadDebug {
-		checkMainThread()
+	if w.config.MetaInfoDebugPrint {
+		w.checkMainThread()
 	}
 	w.SwitchMainThread()
 	if w.status != WorldStatusRunning {
@@ -197,6 +183,10 @@ func (w *worldBase) update() {
 
 func (w *worldBase) optimize(t time.Duration, force bool) {
 	w.optimizer.optimize(t, force)
+}
+
+func (w *worldBase) stop() {
+	w.workPool.Release()
 }
 
 func (w *worldBase) setStatus(status WorldStatus) {
@@ -227,15 +217,15 @@ func (w *worldBase) getMetrics() *Metrics {
 }
 
 func (w *worldBase) registerSystem(system ISystem) {
-	if mainThreadDebug {
-		checkMainThread()
+	if w.config.MainThreadCheck {
+		w.checkMainThread()
 	}
 	w.systemFlow.register(system)
 }
 
 func (w *worldBase) registerComponent(component IComponent) {
-	if mainThreadDebug {
-		checkMainThread()
+	if w.config.MainThreadCheck {
+		w.checkMainThread()
 	}
 	w.componentMeta.GetOrCreateComponentMetaInfo(component)
 }
@@ -297,7 +287,7 @@ func (w *worldBase) getOrCreateComponentMetaInfo(component IComponent) *Componen
 }
 
 func (w *worldBase) newEntity() *EntityInfo {
-	info := EntityInfo{world: w, entity: w.idGenerator.NewID()}
+	info := EntityInfo{world: w, entity: w.idGenerator.NewID(), compound: NewCompound(4)}
 	return w.addEntity(info)
 }
 
@@ -327,9 +317,8 @@ func (w *worldBase) addFreeComponent(component IComponent) {
 	w.addComponent(0, component)
 }
 
-func (w *worldBase) ClearFreeComponentSetByType(typ reflect.Type) {
-	free := w.componentMeta.GetFreeTypes()
-	if it, ok := free[typ]; ok {
-		w.components.deleteOperate(CollectionOperateDeleteAll, 0, it)
+func (w *worldBase) checkMainThread() {
+	if id := atomic.LoadInt64(&w.mainThreadID); id != goroutineID() && id > 0 {
+		panic("not main thread")
 	}
 }

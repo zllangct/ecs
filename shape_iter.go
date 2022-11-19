@@ -39,7 +39,8 @@ func (s *ShapeIter[T]) tryNext() *T {
 	var p unsafe.Pointer
 	var ec *EmptyComponent
 	for i := s.offset; i < s.maxLen; i++ {
-		p = s.indices.containers[s.mainKeyIndex].getPointer(int64(s.offset))
+		//TODO check if this is the best way to do this
+		p = s.indices.containers[s.mainKeyIndex].getPointerByIndex(int64(s.offset))
 		ec = (*EmptyComponent)(p)
 		if s.indices.readOnly[s.mainKeyIndex] {
 			*(**byte)(unsafe.Add(unsafe.Pointer(s.cur), s.indices.subOffset[s.mainKeyIndex])) = &(*(*byte)(p))

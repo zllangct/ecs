@@ -73,8 +73,6 @@ func (u *__world_Test_U_Input) ChangeName(entity Entity, name string) {
 }
 
 func Test_ecsWorld_World(t *testing.T) {
-	EnableMainThreadDebug()
-
 	config := NewDefaultWorldConfig()
 
 	world := NewSyncWorld(config)
@@ -98,15 +96,15 @@ func Test_ecsWorld_World(t *testing.T) {
 		u.ChangeName(entities[0], "name0")
 	}
 
-	for {
+	world.Update()
+	world.Stop()
+	for false {
 		world.Update()
 		time.Sleep(time.Second)
 	}
 }
 
 func Test_ecsWorld_World_launcher(t *testing.T) {
-	EnableMainThreadDebug()
-
 	config := NewDefaultWorldConfig()
 	config.FrameInterval = time.Second
 
@@ -143,7 +141,6 @@ func Test_ecsWorld_World_launcher(t *testing.T) {
 		u.ChangeName(entities[0], "name2")
 	})
 
-	for {
-		time.Sleep(time.Second)
-	}
+	time.Sleep(time.Second)
+	world.Stop()
 }

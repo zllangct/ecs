@@ -1,24 +1,14 @@
 package ecs
 
 import (
-	"reflect"
 	"unsafe"
 )
 
 const (
-	//InitMaxSize        = 1024 * 16
-	InitMaxSize        = 0
-	SeqMax      uint32 = 0xFFFFFFFF
+	InitMaxSize = 1024 * 16
+	//InitMaxSize        = 0
+	SeqMax uint32 = 0xFFFFFFFF
 )
-
-type ICollection interface {
-	Len() int
-	Range(func(v any) bool)
-	Clear()
-	ElementType() reflect.Type
-
-	getPointer(idx int64) unsafe.Pointer
-}
 
 type UnorderedCollection[T any] struct {
 	eleSize  uintptr
@@ -43,13 +33,6 @@ func NewUnorderedCollection[T any](initSize ...int) *UnorderedCollection[T] {
 
 func (c *UnorderedCollection[T]) Get(idx int64) *T {
 	return (*T)(unsafe.Add(unsafe.Pointer(&c.data[0]), uintptr(idx)*c.eleSize))
-}
-
-func (c *UnorderedCollection[T]) getPointer(idx int64) unsafe.Pointer {
-	if len(c.data) == 0 {
-		panic("get pointer from empty collection")
-	}
-	return unsafe.Add(unsafe.Pointer(&c.data[0]), uintptr(idx)*c.eleSize)
 }
 
 func (c *UnorderedCollection[T]) Add(element *T) (*T, int64) {
@@ -80,7 +63,7 @@ func (c *UnorderedCollection[T]) Len() int {
 	return int(c.len)
 }
 
-func (c *UnorderedCollection[T]) RangeRaw(f func(element *T) bool) {
+func (c *UnorderedCollection[T]) Range(f func(element *T) bool) {
 	for i := int64(0); i < c.len; i++ {
 		if !f(&c.data[i]) {
 			break
@@ -88,12 +71,9 @@ func (c *UnorderedCollection[T]) RangeRaw(f func(element *T) bool) {
 	}
 }
 
-func (c *UnorderedCollection[T]) Range(f func(element any) bool) {
-	for i := int64(0); i < c.len; i++ {
-		if !f(&c.data[i]) {
-			break
-		}
-	}
+func (c *UnorderedCollection[T]) Clear() {
+	c.data = make([]T, 0, c.initSize)
+	c.len = 0
 }
 
 func (c *UnorderedCollection[T]) shrink() {
@@ -111,24 +91,15 @@ func (c *UnorderedCollection[T]) shrink() {
 	}
 }
 
-func (c *UnorderedCollection[T]) Clear() {
-	c.data = make([]T, 0, c.initSize)
-	c.len = 0
-}
-
-func (c *UnorderedCollection[T]) ElementType() reflect.Type {
-	return TypeOf[T]()
-}
-
-func (c *UnorderedCollection[T]) getData() []T {
-	return c.data
-}
-
 func (c *UnorderedCollection[T]) getIndexByElePointer(element *T) int64 {
 	if c.len == 0 {
 		return -1
 	}
-	idx := int64(((uintptr)(unsafe.Pointer(element)) - uintptr(unsafe.Pointer(&c.data[0]))) / c.eleSize)
+	offset := uintptr(unsafe.Pointer(element)) - uintptr(unsafe.Pointer(&c.data[0]))
+	if offset%c.eleSize != 0 {
+		return -1
+	}
+	idx := int64(offset / c.eleSize)
 	if idx < 0 || idx > c.len-1 {
 		return -1
 	}

@@ -50,6 +50,7 @@ func (w *AsyncWorld) Startup() {
 					w.stopHandler(w)
 				}
 				w.systemFlow.stop()
+				w.workPool.Release()
 				return
 			default:
 			}

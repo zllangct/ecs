@@ -88,7 +88,7 @@ func (t *Test5System) Update(event ecs.Event) {
 }
 
 type Test6System struct {
-	ecs.System[Test5System]
+	ecs.System[Test6System]
 }
 
 func (t *Test6System) Init(si ecs.SystemInitConstraint) {
@@ -105,7 +105,7 @@ func (t *Test6System) Update(event ecs.Event) {
 }
 
 type Test7System struct {
-	ecs.System[Test5System]
+	ecs.System[Test7System]
 }
 
 func (t *Test7System) Init(si ecs.SystemInitConstraint) {
@@ -122,7 +122,7 @@ func (t *Test7System) Update(event ecs.Event) {
 }
 
 type Test8System struct {
-	ecs.System[Test5System]
+	ecs.System[Test8System]
 }
 
 func (t *Test8System) Init(si ecs.SystemInitConstraint) {
@@ -156,7 +156,7 @@ func (t *Test9System) Update(event ecs.Event) {
 }
 
 type Test10System struct {
-	ecs.System[Test5System]
+	ecs.System[Test10System]
 }
 
 func (t *Test10System) Init(si ecs.SystemInitConstraint) {

@@ -7,7 +7,6 @@ type Iterator[T any] interface {
 	Val() *T
 	Next() *T
 	End() bool
-	Empty() bool
 }
 
 type Iter[T any] struct {
@@ -24,13 +23,6 @@ type Iter[T any] struct {
 
 func EmptyIter[T any]() Iterator[T] {
 	return &Iter[T]{}
-}
-
-func (i *Iter[T]) Empty() bool {
-	if i.len == 0 {
-		return true
-	}
-	return false
 }
 
 func (i *Iter[T]) End() bool {

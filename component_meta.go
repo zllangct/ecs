@@ -17,6 +17,7 @@ type ComponentMetaInfo struct {
 }
 
 type componentMeta struct {
+	world      *worldBase
 	seq        uint16
 	types      map[reflect.Type]uint16
 	infos      *SparseArray[uint16, ComponentMetaInfo]
@@ -24,8 +25,9 @@ type componentMeta struct {
 	free       map[reflect.Type]uint16
 }
 
-func NewComponentMeta() *componentMeta {
+func NewComponentMeta(world *worldBase) *componentMeta {
 	return &componentMeta{
+		world:      world,
 		seq:        0,
 		types:      make(map[reflect.Type]uint16),
 		infos:      NewSparseArray[uint16, ComponentMetaInfo](),
@@ -35,8 +37,8 @@ func NewComponentMeta() *componentMeta {
 }
 
 func (c *componentMeta) CreateComponentMetaInfo(typ reflect.Type, ct ComponentType) *ComponentMetaInfo {
-	if mainThreadDebug {
-		checkMainThread()
+	if c.world.config.MainThreadCheck {
+		c.world.checkMainThread()
 	}
 	c.seq++
 	info := &ComponentMetaInfo{}

@@ -47,6 +47,7 @@ func BenchmarkEcs(b *testing.B) {
 	game := &GameECS{}
 	config := ecs.NewDefaultWorldConfig()
 	config.Debug = false
+	config.MetaInfoDebugPrint = false
 	game.init(config)
 
 	game.world.Startup()
@@ -74,7 +75,7 @@ func BenchmarkEcsSingleCore(b *testing.B) {
 	game := &GameECS{}
 	config := ecs.NewDefaultWorldConfig()
 	config.Debug = false
-	config.CollectionVersion = 1
+	config.MetaInfoDebugPrint = false
 	game.init(config)
 
 	game.world.Startup()

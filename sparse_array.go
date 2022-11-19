@@ -6,6 +6,7 @@ type SparseArray[K Integer, V any] struct {
 	idx2Key         map[int32]int32
 	maxKey          K
 	shrinkThreshold int32
+	initSize        int
 }
 
 func NewSparseArray[K Integer, V any](initSize ...int) *SparseArray[K, V] {
@@ -20,8 +21,14 @@ func NewSparseArray[K Integer, V any](initSize ...int) *SparseArray[K, V] {
 			data:    make([]V, 0, size),
 			eleSize: eleSize,
 		},
-		idx2Key: map[int32]int32{},
+		idx2Key:  map[int32]int32{},
+		initSize: int(size),
 	}
+
+	if size > 0 {
+		c.indices = make([]int32, 0, size)
+	}
+
 	switch any(*new(K)).(type) {
 	case int8, uint8:
 		c.shrinkThreshold = 127
@@ -31,9 +38,6 @@ func NewSparseArray[K Integer, V any](initSize ...int) *SparseArray[K, V] {
 		c.shrinkThreshold = 1024
 	}
 
-	if size == 0 {
-		c.indices = make([]int32, 1)
-	}
 	return c
 }
 
@@ -102,6 +106,22 @@ func (g *SparseArray[K, V]) Get(key K) *V {
 		return nil
 	}
 	return g.UnorderedCollection.Get(int64(idx))
+}
+
+func (g *SparseArray[K, V]) Clear() {
+	if g.Len() == 0 {
+		return
+	}
+	g.UnorderedCollection.Clear()
+	if int(g.maxKey) < 1024 {
+		for i := 0; i < len(g.indices); i++ {
+			g.indices[i] = 0
+		}
+	} else {
+		g.indices = make([]int32, 0, g.initSize)
+	}
+	g.maxKey = 0
+	g.idx2Key = map[int32]int32{}
 }
 
 func (g *SparseArray[K, V]) shrink(key K) {
