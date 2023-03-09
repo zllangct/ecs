@@ -33,6 +33,7 @@ func NewShapeIterator[T any](indices ShapeIndices, mainKeyIndex int) IShapeItera
 	return iter
 }
 
+// TODO 热点
 func (s *ShapeIter[T]) tryNext() *T {
 	skip := false
 	find := false
@@ -48,22 +49,7 @@ func (s *ShapeIter[T]) tryNext() *T {
 			*(**byte)(unsafe.Add(unsafe.Pointer(s.cur), s.indices.subOffset[s.mainKeyIndex])) = (*byte)(p)
 		}
 		entity := ec.Owner()
-		skip = false
-		for i := 0; i < len(s.indices.subTypes); i++ {
-			if i == s.mainKeyIndex {
-				continue
-			}
-			subPointer := s.indices.containers[i].getPointerByEntity(entity)
-			if subPointer == nil {
-				skip = true
-				break
-			}
-			if s.indices.readOnly[i] {
-				*(**byte)(unsafe.Add(unsafe.Pointer(s.cur), s.indices.subOffset[i])) = &(*(*byte)(subPointer))
-			} else {
-				*(**byte)(unsafe.Add(unsafe.Pointer(s.cur), s.indices.subOffset[i])) = (*byte)(subPointer)
-			}
-		}
+		skip = s.getSiblings(entity)
 		if !skip {
 			s.offset = i
 			find = true
@@ -75,6 +61,28 @@ func (s *ShapeIter[T]) tryNext() *T {
 	}
 
 	return s.cur
+}
+
+func (s *ShapeIter[T]) getSiblings(entity Entity) bool {
+	for i := 0; i < len(s.indices.subTypes); i++ {
+		if i == s.mainKeyIndex {
+			continue
+		}
+		subPointer := s.indices.containers[i].getPointerByEntity(entity)
+		if subPointer == nil {
+			return true
+		}
+		s.trans(i, subPointer)
+	}
+	return false
+}
+
+func (s *ShapeIter[T]) trans(i int, subPointer unsafe.Pointer) {
+	if s.indices.readOnly[i] {
+		*(**byte)(unsafe.Add(unsafe.Pointer(s.cur), s.indices.subOffset[i])) = &(*(*byte)(subPointer))
+	} else {
+		*(**byte)(unsafe.Add(unsafe.Pointer(s.cur), s.indices.subOffset[i])) = (*byte)(subPointer)
+	}
 }
 
 func (s *ShapeIter[T]) End() bool {

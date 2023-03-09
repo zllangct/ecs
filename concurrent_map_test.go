@@ -5,7 +5,7 @@
 package ecs_test
 
 import (
-	"ecs"
+	"github.com/zllangct/ecs"
 	"math/rand"
 	"runtime"
 	"sync"
