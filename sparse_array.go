@@ -5,28 +5,23 @@ type SparseArray[K Integer, V any] struct {
 	indices         []int32
 	idx2Key         map[int32]int32
 	maxKey          K
+	sum             int64
 	shrinkThreshold int32
-	initSize        int
 }
 
 func NewSparseArray[K Integer, V any](initSize ...int) *SparseArray[K, V] {
-	typ := TypeOf[V]()
-	eleSize := typ.Size()
-	size := InitMaxSize / eleSize
+	initCap := 0
 	if len(initSize) > 0 {
-		size = uintptr(initSize[0]) / eleSize
+		initCap = initSize[0]
 	}
 	c := &SparseArray[K, V]{
-		UnorderedCollection: UnorderedCollection[V]{
-			data:    make([]V, 0, size),
-			eleSize: eleSize,
-		},
-		idx2Key:  map[int32]int32{},
-		initSize: int(size),
+		idx2Key: map[int32]int32{},
 	}
 
-	if size > 0 {
-		c.indices = make([]int32, 0, size)
+	c.UnorderedCollection.init(true, initCap)
+
+	if initCap > 0 {
+		c.indices = make([]int32, 0, initCap)
 	}
 
 	switch any(*new(K)).(type) {
@@ -57,12 +52,7 @@ func (g *SparseArray[K, V]) Add(key K, value *V) *V {
 		} else {
 			m = key * 5 / 4
 		}
-		newIndices := make([]int32, m)
-		count := copy(newIndices, g.indices)
-		if count != length {
-			panic("copy failed")
-		}
-		g.indices = newIndices
+		g.indices = append(g.indices, make([]int32, m, m)...)
 	}
 
 	g.idx2Key[int32(idx)] = int32(key)
@@ -70,6 +60,7 @@ func (g *SparseArray[K, V]) Add(key K, value *V) *V {
 	if key > g.maxKey {
 		g.maxKey = key
 	}
+	g.sum += int64(key)
 
 	return &g.data[idx]
 }
@@ -84,6 +75,8 @@ func (g *SparseArray[K, V]) Remove(key K) *V {
 	delete(g.idx2Key, idx)
 	g.indices[g.idx2Key[int32(oldIndex)]] = int32(newIndex + 1)
 	g.indices[key] = 0
+
+	g.sum -= int64(key)
 
 	g.shrink(key)
 
@@ -112,7 +105,7 @@ func (g *SparseArray[K, V]) Clear() {
 	if g.Len() == 0 {
 		return
 	}
-	g.UnorderedCollection.Clear()
+	g.UnorderedCollection.Reset()
 	if int(g.maxKey) < 1024 {
 		for i := 0; i < len(g.indices); i++ {
 			g.indices[i] = 0
@@ -121,6 +114,7 @@ func (g *SparseArray[K, V]) Clear() {
 		g.indices = make([]int32, 0, g.initSize)
 	}
 	g.maxKey = 0
+	g.sum = 0
 	g.idx2Key = map[int32]int32{}
 }
 
@@ -141,10 +135,11 @@ func (g *SparseArray[K, V]) shrink(key K) {
 		g.maxKey = K(g.shrinkThreshold)
 	}
 
-	if len(g.indices) > 1024 && int(g.maxKey) < len(g.indices)/2 {
+	if len(g.indices) > 1024 && int(g.maxKey) < len(g.indices)/2 && int64(g.maxKey) > g.sum/int64(g.len)*2 {
 		m := (g.maxKey + 1) * 5 / 4
-		newIndices := make([]int32, m)
-		count := copy(newIndices, g.indices[:m])
+		temp := g.indices
+		g.indices = make([]int32, g.maxKey+1, m)
+		count := copy(g.indices, temp[:g.maxKey+1])
 		if count != int(m) {
 			panic("copy failed")
 		}

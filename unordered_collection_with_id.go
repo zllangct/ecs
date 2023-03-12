@@ -18,20 +18,15 @@ type UnorderedCollectionWithID[T any] struct {
 }
 
 func NewUnorderedCollectionWithID[T any](initSize ...int) *UnorderedCollectionWithID[T] {
-	typ := TypeOf[T]()
-	eleSize := typ.Size()
-	size := InitMaxSize / eleSize
+	initCap := 0
 	if len(initSize) > 0 {
-		eleSize = uintptr(initSize[0]) / eleSize
+		initCap = initSize[0]
 	}
 	c := &UnorderedCollectionWithID[T]{
 		ids:    map[int64]int64{},
 		idx2id: map[int64]int64{},
-		UnorderedCollection: UnorderedCollection[T]{
-			data:    make([]T, 0, size),
-			eleSize: eleSize,
-		},
 	}
+	c.UnorderedCollection.init(true, initCap)
 	return c
 }
 

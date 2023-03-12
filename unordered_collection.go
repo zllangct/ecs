@@ -1,49 +1,88 @@
 package ecs
 
 import (
+	"arena"
 	"unsafe"
 )
 
 const (
-	InitMaxSize = 1024 * 16
-	//InitMaxSize        = 0
-	SeqMax uint32 = 0xFFFFFFFF
+	SeqMax        uint32 = 0xFFFFFFFF
+	ShrinkMinSize int    = 1024
 )
 
 type UnorderedCollection[T any] struct {
+	isArena  bool
+	a        *arena.Arena
 	eleSize  uintptr
-	len      int64
-	initSize int64
+	len      int
+	initSize int
 	data     []T
 }
 
 func NewUnorderedCollection[T any](initSize ...int) *UnorderedCollection[T] {
-	typ := TypeOf[T]()
-	eleSize := typ.Size()
-	size := InitMaxSize / eleSize
-	c := &UnorderedCollection[T]{
-		data: make([]T, 0, size),
+	c := &UnorderedCollection[T]{}
+	size := 0
+	for _, v := range initSize {
+		size = v
 	}
-	if len(initSize) > 0 {
-		c.initSize = int64(initSize[0])
-		c.eleSize = uintptr(initSize[0]) / eleSize
-	}
+	c.init(true, size)
 	return c
 }
 
+func NewUnorderedCollectionNoArena[T any](initSize ...int) *UnorderedCollection[T] {
+	c := &UnorderedCollection[T]{}
+	size := 0
+	for _, v := range initSize {
+		size = v
+	}
+	c.init(false, size)
+	return c
+}
+
+func (c *UnorderedCollection[T]) init(isArena bool, initSize int) {
+	c.isArena = isArena
+	typ := TypeOf[T]()
+	c.initSize = initSize
+	c.eleSize = typ.Size()
+	c.alloc(0, initSize)
+	c.len = 0
+}
+
+func (c *UnorderedCollection[T]) alloc(size int, cap int) {
+	if c.isArena {
+		if c.a != nil {
+			c.a.Free()
+		}
+		c.a = arena.NewArena()
+		c.data = arena.MakeSlice[T](c.a, size, cap)
+	} else {
+		c.a = nil
+		c.data = make([]T, size, cap)
+	}
+}
+
+func (c *UnorderedCollection[T]) Free() {
+	if c.a != nil {
+		c.a.Free()
+	}
+	c.len = 0
+	c.data = nil
+}
+
 func (c *UnorderedCollection[T]) Get(idx int64) *T {
+	//return &c.data[idx]
 	return (*T)(unsafe.Add(unsafe.Pointer(&c.data[0]), uintptr(idx)*c.eleSize))
 }
 
 func (c *UnorderedCollection[T]) Add(element *T) (*T, int64) {
-	if int64(len(c.data)) > c.len {
+	if len(c.data) > c.len {
 		c.data[c.len] = *element
 	} else {
 		c.data = append(c.data, *element)
 	}
 	idx := c.len
 	c.len++
-	return &c.data[idx], idx
+	return &c.data[idx], int64(idx)
 }
 
 func (c *UnorderedCollection[T]) Remove(idx int64) (*T, int64, int64) {
@@ -53,41 +92,46 @@ func (c *UnorderedCollection[T]) Remove(idx int64) (*T, int64, int64) {
 	lastIdx := c.len - 1
 
 	c.data[idx], c.data[lastIdx] = c.data[lastIdx], c.data[idx]
-	c.shrink()
 	c.len--
 	removed := c.data[lastIdx]
-	return &removed, lastIdx, idx
+	c.shrink()
+	return &removed, int64(lastIdx), idx
 }
 
 func (c *UnorderedCollection[T]) Len() int {
-	return int(c.len)
+	return c.len
 }
 
 func (c *UnorderedCollection[T]) Range(f func(element *T) bool) {
-	for i := int64(0); i < c.len; i++ {
+	for i := 0; i < c.len; i++ {
 		if !f(&c.data[i]) {
 			break
 		}
 	}
 }
 
-func (c *UnorderedCollection[T]) Clear() {
-	c.data = make([]T, 0, c.initSize)
+func (c *UnorderedCollection[T]) Reset() {
+	c.data = c.data[0:0]
 	c.len = 0
+	c.shrink()
 }
 
 func (c *UnorderedCollection[T]) shrink() {
-	var threshold int64
-	if len(c.data) < InitMaxSize {
+	capSize := cap(c.data)
+	if capSize < ShrinkMinSize || capSize <= c.initSize {
 		return
-	} else {
-		threshold = int64(float64(c.len) * 1.25)
 	}
-	if int64(len(c.data)) > threshold {
-		//c.data = c.data[:threshold]
-		newData := make([]T, threshold)
-		copy(newData, c.data)
-		c.data = newData
+	threshold := int(float64(c.len) * 2)
+	if cap(c.data) > threshold {
+		resize := int(float64(c.len) * 1.25)
+		var temp []T
+		if c.isArena {
+			temp = arena.Clone(c.data)
+		} else {
+			temp = c.data
+		}
+		c.alloc(c.len, resize)
+		copy(c.data, temp[:c.len])
 	}
 }
 
@@ -99,11 +143,11 @@ func (c *UnorderedCollection[T]) getIndexByElePointer(element *T) int64 {
 	if offset%c.eleSize != 0 {
 		return -1
 	}
-	idx := int64(offset / c.eleSize)
+	idx := int(offset / c.eleSize)
 	if idx < 0 || idx > c.len-1 {
 		return -1
 	}
-	return idx
+	return int64(idx)
 }
 
 func NewUnorderedCollectionIterator[T ComponentObject](collection *UnorderedCollection[T], readOnly ...bool) Iterator[T] {

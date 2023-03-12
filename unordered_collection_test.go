@@ -11,6 +11,24 @@ type __unorderedCollection_Test_item struct {
 	Arr    [3]int
 }
 
+func TestUnorderedCollection_RW(t *testing.T) {
+	c := NewUnorderedCollection[__unorderedCollection_Test_item](0)
+	for i := 0; i < 5; i++ {
+		_, _ = c.Add(&__unorderedCollection_Test_item{
+			ItemID: int64(i),
+			Arr:    [3]int{1, 2, 3},
+		})
+	}
+
+	if get, want := c.Get(2).ItemID, int64(2); get != want {
+		t.Errorf("want: %d, get: %d", want, get)
+	}
+
+	for i := 0; i < 5; i++ {
+		c.Remove(0)
+	}
+}
+
 func TestUnorderedCollection_Iterator(t *testing.T) {
 	//准备数据
 	caseCount := 50
