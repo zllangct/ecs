@@ -11,8 +11,9 @@ type SyncSystem struct {
 	ecs.System[SyncSystem]
 }
 
-func (m *SyncSystem) Init(si ecs.SystemInitConstraint) {
+func (m *SyncSystem) Init(si ecs.SystemInitConstraint) error {
 	m.SetRequirements(si, &Position{}, &PlayerComponent{})
+	return nil
 }
 
 func (m *SyncSystem) PostUpdate(event ecs.Event) {

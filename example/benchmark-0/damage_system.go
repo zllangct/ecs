@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"github.com/zllangct/ecs"
 	"math/rand"
 )
@@ -22,7 +23,7 @@ type DamageSystem struct {
 	targetGetter *ecs.Shape[Target]
 }
 
-func (d *DamageSystem) Init(si ecs.SystemInitConstraint) {
+func (d *DamageSystem) Init(si ecs.SystemInitConstraint) error {
 	d.SetRequirements(
 		si,
 		//&ecs.ReadOnly[Position]{},
@@ -36,8 +37,9 @@ func (d *DamageSystem) Init(si ecs.SystemInitConstraint) {
 	d.targetGetter = ecs.NewShape[Target](si)
 
 	if !d.casterGetter.IsValid() || !d.targetGetter.IsValid() {
-		si.SetBroken("invalid shape getter")
+		return errors.New("invalid shape getter")
 	}
+	return nil
 }
 
 // Update will be called every frame

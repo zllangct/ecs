@@ -49,9 +49,10 @@ func (m *MoveSystem) Init(si ecs.SystemInitConstraint) {
 	m.getter = ecs.NewShape[MoveSystemData](si)
 }
 
-func (m *MoveSystem) UpdateTimeScale(timeScale []interface{}) {
+func (m *MoveSystem) UpdateTimeScale(timeScale []interface{}) error {
 	ecs.Log.Info("time scale change to ", timeScale[0])
 	m.timeScale = timeScale[0].(float64)
+	return nil
 }
 
 func (m *MoveSystem) Update(event ecs.Event) {

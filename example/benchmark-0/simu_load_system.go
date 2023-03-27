@@ -6,8 +6,9 @@ type Test1System struct {
 	ecs.System[Test1System]
 }
 
-func (t *Test1System) Init(si ecs.SystemInitConstraint) {
+func (t *Test1System) Init(si ecs.SystemInitConstraint) error {
 	t.SetRequirements(si, &Test1{})
+	return nil
 }
 
 func (t *Test1System) Update(event ecs.Event) {
@@ -23,8 +24,9 @@ type Test2System struct {
 	ecs.System[Test2System]
 }
 
-func (t *Test2System) Init(si ecs.SystemInitConstraint) {
+func (t *Test2System) Init(si ecs.SystemInitConstraint) error {
 	t.SetRequirements(si, &Test2{})
+	return nil
 }
 
 func (t *Test2System) Update(event ecs.Event) {
@@ -40,8 +42,9 @@ type Test3System struct {
 	ecs.System[Test3System]
 }
 
-func (t *Test3System) Init(si ecs.SystemInitConstraint) {
+func (t *Test3System) Init(si ecs.SystemInitConstraint) error {
 	t.SetRequirements(si, &Test3{})
+	return nil
 }
 
 func (t *Test3System) Update(event ecs.Event) {
@@ -57,8 +60,9 @@ type Test4System struct {
 	ecs.System[Test4System]
 }
 
-func (t *Test4System) Init(si ecs.SystemInitConstraint) {
+func (t *Test4System) Init(si ecs.SystemInitConstraint) error {
 	t.SetRequirements(si, &Test4{})
+	return nil
 }
 
 func (t *Test4System) Update(event ecs.Event) {
@@ -74,8 +78,9 @@ type Test5System struct {
 	ecs.System[Test5System]
 }
 
-func (t *Test5System) Init(si ecs.SystemInitConstraint) {
+func (t *Test5System) Init(si ecs.SystemInitConstraint) error {
 	t.SetRequirements(si, &Test5{})
+	return nil
 }
 
 func (t *Test5System) Update(event ecs.Event) {
@@ -91,8 +96,9 @@ type Test6System struct {
 	ecs.System[Test6System]
 }
 
-func (t *Test6System) Init(si ecs.SystemInitConstraint) {
+func (t *Test6System) Init(si ecs.SystemInitConstraint) error {
 	t.SetRequirements(si, &Test6{})
+	return nil
 }
 
 func (t *Test6System) Update(event ecs.Event) {
@@ -108,8 +114,9 @@ type Test7System struct {
 	ecs.System[Test7System]
 }
 
-func (t *Test7System) Init(si ecs.SystemInitConstraint) {
+func (t *Test7System) Init(si ecs.SystemInitConstraint) error {
 	t.SetRequirements(si, &Test7{})
+	return nil
 }
 
 func (t *Test7System) Update(event ecs.Event) {
@@ -125,8 +132,9 @@ type Test8System struct {
 	ecs.System[Test8System]
 }
 
-func (t *Test8System) Init(si ecs.SystemInitConstraint) {
+func (t *Test8System) Init(si ecs.SystemInitConstraint) error {
 	t.SetRequirements(si, &Test8{})
+	return nil
 }
 
 func (t *Test8System) Update(event ecs.Event) {
@@ -142,8 +150,9 @@ type Test9System struct {
 	ecs.System[Test9System]
 }
 
-func (t *Test9System) Init(si ecs.SystemInitConstraint) {
+func (t *Test9System) Init(si ecs.SystemInitConstraint) error {
 	t.SetRequirements(si, &Test9{})
+	return nil
 }
 
 func (t *Test9System) Update(event ecs.Event) {
@@ -159,8 +168,9 @@ type Test10System struct {
 	ecs.System[Test10System]
 }
 
-func (t *Test10System) Init(si ecs.SystemInitConstraint) {
+func (t *Test10System) Init(si ecs.SystemInitConstraint) error {
 	t.SetRequirements(si, &Test10{})
+	return nil
 }
 
 func (t *Test10System) Update(event ecs.Event) {
