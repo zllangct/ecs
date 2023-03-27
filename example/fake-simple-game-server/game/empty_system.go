@@ -9,8 +9,9 @@ type EmptySystem struct {
 	isPostStart bool
 }
 
-func (e *EmptySystem) Init(si ecs.SystemInitConstraint) {
+func (e *EmptySystem) Init(si ecs.SystemInitConstraint) error {
 	ecs.Log.Info("empty system init")
+	return nil
 }
 
 func (e *EmptySystem) Start(event ecs.Event) {

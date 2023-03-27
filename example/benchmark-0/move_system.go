@@ -8,8 +8,9 @@ type MoveSystem struct {
 	ecs.System[MoveSystem]
 }
 
-func (m *MoveSystem) Init(si ecs.SystemInitConstraint) {
+func (m *MoveSystem) Init(si ecs.SystemInitConstraint) error {
 	m.SetRequirements(si, &Position{}, &ecs.ReadOnly[Movement]{})
+	return nil
 }
 
 func (m *MoveSystem) Update(event ecs.Event) {
