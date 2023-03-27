@@ -12,5 +12,5 @@ type Position struct {
 type Movement struct {
 	ecs.Component[Movement]
 	V   int
-	Dir []int
+	Dir [3]int
 }

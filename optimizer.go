@@ -21,7 +21,7 @@ func (o *OptimizerReporter) init() {
 }
 
 type optimizer struct {
-	world                  *worldBase
+	world                  *ecsWorld
 	startTime              time.Time
 	expireTime             time.Time
 	lastSample             time.Time
@@ -29,7 +29,7 @@ type optimizer struct {
 	lastCollectConsumption time.Duration
 }
 
-func newOptimizer(world *worldBase) *optimizer {
+func newOptimizer(world *ecsWorld) *optimizer {
 	return &optimizer{world: world}
 }
 

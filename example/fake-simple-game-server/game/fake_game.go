@@ -2,6 +2,7 @@ package game
 
 import (
 	"context"
+	"errors"
 	"github.com/zllangct/ecs"
 	"strconv"
 	"strings"
@@ -18,7 +19,7 @@ type Msg2Client struct {
 
 type FakeGame struct {
 	clients  sync.Map
-	world    ecs.iWorldBase
+	world    *ecs.AsyncWorld
 	chatRoom *ChatRoom
 }
 
@@ -33,38 +34,37 @@ func (f *FakeGame) Run(ctx context.Context) {
 }
 
 func (f *FakeGame) InitEcs() {
-	//run your ecs runtime
-	ecs.Configure(ecs.NewDefaultRuntimeConfig())
-	ecs.Run()
+	//create config
+	config := ecs.NewDefaultWorldConfig()
 
-	//create a world
-	f.world = ecs.CreateWorld(ecs.NewDefaultWorldConfig())
-	//world.Run() or ecs.WorldRun(world)
-	ecs.WorldRun(f.world)
+	//create a world and startup
+	f.world = ecs.NewAsyncWorld(config)
+	f.world.Startup()
 
 	//register your system
 	ecs.RegisterSystem[MoveSystem](f.world)
 	ecs.RegisterSystem[SyncSystem](f.world)
 	ecs.RegisterSystem[EmptySystem](f.world)
-	ecs.RegisterSystem[InputSystem](f.world)
 }
 
 func (f *FakeGame) EnterGame(sess *Session) {
-	info := f.world.newEntity()
-	info.Add(&PlayerComponent{
-		SessionID: sess.SessionID,
+	f.world.Wait(func(gaw ecs.SyncWrapper) error {
+		e := gaw.NewEntity()
+		gaw.Add(e, &PlayerComponent{
+			SessionID: sess.SessionID,
+		})
+		gaw.Add(e, &Position{
+			X: 100,
+			Y: 100,
+			Z: 100,
+		})
+		gaw.Add(e, &Movement{
+			V:   2000,
+			Dir: [3]int{1, 0, 0},
+		})
+		sess.Entity = e
+		return nil
 	})
-	info.Add(&Position{
-		X: 100,
-		Y: 100,
-		Z: 100,
-	})
-	info.Add(&Movement{
-		V:   2000,
-		Dir: []int{1, 0, 0},
-	})
-
-	sess.Entity = info.Entity()
 }
 
 func (f *FakeGame) InitNetwork() {
@@ -136,43 +136,44 @@ func (f *FakeGame) Dispatch(pkg interface{}, sess *Session) {
 			return
 		}
 		d := strings.Split(split[1], ",")
-		var dir []int
-		for _, s := range d {
-			value, _ := strconv.Atoi(s)
-			dir = append(dir, value)
+		if len(d) != 3 {
+			return
+		}
+		var dir [3]int
+		for i := 0; i < 3; i++ {
+			value, _ := strconv.Atoi(d[i])
+			dir[i] = value
 		}
 
 		v, _ := strconv.Atoi(split[2])
-
-		//e := ecs.GetEntityInfo(f.world, sess.entity)
-		//e.Add(&MoveChange2{
-		//	V:   v,
-		//	Dir: dir,
-		//})
-
-		//f.world.addFreeComponent(&MoveChange{
-		//	entity: sess.entity,
-		//	V:      v,
-		//	Dir:    dir,
-		//})
-
-		ecs.AddFreeComponent(f.world, &MoveChange{
-			Entity: sess.Entity,
-			V:      v,
-			Dir:    dir,
-		})
+		f.Move(sess.Entity, v, dir)
 	}
+}
+
+func (f *FakeGame) Move(entity ecs.Entity, v int, dir [3]int) {
+	if f.world == nil {
+		return
+	}
+	f.world.Sync(func(gaw ecs.SyncWrapper) error {
+		u, ok := ecs.GetUtility[MoveSystemUtility](gaw)
+		if !ok {
+			return errors.New("can not find MoveSystemUtility")
+		}
+		return u.Move(entity, v, dir)
+	})
 }
 
 func (f *FakeGame) ChangeMovementTimeScale(timeScale float64) {
 	if f.world == nil {
 		return
 	}
-	sys, ok := ecs.GetSystem[MoveSystem](f.world)
-	if !ok {
-		return
-	}
-	sys.Emit("UpdateTimeScale", timeScale)
+	f.world.Sync(func(gaw ecs.SyncWrapper) error {
+		u, ok := ecs.GetUtility[MoveSystemUtility](gaw)
+		if !ok {
+			return errors.New("can not find MoveSystemUtility")
+		}
+		return u.UpdateTimeScale(timeScale)
+	})
 }
 
 func (f *FakeGame) InitChat() {

@@ -6,21 +6,50 @@ import (
 )
 
 type SyncWrapper struct {
-	world *iWorldBase
+	world *IWorld
 }
 
-func (g SyncWrapper) getWorld() iWorldBase {
+func (g SyncWrapper) getWorld() IWorld {
 	return *g.world
 }
 
-func (g SyncWrapper) NewEntity() *EntityInfo {
-	return g.getWorld().newEntity()
+func (g SyncWrapper) NewEntity() Entity {
+	return g.getWorld().newEntity().Entity()
+}
+
+func (g SyncWrapper) DestroyEntity(entity Entity) {
+	info, ok := (*g.world).getEntityInfo(entity)
+	if !ok {
+		return
+	}
+	info.Destroy(*g.world)
+}
+
+func (g SyncWrapper) Add(entity Entity, components ...IComponent) {
+	info, ok := (*g.world).getEntityInfo(entity)
+	if !ok {
+		return
+	}
+	info.Add(*g.world, components...)
+}
+
+func (g SyncWrapper) Remove(entity Entity, components ...IComponent) {
+	info, ok := (*g.world).getEntityInfo(entity)
+	if !ok {
+		return
+	}
+	info.Remove(*g.world, components...)
+}
+
+type syncTask struct {
+	wait chan struct{}
+	fn   func(wrapper SyncWrapper) error
 }
 
 type AsyncWorld struct {
-	worldBase
+	ecsWorld
 	lock        sync.Mutex
-	syncQueue   []func(wrapper SyncWrapper)
+	syncQueue   []syncTask
 	wStop       chan struct{}
 	stopHandler func(world *AsyncWorld)
 }
@@ -29,7 +58,7 @@ func NewAsyncWorld(config *WorldConfig) *AsyncWorld {
 	w := &AsyncWorld{
 		wStop: make(chan struct{}),
 	}
-	w.worldBase.init(config)
+	w.ecsWorld.init(config)
 	return w
 }
 
@@ -72,7 +101,7 @@ func (w *AsyncWorld) Stop() {
 	w.wStop <- struct{}{}
 }
 
-func (w *AsyncWorld) getWorld() iWorldBase {
+func (w *AsyncWorld) getWorld() IWorld {
 	return w
 }
 
@@ -81,25 +110,42 @@ func (w *AsyncWorld) dispatch() {
 	defer w.lock.Unlock()
 
 	gaw := SyncWrapper{}
-	ig := iWorldBase(w)
+	ig := IWorld(w)
 	gaw.world = &ig
-	for _, fn := range w.syncQueue {
-		err := TryAndReport(func() {
-			fn(gaw)
+	for _, task := range w.syncQueue {
+		err := TryAndReport(func() error {
+			return task.fn(gaw)
 		})
 		if err != nil {
 			Log.Error(err)
 		}
+		if task.wait != nil {
+			task.wait <- struct{}{}
+		}
 	}
-	w.syncQueue = make([]func(SyncWrapper), 0)
+	w.syncQueue = make([]syncTask, 0)
 
 	*gaw.world = nil
 	gaw.world = nil
 }
 
-func (w *AsyncWorld) Sync(fn func(g SyncWrapper)) {
+func (w *AsyncWorld) Sync(fn func(g SyncWrapper) error) {
 	w.lock.Lock()
 	defer w.lock.Unlock()
 
-	w.syncQueue = append(w.syncQueue, fn)
+	w.syncQueue = append(w.syncQueue, syncTask{
+		wait: nil,
+		fn:   fn,
+	})
+}
+
+func (w *AsyncWorld) Wait(fn func(g SyncWrapper) error) {
+	w.lock.Lock()
+	defer w.lock.Unlock()
+	wait := make(chan struct{})
+	w.syncQueue = append(w.syncQueue, syncTask{
+		wait: wait,
+		fn:   fn,
+	})
+	<-wait
 }

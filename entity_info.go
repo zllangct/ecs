@@ -1,29 +1,26 @@
 package ecs
 
 type EntityInfo struct {
-	world    *worldBase
 	entity   Entity
 	compound Compound
 }
 
-func (e *EntityInfo) Destroy() {
-	e.world.deleteEntity(e.entity)
+func (e *EntityInfo) Destroy(world IWorld) {
 	for i := 0; i < len(e.compound); i++ {
-		e.world.deleteComponentByIntType(e.entity, e.compound[i])
+		world.deleteComponentByIntType(e.entity, e.compound[i])
 	}
+	// must be last
+	world.deleteEntity(e.entity)
 }
 
 func (e *EntityInfo) Entity() Entity {
 	return e.entity
 }
 
-func (e *EntityInfo) Add(components ...IComponent) {
-	if e.world.config.MainThreadCheck {
-		e.world.checkMainThread()
-	}
+func (e *EntityInfo) Add(world IWorld, components ...IComponent) {
 	for _, c := range components {
-		if !e.compound.Exist(e.world.getComponentMetaInfoByType(c.Type()).it) {
-			e.world.addComponent(e.entity, c)
+		if !e.compound.Exist(world.getComponentMetaInfoByType(c.Type()).it) {
+			world.addComponent(e.entity, c)
 		}
 	}
 }
@@ -37,9 +34,9 @@ func (e *EntityInfo) Has(its ...uint16) bool {
 	return true
 }
 
-func (e *EntityInfo) HasType(components ...IComponent) bool {
+func (e *EntityInfo) HasType(world *ecsWorld, components ...IComponent) bool {
 	for i := 0; i < len(components); i++ {
-		if !e.compound.Exist(e.world.getComponentMetaInfoByType(components[i].Type()).it) {
+		if !e.compound.Exist(world.getComponentMetaInfoByType(components[i].Type()).it) {
 			return false
 		}
 	}
@@ -54,13 +51,10 @@ func (e *EntityInfo) removeFromCompound(it uint16) {
 	e.compound.Remove(it)
 }
 
-func (e *EntityInfo) Remove(components ...IComponent) {
-	if e.world.config.MainThreadCheck {
-		e.world.checkMainThread()
-	}
+func (e *EntityInfo) Remove(world IWorld, components ...IComponent) {
 	for _, c := range components {
-		if e.compound.Exist(e.world.getComponentMetaInfoByType(c.Type()).it) {
-			e.world.deleteComponent(e.entity, c)
+		if e.compound.Exist(world.getComponentMetaInfoByType(c.Type()).it) {
+			world.deleteComponent(e.entity, c)
 		}
 	}
 }

@@ -133,8 +133,8 @@ func main() {
 	entities := make([]Entity, count)
 	for i := 0; i < count; i++ {
 		e1 := world.NewEntity()
-		e1.Add(&TestComponent1{}, &TestComponent2{}, &TestComponent3{})
-		entities[i] = e1.Entity()
+		world.Add(e1, &TestComponent1{}, &TestComponent2{}, &TestComponent3{})
+		entities[i] = e1
 	}
 
 	// 持续更新你的世界
@@ -246,9 +246,8 @@ world := ecs.NewAsyncWorld()
 ```
 ### 创建一个Entity
 ```go
-// NewEntity() 创建的是一个EntityInfo类型
-info := world.NewEntity()
-entity := info.Entity()
+// NewEntity() 创建的是一个Entity
+entity := world.NewEntity()
 ```
 ### 创建一个Component
 ```go
@@ -268,7 +267,7 @@ type TestSystem struct {
 // 所有系统事件都是可选的，如果不需要某个事件，可以不实现
 
 // 系统Init事件
-func (w *TestSystem) Init(sic SystemInitConstraint) {}
+func (w *TestSystem) Init(sic SystemInitConstraint) error {}
 
 // 系统Start事件
 func (w *TestSystem) Start(event Event) {}
@@ -401,8 +400,8 @@ func main() {
     entities := make([]Entity, 100)
     for i := 0; i < 100; i++ {
         e1 := world.NewEntity()
-        e1.Add(&TestComponent1{}, &TestComponent2{}, &TestComponent3{})
-        entities[i] = e1.Entity()
+        world.Add(e1, &TestComponent1{}, &TestComponent2{}, &TestComponent3{})
+        entities[i] = e1
     }
 
     // 尝试更新世界，使实体与他们的组件生效
@@ -459,8 +458,8 @@ func main() {
     world.Sync(func(gaw SyncWrapper) {
         for i := 0; i < __worldTest_Entity_Count; i++ {
             e1 := gaw.NewEntity()
-            e1.Add(&__world_Test_C_1{}, &__world_Test_C_2{}, &__world_Test_C_3{})
-            entities[i] = e1.Entity()
+            gaw.Add(e1, &__world_Test_C_1{}, &__world_Test_C_2{}, &__world_Test_C_3{})
+            entities[i] = e1
         }
     })
 	
@@ -492,7 +491,7 @@ type TestSystem1 struct {
     ecs.System[TestSystem1]
 }
 
-func (s *TestSystem1) Init(si SystemInitConstraint) {
+func (s *TestSystem1) Init(si SystemInitConstraint) error {
     Log.Info("TestSystem1 Init")
 }
 
@@ -584,7 +583,7 @@ type TestSystem1 struct {
     ecs.System[TestSystem1]
 }
 
-func (s *TestSystem1) Init(si SystemInitConstraint) {
+func (s *TestSystem1) Init(si SystemInitConstraint) error {
     // 设置系统感兴趣的组件
     s.SetRequirements(si, &TestComponent1{}, &TestComponent1{}, &TestComponent1{})
 }

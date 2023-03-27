@@ -8,7 +8,7 @@ type Event struct {
 }
 
 type InitReceiver interface {
-	Init(initializer SystemInitConstraint)
+	Init(initializer SystemInitConstraint) error
 }
 
 type SyncBeforeStartReceiver interface {

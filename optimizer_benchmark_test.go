@@ -47,7 +47,7 @@ func (t *__optimizer_Bench_S_1) Update(event Event) {
 }
 
 type __optimizer_Bench_GameECS struct {
-	world    iWorldBase
+	world    *SyncWorld
 	entities []Entity
 }
 
@@ -61,7 +61,7 @@ func (g *__optimizer_Bench_GameECS) init() {
 	for i := 0; i < testOptimizerEntityMax; i++ {
 		c := &__optimizer_Bench_C_1{}
 		e := g.world.newEntity()
-		e.Add(c)
+		g.world.Add(e.Entity(), c)
 		g.entities = append(g.entities, e.Entity())
 	}
 	rand.Seed(0)

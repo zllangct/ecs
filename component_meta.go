@@ -5,7 +5,7 @@ import (
 	"reflect"
 )
 
-func GetComponentMeta[T ComponentObject](world iWorldBase) *ComponentMetaInfo {
+func GetComponentMeta[T ComponentObject](world IWorld) *ComponentMetaInfo {
 	return world.getComponentMetaInfoByType(TypeOf[T]())
 }
 
@@ -17,7 +17,7 @@ type ComponentMetaInfo struct {
 }
 
 type componentMeta struct {
-	world      *worldBase
+	world      *ecsWorld
 	seq        uint16
 	types      map[reflect.Type]uint16
 	infos      *SparseArray[uint16, ComponentMetaInfo]
@@ -25,7 +25,7 @@ type componentMeta struct {
 	free       map[reflect.Type]uint16
 }
 
-func NewComponentMeta(world *worldBase) *componentMeta {
+func NewComponentMeta(world *ecsWorld) *componentMeta {
 	return &componentMeta{
 		world:      world,
 		seq:        0,
@@ -37,9 +37,7 @@ func NewComponentMeta(world *worldBase) *componentMeta {
 }
 
 func (c *componentMeta) CreateComponentMetaInfo(typ reflect.Type, ct ComponentType) *ComponentMetaInfo {
-	if c.world.config.MainThreadCheck {
-		c.world.checkMainThread()
-	}
+	c.world.checkMainThread()
 	c.seq++
 	info := &ComponentMetaInfo{}
 	info.it = c.seq

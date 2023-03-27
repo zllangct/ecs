@@ -35,7 +35,7 @@ func (g *GameECS) attack() {
 	}
 	for _, entity := range g.entities {
 		info, _ := g.world.GetEntityInfo(entity)
-		info.Add(act)
+		info.Add(g.world, act)
 	}
 }
 
@@ -70,8 +70,8 @@ func DataGenerateECS(game *GameECS) {
 		t10 := &Test10{}
 
 		e := game.world.NewEntity()
-		e.Add(p, m, h, f, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10)
+		game.world.Add(e, p, m, h, f, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10)
 
-		game.entities = append(game.entities, e.Entity())
+		game.entities = append(game.entities, e)
 	}
 }

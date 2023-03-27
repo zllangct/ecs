@@ -46,14 +46,14 @@ type SystemGroupList []*SystemGroup
 
 // system execute flow
 type systemFlow struct {
-	world     *worldBase
+	world     *ecsWorld
 	stages    map[Stage]SystemGroupList
 	stageList []Stage
 	systems   map[reflect.Type]ISystem
 	wg        *sync.WaitGroup
 }
 
-func newSystemFlow(runtime *worldBase) *systemFlow {
+func newSystemFlow(runtime *ecsWorld) *systemFlow {
 	sf := &systemFlow{
 		world:   runtime,
 		systems: map[reflect.Type]ISystem{},
@@ -113,44 +113,6 @@ func (p *systemFlow) flushTempTask() {
 		})
 	}
 	p.wg.Wait()
-}
-
-func (p *systemFlow) eventDispatch() {
-	var sq SystemGroupList
-	for _, period := range p.stageList {
-		sq = p.stages[period]
-		for _, sl := range sq {
-			iter := sl.iter(true)
-			for ss := iter.Begin(); !iter.End(); ss = iter.Next() {
-				if systemCount := len(ss); systemCount != 0 {
-					for i := 0; i < systemCount; i++ {
-						fn := ss[i].eventsAsyncExecute
-						p.wg.Add(1)
-						wg := p.wg
-						p.world.addJob(func() {
-							defer wg.Done()
-							fn()
-						})
-					}
-				}
-				p.wg.Wait()
-			}
-		}
-	}
-	for _, period := range p.stageList {
-		sq = p.stages[period]
-		for _, sl := range sq {
-			iter := sl.iter(true)
-			for ss := iter.Begin(); !iter.End(); ss = iter.Next() {
-				if systemCount := len(ss); systemCount != 0 {
-					for i := 0; i < systemCount; i++ {
-						fn := ss[i].eventsAsyncExecute
-						fn()
-					}
-				}
-			}
-		}
-	}
 }
 
 func (p *systemFlow) systemUpdate(event Event) {
@@ -321,13 +283,6 @@ func (p *systemFlow) run(event Event) {
 	reporter.Start()
 
 	//Log.Info("system flow # Temp Task Execute #")
-	p.flushTempTask()
-	reporter.Sample("Temp Task Execute")
-
-	//Log.Info("system flow # Event Dispatch #")
-	p.eventDispatch()
-	reporter.Sample("Event Dispatch")
-
 	p.flushTempTask()
 	reporter.Sample("Temp Task Execute")
 
