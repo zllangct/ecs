@@ -1,6 +1,8 @@
 package ecs
 
 import (
+	"errors"
+	"sync"
 	"testing"
 	"time"
 )
@@ -33,9 +35,10 @@ type __world_Test_S_1 struct {
 	System[__world_Test_S_1]
 }
 
-func (w *__world_Test_S_1) Init(si SystemInitConstraint) {
+func (w *__world_Test_S_1) Init(si SystemInitConstraint) error {
 	w.SetRequirements(si, &__world_Test_C_1{}, &__world_Test_C_2{}, &__world_Test_C_3{})
 	BindUtility[__world_Test_U_Input](si)
+	return nil
 }
 
 func (w *__world_Test_S_1) Update(event Event) {
@@ -44,6 +47,7 @@ func (w *__world_Test_S_1) Update(event Event) {
 	for c := iter.Begin(); !iter.End(); c = iter.Next() {
 		c2 := GetRelated[__world_Test_C_2](w, c.owner)
 		if c2 == nil {
+			Log.Infof("Component(Owner:%d) has no related component __world_Test_C_2", c.Owner())
 			continue
 		}
 		for i := 0; i < testOptimizerDummyMaxFor; i++ {
@@ -54,7 +58,9 @@ func (w *__world_Test_S_1) Update(event Event) {
 			c2.Field2 += i
 		}
 
-		Log.Infof("Component(Owner:%d) Changed: __world_Test_C_1: %d, __world_Test_C_2: %d", c.Owner(), c.Field1, c2.Field2)
+		c3 := GetRelated[__world_Test_C_3](w, c.owner)
+
+		Log.Infof("Component(Owner:%d) Changed: __world_Test_C_1: %d, __world_Test_C_2: %d, __world_Test_C_3: %s", c.Owner(), c.Field1, c2.Field2, c3.Name.String())
 	}
 }
 
@@ -85,8 +91,8 @@ func Test_ecsWorld_World(t *testing.T) {
 
 	for i := 0; i < __worldTest_Entity_Count; i++ {
 		e1 := world.NewEntity()
-		e1.Add(&__world_Test_C_1{}, &__world_Test_C_2{}, &__world_Test_C_3{})
-		entities[i] = e1.Entity()
+		world.Add(e1, &__world_Test_C_1{}, &__world_Test_C_2{}, &__world_Test_C_3{})
+		entities[i] = e1
 	}
 
 	world.Update()
@@ -114,33 +120,48 @@ func Test_ecsWorld_World_launcher(t *testing.T) {
 
 	world.Startup()
 
+	wg := &sync.WaitGroup{}
+
+	wg.Add(1)
 	entities := make([]Entity, __worldTest_Entity_Count)
-	world.Sync(func(gaw SyncWrapper) {
+	world.Sync(func(gaw SyncWrapper) error {
 		for i := 0; i < __worldTest_Entity_Count; i++ {
 			e1 := gaw.NewEntity()
-			e1.Add(&__world_Test_C_1{}, &__world_Test_C_2{}, &__world_Test_C_3{})
-			entities[i] = e1.Entity()
+			gaw.Add(e1, &__world_Test_C_1{}, &__world_Test_C_2{}, &__world_Test_C_3{})
+			entities[i] = e1
 		}
+		wg.Done()
+		return nil
 	})
 
-	time.Sleep(time.Second * 2)
-	world.Sync(func(gaw SyncWrapper) {
+	wg.Wait()
+
+	wg.Add(1)
+	world.Sync(func(gaw SyncWrapper) error {
 		u, ok := GetUtility[__world_Test_U_Input](gaw)
 		if !ok {
-			return
+			return errors.New("Utility not found")
 		}
 		u.ChangeName(entities[0], "name1")
+		gaw.DestroyEntity(entities[1])
+		gaw.Remove(entities[2], &__world_Test_C_2{})
+		wg.Done()
+		return nil
 	})
 
-	time.Sleep(time.Second * 2)
-	world.Sync(func(gaw SyncWrapper) {
+	wg.Wait()
+
+	wg.Add(1)
+	world.Sync(func(gaw SyncWrapper) error {
 		u, ok := GetUtility[__world_Test_U_Input](gaw)
 		if !ok {
-			return
+			return errors.New("Utility not found")
 		}
 		u.ChangeName(entities[0], "name2")
+		wg.Done()
+		return nil
 	})
 
-	time.Sleep(time.Second)
+	wg.Wait()
 	world.Stop()
 }

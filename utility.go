@@ -6,14 +6,14 @@ import (
 )
 
 type IUtilityGetter interface {
-	getWorld() iWorldBase
+	getWorld() IWorld
 }
 
 type UtilityGetter struct {
-	world *iWorldBase
+	world *IWorld
 }
 
-func (g UtilityGetter) getWorld() iWorldBase {
+func (g UtilityGetter) getWorld() IWorld {
 	return *g.world
 }
 
@@ -27,19 +27,23 @@ type UtilityPointer[T UtilityObject] interface {
 }
 
 type IUtility interface {
-	Async(fn func(*SystemApi))
 	Type() reflect.Type
 	getPointer() unsafe.Pointer
 	setSystem(sys ISystem)
-	setWorld(world iWorldBase)
+	setWorld(world IWorld)
 }
 
+type utilityIdentification struct{}
+
+func (u utilityIdentification) __UtilityIdentification() {}
+
 type Utility[T UtilityObject] struct {
-	w   iWorldBase
+	utilityIdentification
+	w   IWorld
 	sys ISystem
 }
 
-func (u *Utility[T]) setWorld(w iWorldBase) {
+func (u *Utility[T]) setWorld(w IWorld) {
 	u.w = w
 }
 
@@ -47,18 +51,8 @@ func (u *Utility[T]) setSystem(sys ISystem) {
 	u.sys = sys
 }
 
-func (u Utility[T]) __UtilityIdentification() {}
-
 func (u *Utility[T]) GetSystem() ISystem {
 	return u.sys
-}
-
-func (u *Utility[T]) Async(fn func(*SystemApi)) {
-	u.sys.doAsync(fn)
-}
-
-func (u *Utility[T]) Sync(fn func(*SystemApi)) {
-	u.sys.doSync(fn)
 }
 
 func (u *Utility[T]) getPointer() unsafe.Pointer {
@@ -69,22 +63,18 @@ func (u *Utility[T]) Type() reflect.Type {
 	return TypeOf[T]()
 }
 
-type SystemApi struct {
-	sys ISystem
+func (u *Utility[T]) GetRequirements() map[reflect.Type]IRequirement {
+	return u.sys.GetRequirements()
 }
 
-func (s *SystemApi) GetRequirements() map[reflect.Type]IRequirement {
-	return s.sys.GetRequirements()
+func (u *Utility[T]) SystemPause() {
+	u.sys.pause()
 }
 
-func (s *SystemApi) Pause() {
-
+func (u *Utility[T]) SystemResume() {
+	u.sys.resume()
 }
 
-func (s *SystemApi) Resume() {
-
-}
-
-func (s *SystemApi) Stop() {
-
+func (u *Utility[T]) SystemStop() {
+	u.sys.stop()
 }

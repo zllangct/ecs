@@ -29,7 +29,7 @@ type WorldConfig struct {
 	HashCount          int    //容器桶数量
 	CollectionVersion  int
 	FrameInterval      time.Duration //帧间隔
-	StopCallback       func(world *worldBase)
+	StopCallback       func(world *ecsWorld)
 }
 
 func NewDefaultWorldConfig() *WorldConfig {
@@ -47,7 +47,7 @@ func NewDefaultWorldConfig() *WorldConfig {
 	}
 }
 
-type iWorldBase interface {
+type IWorld interface {
 	getStatus() WorldStatus
 	getID() int64
 	addFreeComponent(component IComponent)
@@ -56,6 +56,7 @@ type iWorldBase interface {
 	getMetrics() *Metrics
 	getEntityInfo(id Entity) (*EntityInfo, bool)
 	newEntity() *EntityInfo
+	deleteEntity(entity Entity)
 	getComponentMetaInfoByType(typ reflect.Type) *ComponentMetaInfo
 	optimize(t time.Duration, force bool)
 	getSystem(sys reflect.Type) (ISystem, bool)
@@ -64,16 +65,19 @@ type iWorldBase interface {
 	update()
 	setStatus(status WorldStatus)
 	addComponent(entity Entity, component IComponent)
+	deleteComponent(entity Entity, component IComponent)
+	deleteComponentByIntType(entity Entity, it uint16)
 	getComponentSet(typ reflect.Type) IComponentSet
 	getComponentSetByIntType(typ uint16) IComponentSet
 	getComponentCollection() IComponentCollection
 	getComponentMeta() *componentMeta
 	getOrCreateComponentMetaInfo(component IComponent) *ComponentMetaInfo
 	registerForT(system interface{}, order ...Order)
-	base() *worldBase
+	checkMainThread()
+	base() *ecsWorld
 }
 
-type worldBase struct {
+type ecsWorld struct {
 	id              int64
 	status          WorldStatus
 	config          *WorldConfig
@@ -93,7 +97,7 @@ type worldBase struct {
 	mainThreadID    int64
 }
 
-func (w *worldBase) init(config *WorldConfig) *worldBase {
+func (w *ecsWorld) init(config *WorldConfig) *ecsWorld {
 	w.id = LocalUniqueID()
 	w.systemFlow = nil
 	w.config = config
@@ -136,19 +140,19 @@ func (w *worldBase) init(config *WorldConfig) *worldBase {
 	return w
 }
 
-func (w *worldBase) base() *worldBase {
+func (w *ecsWorld) base() *ecsWorld {
 	return w
 }
 
-func (w *worldBase) getID() int64 {
+func (w *ecsWorld) getID() int64 {
 	return w.id
 }
 
-func (w *worldBase) SwitchMainThread() {
+func (w *ecsWorld) SwitchMainThread() {
 	atomic.StoreInt64(&w.mainThreadID, goroutineID())
 }
 
-func (w *worldBase) startup() {
+func (w *ecsWorld) startup() {
 	if w.getStatus() != WorldStatusInitialized {
 		panic("world is not initialized or already running.")
 	}
@@ -163,7 +167,7 @@ func (w *worldBase) startup() {
 	w.setStatus(WorldStatusRunning)
 }
 
-func (w *worldBase) update() {
+func (w *ecsWorld) update() {
 	if w.config.MetaInfoDebugPrint {
 		w.checkMainThread()
 	}
@@ -181,56 +185,52 @@ func (w *worldBase) update() {
 	w.frame++
 }
 
-func (w *worldBase) optimize(t time.Duration, force bool) {
+func (w *ecsWorld) optimize(t time.Duration, force bool) {
 	w.optimizer.optimize(t, force)
 }
 
-func (w *worldBase) stop() {
+func (w *ecsWorld) stop() {
 	w.workPool.Release()
 }
 
-func (w *worldBase) setStatus(status WorldStatus) {
+func (w *ecsWorld) setStatus(status WorldStatus) {
 	w.status = status
 }
 
-func (w *worldBase) getUtilityGetter() UtilityGetter {
+func (w *ecsWorld) getUtilityGetter() UtilityGetter {
 	ug := UtilityGetter{}
-	iw := iWorldBase(w)
+	iw := IWorld(w)
 	ug.world = &iw
 	return ug
 }
 
-func (w *worldBase) addUtility(utility IUtility) {
+func (w *ecsWorld) addUtility(utility IUtility) {
 	w.utilities[utility.Type()] = utility
 }
-func (w *worldBase) getUtilityForT(typ reflect.Type) (unsafe.Pointer, bool) {
+func (w *ecsWorld) getUtilityForT(typ reflect.Type) (unsafe.Pointer, bool) {
 	u, ok := w.utilities[typ]
 	return u.getPointer(), ok
 }
 
-func (w *worldBase) getStatus() WorldStatus {
+func (w *ecsWorld) getStatus() WorldStatus {
 	return w.status
 }
 
-func (w *worldBase) getMetrics() *Metrics {
+func (w *ecsWorld) getMetrics() *Metrics {
 	return w.metrics
 }
 
-func (w *worldBase) registerSystem(system ISystem) {
-	if w.config.MainThreadCheck {
-		w.checkMainThread()
-	}
+func (w *ecsWorld) registerSystem(system ISystem) {
+	w.checkMainThread()
 	w.systemFlow.register(system)
 }
 
-func (w *worldBase) registerComponent(component IComponent) {
-	if w.config.MainThreadCheck {
-		w.checkMainThread()
-	}
+func (w *ecsWorld) registerComponent(component IComponent) {
+	w.checkMainThread()
 	w.componentMeta.GetOrCreateComponentMetaInfo(component)
 }
 
-func (w *worldBase) registerForT(system interface{}, order ...Order) {
+func (w *ecsWorld) registerForT(system interface{}, order ...Order) {
 	sys := system.(ISystem)
 	if len(order) > 0 {
 		sys.setOrder(order[0])
@@ -238,7 +238,7 @@ func (w *worldBase) registerForT(system interface{}, order ...Order) {
 	w.registerSystem(system.(ISystem))
 }
 
-func (w *worldBase) getSystem(sys reflect.Type) (ISystem, bool) {
+func (w *ecsWorld) getSystem(sys reflect.Type) (ISystem, bool) {
 	s, ok := w.systemFlow.systems[sys]
 	if ok {
 		return s.(ISystem), ok
@@ -246,52 +246,52 @@ func (w *worldBase) getSystem(sys reflect.Type) (ISystem, bool) {
 	return nil, ok
 }
 
-func (w *worldBase) addJob(job func(), hashKey ...uint32) {
+func (w *ecsWorld) addJob(job func(), hashKey ...uint32) {
 	w.workPool.Add(job, hashKey...)
 }
 
-func (w *worldBase) addEntity(info EntityInfo) *EntityInfo {
+func (w *ecsWorld) addEntity(info EntityInfo) *EntityInfo {
 	return w.entities.Add(info)
 }
 
-func (w *worldBase) getEntityInfo(entity Entity) (*EntityInfo, bool) {
+func (w *ecsWorld) getEntityInfo(entity Entity) (*EntityInfo, bool) {
 	return w.entities.GetEntityInfo(entity)
 }
 
-func (w *worldBase) deleteEntity(entity Entity) {
+func (w *ecsWorld) deleteEntity(entity Entity) {
 	w.entities.Remove(entity)
 }
 
-func (w *worldBase) getComponentSet(typ reflect.Type) IComponentSet {
+func (w *ecsWorld) getComponentSet(typ reflect.Type) IComponentSet {
 	return w.components.getComponentSet(typ)
 }
 
-func (w *worldBase) getComponentSetByIntType(it uint16) IComponentSet {
+func (w *ecsWorld) getComponentSetByIntType(it uint16) IComponentSet {
 	return w.components.getComponentSetByIntType(it)
 }
 
-func (w *worldBase) getComponentMetaInfoByType(typ reflect.Type) *ComponentMetaInfo {
+func (w *ecsWorld) getComponentMetaInfoByType(typ reflect.Type) *ComponentMetaInfo {
 	return w.componentMeta.GetComponentMetaInfoByType(typ)
 }
 
-func (w *worldBase) getComponentCollection() IComponentCollection {
+func (w *ecsWorld) getComponentCollection() IComponentCollection {
 	return w.components
 }
 
-func (w *worldBase) getComponentMeta() *componentMeta {
+func (w *ecsWorld) getComponentMeta() *componentMeta {
 	return w.componentMeta
 }
 
-func (w *worldBase) getOrCreateComponentMetaInfo(component IComponent) *ComponentMetaInfo {
+func (w *ecsWorld) getOrCreateComponentMetaInfo(component IComponent) *ComponentMetaInfo {
 	return w.componentMeta.GetOrCreateComponentMetaInfo(component)
 }
 
-func (w *worldBase) newEntity() *EntityInfo {
-	info := EntityInfo{world: w, entity: w.idGenerator.NewID(), compound: NewCompound(4)}
+func (w *ecsWorld) newEntity() *EntityInfo {
+	info := EntityInfo{entity: w.idGenerator.NewID(), compound: NewCompound(4)}
 	return w.addEntity(info)
 }
 
-func (w *worldBase) addComponent(entity Entity, component IComponent) {
+func (w *ecsWorld) addComponent(entity Entity, component IComponent) {
 	typ := component.Type()
 	if !w.componentMeta.Exist(typ) {
 		w.componentMeta.CreateComponentMetaInfo(component.Type(), component.getComponentType())
@@ -299,15 +299,15 @@ func (w *worldBase) addComponent(entity Entity, component IComponent) {
 	w.components.operate(CollectionOperateAdd, entity, component)
 }
 
-func (w *worldBase) deleteComponent(entity Entity, component IComponent) {
+func (w *ecsWorld) deleteComponent(entity Entity, component IComponent) {
 	w.components.operate(CollectionOperateDelete, entity, component)
 }
 
-func (w *worldBase) deleteComponentByIntType(entity Entity, it uint16) {
+func (w *ecsWorld) deleteComponentByIntType(entity Entity, it uint16) {
 	w.components.deleteOperate(CollectionOperateDelete, entity, it)
 }
 
-func (w *worldBase) addFreeComponent(component IComponent) {
+func (w *ecsWorld) addFreeComponent(component IComponent) {
 	switch component.getComponentType() {
 	case ComponentTypeFree, ComponentTypeFreeDisposable:
 	default:
@@ -317,7 +317,10 @@ func (w *worldBase) addFreeComponent(component IComponent) {
 	w.addComponent(0, component)
 }
 
-func (w *worldBase) checkMainThread() {
+func (w *ecsWorld) checkMainThread() {
+	if !w.config.MainThreadCheck {
+		return
+	}
 	if id := atomic.LoadInt64(&w.mainThreadID); id != goroutineID() && id > 0 {
 		panic("not main thread")
 	}

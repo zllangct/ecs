@@ -61,22 +61,23 @@ func Try(task func(), catch ...func(error)) {
 	task()
 }
 
-func TryAndReport(task func()) (err error) {
+func TryAndReport(task func() error) (err error) {
 	defer func() {
 		if DebugTry {
 			return
 		}
-		r := recover()
-		switch typ := r.(type) {
-		case error:
-			err = r.(error)
-		case string:
-			err = errors.New(r.(string))
-		default:
-			_ = typ
+		if r := recover(); r != nil {
+			switch typ := r.(type) {
+			case error:
+				err = r.(error)
+			case string:
+				err = errors.New(r.(string))
+			default:
+				_ = typ
+			}
 		}
 	}()
-	task()
+	err = task()
 	return nil
 }
 

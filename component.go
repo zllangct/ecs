@@ -62,23 +62,18 @@ type IComponent interface {
 
 type ComponentObject interface {
 	__ComponentIdentification()
-	OwnerEntity() Entity
 }
 
 type FreeComponentObject interface {
-	ComponentObject
-	__FreeComponentIdentification()
+	__ComponentIdentification()
 }
 
 type DisposableComponentObject interface {
-	ComponentObject
-	__DisposableComponentIdentification()
+	__ComponentIdentification()
 }
 
 type FreeDisposableComponentObject interface {
-	ComponentObject
-	__FreeComponentIdentification()
-	__DisposableComponentIdentification()
+	__ComponentIdentification()
 }
 
 type ComponentPointer[T ComponentObject] interface {
@@ -87,21 +82,21 @@ type ComponentPointer[T ComponentObject] interface {
 }
 
 type FreeComponentPointer[T FreeComponentObject] interface {
-	IComponent
+	ComponentPointer[T]
 	*T
 }
 
-type DisposableComponentPointer[T DisposableComponentObject] interface {
-	IComponent
+type DisposableComponentPointer[T FreeComponentObject] interface {
+	ComponentPointer[T]
 	*T
 }
 
-type FreeDisposableComponentPointer[T FreeDisposableComponentObject] interface {
-	IComponent
+type FreeDisposableComponentPointer[T FreeComponentObject] interface {
+	ComponentPointer[T]
 	*T
 }
 
-type FreeComponent[T FreeComponentObject] struct {
+type FreeComponent[T ComponentObject] struct {
 	Component[T]
 }
 
@@ -109,9 +104,7 @@ func (f *FreeComponent[T]) getComponentType() ComponentType {
 	return ComponentTypeFree
 }
 
-func (f FreeComponent[T]) __FreeComponentIdentification() {}
-
-type DisposableComponent[T DisposableComponentObject] struct {
+type DisposableComponent[T ComponentObject] struct {
 	Component[T]
 }
 
@@ -119,9 +112,7 @@ func (f *DisposableComponent[T]) getComponentType() ComponentType {
 	return ComponentTypeDisposable
 }
 
-func (f DisposableComponent[T]) __DisposableComponentIdentification() {}
-
-type FreeDisposableComponent[T FreeDisposableComponentObject] struct {
+type FreeDisposableComponent[T ComponentObject] struct {
 	Component[T]
 }
 
@@ -129,22 +120,17 @@ func (f *FreeDisposableComponent[T]) getComponentType() ComponentType {
 	return ComponentTypeFreeDisposable
 }
 
-func (f FreeDisposableComponent[T]) __FreeComponentIdentification() {}
+type componentIdentification struct{}
 
-func (f FreeDisposableComponent[T]) __DisposableComponentIdentification() {}
+func (c componentIdentification) __ComponentIdentification() {}
 
 type Component[T ComponentObject] struct {
+	componentIdentification
 	st    uint8
 	o1    uint8
 	it    uint16
 	seq   uint32
 	owner Entity
-}
-
-func (c Component[T]) __ComponentIdentification() {}
-
-func (c Component[T]) OwnerEntity() Entity {
-	return c.owner
 }
 
 func (c *Component[T]) getComponentType() ComponentType {

@@ -22,10 +22,10 @@ func (g *GM) Run(ctx context.Context, game *game.FakeGame) {
 	for {
 		time.Sleep(time.Second * time.Duration(rand.Intn(5)))
 		if timeScale == 0 {
-			g.ChangeMovementTimeScale(float64(1.2))
+			g.ChangeMovementTimeScale(1.2)
 			timeScale = 1
 		} else {
-			g.ChangeMovementTimeScale(float64(1.0))
+			g.ChangeMovementTimeScale(1.0)
 			timeScale = 0
 		}
 	}

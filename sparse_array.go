@@ -81,9 +81,11 @@ func (g *SparseArray[K, V]) Remove(key K) *V {
 	idx := g.indices[key] - 1
 	removed, oldIndex, newIndex := g.UnorderedCollection.Remove(int64(idx))
 
-	delete(g.idx2Key, idx)
-	g.indices[g.idx2Key[int32(oldIndex)]] = int32(newIndex + 1)
+	lastKey := g.idx2Key[int32(oldIndex)]
+	g.indices[lastKey] = int32(newIndex + 1)
 	g.indices[key] = 0
+	g.idx2Key[idx] = lastKey
+	delete(g.idx2Key, int32(oldIndex))
 
 	g.shrink(key)
 

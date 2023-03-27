@@ -41,22 +41,15 @@ func (s *SystemInitConstraint) isValid() bool {
 type ISystem interface {
 	Type() reflect.Type
 	Order() Order
-	World() iWorldBase
+	World() IWorld
 	GetRequirements() map[reflect.Type]IRequirement
 	IsRequire(component IComponent) bool
 	ID() int64
-	Pause()
-	Resume()
-	Stop()
-
 	GetUtility() IUtility
+
 	pause()
 	resume()
 	stop()
-	doAsync(func(api *SystemApi))
-	doSync(func(api *SystemApi))
-	eventsSyncExecute()
-	eventsAsyncExecute()
 	getPointer() unsafe.Pointer
 	isRequire(componentType reflect.Type) bool
 	setOrder(order Order)
@@ -67,7 +60,7 @@ type ISystem interface {
 	isThreadSafe() bool
 	setExecuting(isExecuting bool)
 	isExecuting() bool
-	baseInit(world *worldBase, ins ISystem)
+	baseInit(world *ecsWorld, ins ISystem)
 	getOptimizer() *OptimizerReporter
 	getGetterCache() *GetterCache
 	setBroken()
@@ -84,15 +77,18 @@ type SystemPointer[T SystemObject] interface {
 	*T
 }
 
+type systemIdentification struct{}
+
+func (s systemIdentification) __SystemIdentification() {}
+
 type System[T SystemObject] struct {
+	systemIdentification
 	lock              sync.Mutex
 	requirements      map[reflect.Type]IRequirement
-	eventsSync        []func(api *SystemApi)
-	eventsAsync       []func(api *SystemApi)
 	getterCache       *GetterCache
 	order             Order
 	optimizerReporter *OptimizerReporter
-	world             *worldBase
+	world             *ecsWorld
 	utility           IUtility
 	realType          reflect.Type
 	state             SystemState
@@ -101,8 +97,6 @@ type System[T SystemObject] struct {
 	executing         bool
 	id                int64
 }
-
-func (s System[T]) __SystemIdentification() {}
 
 func (s *System[T]) instance() (sys ISystem) {
 	(*iface)(unsafe.Pointer(&sys)).data = unsafe.Pointer(s)
@@ -118,40 +112,6 @@ func (s *System[T]) ID() int64 {
 		s.id = LocalUniqueID()
 	}
 	return s.id
-}
-
-func (s *System[T]) doSync(fn func(api *SystemApi)) {
-	s.eventsSync = append(s.eventsSync, fn)
-}
-
-func (s *System[T]) doAsync(fn func(api *SystemApi)) {
-	s.eventsAsync = append(s.eventsAsync, fn)
-}
-
-func (s *System[T]) eventsSyncExecute() {
-	api := &SystemApi{sys: s}
-	events := s.eventsSync
-	s.eventsSync = make([]func(api *SystemApi), 0)
-	for _, f := range events {
-		f(api)
-	}
-	api.sys = nil
-}
-
-func (s *System[T]) eventsAsyncExecute() {
-	api := &SystemApi{sys: s}
-	events := s.eventsAsync
-	s.eventsAsync = make([]func(api *SystemApi), 0)
-	var err error
-	for _, f := range events {
-		err = TryAndReport(func() {
-			f(api)
-		})
-		if err != nil {
-			Log.Error(err)
-		}
-	}
-	api.sys = nil
 }
 
 func (s *System[T]) SetRequirements(initializer SystemInitConstraint, rqs ...IRequirement) {
@@ -202,24 +162,6 @@ func (s *System[T]) isThreadSafe() bool {
 
 func (s *System[T]) GetUtility() IUtility {
 	return s.utility
-}
-
-func (s *System[T]) Pause() {
-	s.doAsync(func(api *SystemApi) {
-		api.Pause()
-	})
-}
-
-func (s *System[T]) Resume() {
-	s.doAsync(func(api *SystemApi) {
-		api.Resume()
-	})
-}
-
-func (s *System[T]) Stop() {
-	s.doAsync(func(api *SystemApi) {
-		api.Stop()
-	})
 }
 
 func (s *System[T]) pause() {
@@ -277,10 +219,8 @@ func (s *System[T]) isRequire(typ reflect.Type) bool {
 	return ok
 }
 
-func (s *System[T]) baseInit(world *worldBase, ins ISystem) {
+func (s *System[T]) baseInit(world *ecsWorld, ins ISystem) {
 	s.requirements = map[reflect.Type]IRequirement{}
-	s.eventsSync = make([]func(api *SystemApi), 0)
-	s.eventsAsync = make([]func(api *SystemApi), 0)
 	s.getterCache = NewGetterCache(len(s.requirements))
 
 	if ins.Order() == OrderInvalid {
@@ -294,8 +234,8 @@ func (s *System[T]) baseInit(world *worldBase, ins ISystem) {
 	is := ISystem(s)
 	initializer.sys = &is
 	if i, ok := ins.(InitReceiver); ok {
-		err := TryAndReport(func() {
-			i.Init(initializer)
+		err := TryAndReport(func() error {
+			return i.Init(initializer)
 		})
 		if err != nil {
 			Log.Error(err)
@@ -330,7 +270,7 @@ func (s *System[T]) Order() Order {
 	return s.order
 }
 
-func (s *System[T]) World() iWorldBase {
+func (s *System[T]) World() IWorld {
 	return s.world
 }
 

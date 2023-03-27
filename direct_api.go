@@ -5,11 +5,11 @@ import (
 	"unsafe"
 )
 
-func RegisterSystem[T SystemObject](world iWorldBase, order ...Order) {
+func RegisterSystem[T SystemObject](world IWorld, order ...Order) {
 	world.registerForT(new(T), order...)
 }
 
-func AddFreeComponent[T FreeComponentObject, TP FreeComponentPointer[T]](world iWorldBase, component *T) {
+func AddFreeComponent[T FreeComponentObject, TP FreeComponentPointer[T]](world IWorld, component *T) {
 	world.addFreeComponent(TP(component))
 }
 

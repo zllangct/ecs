@@ -50,8 +50,8 @@ func TestNewShapeGetter(t *testing.T) {
 	world.Startup()
 
 	for i := 0; i < 3; i++ {
-		e := world.newEntity()
-		e.Add(&__ShapeGetter_Test_C_1{Field1: i}, &__ShapeGetter_Test_C_2{Field1: i * 10})
+		e := world.newEntity().Entity()
+		world.Add(e, &__ShapeGetter_Test_C_1{Field1: i}, &__ShapeGetter_Test_C_2{Field1: i * 10})
 	}
 
 	world.Update()
