@@ -95,14 +95,8 @@ func (w *AsyncWorld) Startup() {
 	}()
 }
 
-func (w *AsyncWorld) Optimize(t time.Duration, force bool) {}
-
 func (w *AsyncWorld) Stop() {
 	w.wStop <- struct{}{}
-}
-
-func (w *AsyncWorld) getWorld() IWorld {
-	return w
 }
 
 func (w *AsyncWorld) dispatch() {

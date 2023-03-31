@@ -72,7 +72,6 @@ type IWorld interface {
 	getComponentCollection() IComponentCollection
 	getComponentMeta() *componentMeta
 	getOrCreateComponentMetaInfo(component IComponent) *ComponentMetaInfo
-	registerForT(system interface{}, order ...Order)
 	checkMainThread()
 	base() *ecsWorld
 }
@@ -228,14 +227,6 @@ func (w *ecsWorld) registerSystem(system ISystem) {
 func (w *ecsWorld) registerComponent(component IComponent) {
 	w.checkMainThread()
 	w.componentMeta.GetOrCreateComponentMetaInfo(component)
-}
-
-func (w *ecsWorld) registerForT(system interface{}, order ...Order) {
-	sys := system.(ISystem)
-	if len(order) > 0 {
-		sys.setOrder(order[0])
-	}
-	w.registerSystem(system.(ISystem))
 }
 
 func (w *ecsWorld) getSystem(sys reflect.Type) (ISystem, bool) {

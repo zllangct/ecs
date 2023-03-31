@@ -5,8 +5,12 @@ import (
 	"unsafe"
 )
 
-func RegisterSystem[T SystemObject](world IWorld, order ...Order) {
-	world.registerForT(new(T), order...)
+func RegisterSystem[T SystemObject, TP SystemPointer[T]](world IWorld, order ...Order) {
+	sys := TP(new(T))
+	if len(order) > 0 {
+		sys.setOrder(order[0])
+	}
+	world.registerSystem(sys)
 }
 
 func AddFreeComponent[T FreeComponentObject, TP FreeComponentPointer[T]](world IWorld, component *T) {
@@ -67,7 +71,7 @@ func BindUtility[T UtilityObject, TP UtilityPointer[T]](si SystemInitConstraint)
 	sys.World().base().utilities[utility.Type()] = utility
 }
 
-func GetUtility[T UtilityObject](getter IUtilityGetter) (*T, bool) {
+func GetUtility[T UtilityObject, TP UtilityPointer[T]](getter IUtilityGetter) (*T, bool) {
 	w := getter.getWorld()
 	if w == nil {
 		return nil, false

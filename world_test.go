@@ -140,7 +140,7 @@ func Test_ecsWorld_World_launcher(t *testing.T) {
 	world.Sync(func(gaw SyncWrapper) error {
 		u, ok := GetUtility[__world_Test_U_Input](gaw)
 		if !ok {
-			return errors.New("Utility not found")
+			return errors.New("utility not found")
 		}
 		u.ChangeName(entities[0], "name1")
 		gaw.DestroyEntity(entities[1])

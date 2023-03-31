@@ -34,8 +34,7 @@ func (g *GameECS) attack() {
 		ActionType: 1,
 	}
 	for _, entity := range g.entities {
-		info, _ := g.world.GetEntityInfo(entity)
-		info.Add(g.world, act)
+		g.world.Add(entity, act)
 	}
 }
 

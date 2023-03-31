@@ -54,10 +54,6 @@ func (w *SyncWorld) Remove(entity Entity, components ...IComponent) {
 	info.Remove(w, components...)
 }
 
-func (w *SyncWorld) GetEntityInfo(id Entity) (*EntityInfo, bool) {
-	return w.getEntityInfo(id)
-}
-
 func (w *SyncWorld) getWorld() IWorld {
 	return w
 }
