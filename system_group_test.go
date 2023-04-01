@@ -76,8 +76,7 @@ func TestNewSystemGroupIterEmpty(t *testing.T) {
 
 	Log.Infof("========== system count %d, Batch count: %d, Max peer Batch: %d:", sg.systemCount(), sg.batchCount(), sg.maxSystemCountPeerBatch())
 
-	iter := sg.iter()
-	for ss := iter.Begin(); !iter.End(); ss = iter.Next() {
+	for ss := sg.Begin(); !sg.End(); ss = sg.Next() {
 		Log.Info("========== batch:")
 		for _, s := range ss {
 			Log.Infof("%s\n", ObjectToString(s))
@@ -96,8 +95,7 @@ func TestNewSystemGroupIter(t *testing.T) {
 
 	Log.Infof("========== system count %d, Batch count: %d, Max peer Batch: %d:", sg.systemCount(), sg.batchCount(), sg.maxSystemCountPeerBatch())
 
-	iter := sg.iter()
-	for ss := iter.Begin(); !iter.End(); ss = iter.Next() {
+	for ss := sg.Begin(); !sg.End(); ss = sg.Next() {
 		Log.Info("========== batch:")
 		for _, s := range ss {
 			Log.Infof("%s\n", ObjectToString(s))
@@ -116,16 +114,14 @@ func TestNewSystemGroupIterTemp(t *testing.T) {
 
 	Log.Infof("========== system count %d, Batch count: %d, Max peer Batch: %d:", sg.systemCount(), sg.batchCount(), sg.maxSystemCountPeerBatch())
 
-	iter := sg.iter(true)
-	for ss := iter.Begin(); !iter.End(); ss = iter.Next() {
+	for ss := sg.Begin(); !sg.End(); ss = sg.Next() {
 		Log.Info("========== batch:")
 		for _, s := range ss {
 			Log.Infof("%s\n", ObjectToString(s))
 		}
 	}
 
-	iter = sg.iter(true)
-	for ss := iter.Begin(); !iter.End(); ss = iter.Next() {
+	for ss := sg.Begin(); !sg.End(); ss = sg.Next() {
 		Log.Info("========== batch:")
 		for _, s := range ss {
 			Log.Infof("%s\n", ObjectToString(s))
@@ -144,8 +140,7 @@ func BenchmarkSystemGroupIter(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		iter := sg.iter()
-		for ss := iter.Begin(); !iter.End(); ss = iter.Next() {
+		for ss := sg.Begin(); !sg.End(); ss = sg.Next() {
 			_ = ss
 		}
 	}

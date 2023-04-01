@@ -48,6 +48,7 @@ func (p *Node) attach(node *Node) {
 
 // SystemGroup system group ordered by interrelation
 type SystemGroup struct {
+	SystemGroupIterator
 	systems      []*Node
 	ref          map[reflect.Type]int
 	root         *Node
@@ -55,7 +56,6 @@ type SystemGroup struct {
 	batchTotal   int
 	maxPeerBatch int
 	ordered      bool
-	iterTemp     *SystemGroupIterator
 }
 
 func NewSystemGroup() *SystemGroup {
@@ -113,35 +113,28 @@ func (p *SystemGroup) resort() {
 		p.batchTotal++
 	}
 
-	p.iterTemp = nil
+	p.resetIter()
 }
 
-func (p *SystemGroup) iter(useTemp ...bool) *SystemGroupIterator {
-	if !p.ordered {
-		p.resort()
+func (p *SystemGroup) resetIter() {
+	if p.group == nil {
+		p.group = p
 	}
-
-	if p.maxPeerBatch == 0 {
-		return emptySystemGroupIterator
-	}
-
-	if len(useTemp) > 0 && useTemp[0] {
-		if p.iterTemp == nil {
-			p.iterTemp = &SystemGroupIterator{
-				group:   p,
-				top:     make([]*Node, p.maxPeerBatch),
-				topTemp: make([]*Node, p.maxPeerBatch),
-				buffer:  make([]ISystem, p.maxPeerBatch),
-			}
-		}
-		return p.iterTemp
-	}
-
-	return &SystemGroupIterator{
-		group:   p,
-		top:     make([]*Node, p.maxPeerBatch),
-		topTemp: make([]*Node, p.maxPeerBatch),
-		buffer:  make([]ISystem, p.maxPeerBatch),
+	curLen := len(p.SystemGroupIterator.top)
+	if curLen-p.maxPeerBatch == 1 {
+		p.SystemGroupIterator.top = p.SystemGroupIterator.top[:p.maxPeerBatch]
+		p.SystemGroupIterator.topTemp = p.SystemGroupIterator.topTemp[:p.maxPeerBatch]
+		p.SystemGroupIterator.buffer = p.SystemGroupIterator.buffer[:p.maxPeerBatch]
+	} else if curLen-p.maxPeerBatch == -1 {
+		p.SystemGroupIterator.top = append(p.SystemGroupIterator.top, (*Node)(nil))
+		p.SystemGroupIterator.topTemp = append(p.SystemGroupIterator.topTemp, (*Node)(nil))
+		p.SystemGroupIterator.buffer = append(p.SystemGroupIterator.buffer, ISystem(nil))
+	} else if curLen-p.maxPeerBatch == 0 {
+		// do nothing
+	} else {
+		p.SystemGroupIterator.top = make([]*Node, p.maxPeerBatch)
+		p.SystemGroupIterator.topTemp = make([]*Node, p.maxPeerBatch)
+		p.SystemGroupIterator.buffer = make([]ISystem, p.maxPeerBatch)
 	}
 }
 
@@ -228,6 +221,23 @@ func (p *SystemGroup) remove(sys ISystem) {
 	p.ordered = false
 }
 
+func (p *SystemGroup) iter() *SystemGroupIterator {
+	if !p.ordered {
+		p.resort()
+	}
+
+	if p.maxPeerBatch == 0 {
+		return emptySystemGroupIterator
+	}
+
+	return &SystemGroupIterator{
+		group:   p,
+		top:     make([]*Node, p.maxPeerBatch),
+		topTemp: make([]*Node, p.maxPeerBatch),
+		buffer:  make([]ISystem, p.maxPeerBatch),
+	}
+}
+
 type SystemGroupIterator struct {
 	group   *SystemGroup
 	top     []*Node
@@ -240,6 +250,9 @@ type SystemGroupIterator struct {
 func (s *SystemGroupIterator) Begin() []ISystem {
 	if s.group == nil {
 		return nil
+	}
+	if !s.group.ordered {
+		s.group.resort()
 	}
 	copy(s.top, s.group.root.children)
 	s.topSize = len(s.group.root.children)

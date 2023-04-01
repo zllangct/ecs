@@ -127,8 +127,7 @@ func (p *systemFlow) systemUpdate(event Event) {
 			if sl.systemCount() == 0 {
 				continue
 			}
-			iter := sl.iter(true)
-			for ss := iter.Begin(); !iter.End(); ss = iter.Next() {
+			for ss := sl.Begin(); !sl.End(); ss = sl.Next() {
 				if systemCount := len(ss); systemCount != 0 {
 					for i := 0; i < systemCount; i++ {
 						sys = ss[i]
@@ -423,8 +422,7 @@ func (p *systemFlow) SystemInfoPrint() {
 			batchTotal := sl.batchCount()
 			batch := 0
 			var batchContent []string
-			iter := sl.iter()
-			for ss := iter.Begin(); !iter.End(); ss = iter.Next() {
+			for ss := sl.Begin(); !sl.End(); ss = sl.Next() {
 				if systemCount := len(ss); systemCount != 0 {
 
 					str := "│     │  └─ "
