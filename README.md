@@ -719,4 +719,3 @@ func (s *TestSystem1) Update(event Event) {
 * [ ] 更新Atomic
 * [ ] 测试用例混乱
 * [ ] Example FakeGame 暂不可用
-
