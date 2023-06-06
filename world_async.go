@@ -135,11 +135,11 @@ func (w *AsyncWorld) Sync(fn func(g SyncWrapper) error) {
 
 func (w *AsyncWorld) Wait(fn func(g SyncWrapper) error) {
 	w.lock.Lock()
-	defer w.lock.Unlock()
 	wait := make(chan struct{})
 	w.syncQueue = append(w.syncQueue, syncTask{
 		wait: wait,
 		fn:   fn,
 	})
+	w.lock.Unlock()
 	<-wait
 }
