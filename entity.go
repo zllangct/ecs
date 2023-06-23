@@ -74,11 +74,11 @@ func (e *EntityIDGenerator) NewID() Entity {
 func (e *EntityIDGenerator) FreeID(entity Entity) {
 	e.len--
 
-	real := entity.ToRealID()
-	e.ids[real.index].index = -1
-	e.ids[real.index].reuse++
+	realID := entity.ToRealID()
+	e.ids[realID.index].index = -1
+	e.ids[realID.index].reuse++
 
-	e.removeDelay[e.delayFree] = real
+	e.removeDelay[e.delayFree] = realID
 	e.delayFree++
 	if e.delayFree >= e.delayCap {
 		e.delayFlush()

@@ -147,7 +147,7 @@ func (w *ecsWorld) getID() int64 {
 	return w.id
 }
 
-func (w *ecsWorld) SwitchMainThread() {
+func (w *ecsWorld) switchMainThread() {
 	atomic.StoreInt64(&w.mainThreadID, goroutineID())
 }
 
@@ -161,7 +161,7 @@ func (w *ecsWorld) startup() {
 		w.componentMeta.ComponentMetaInfoPrint()
 	}
 
-	w.SwitchMainThread()
+	w.switchMainThread()
 	w.workPool.Start()
 	w.setStatus(WorldStatusRunning)
 }
@@ -170,7 +170,7 @@ func (w *ecsWorld) update() {
 	if w.config.MetaInfoDebugPrint {
 		w.checkMainThread()
 	}
-	w.SwitchMainThread()
+	w.switchMainThread()
 	if w.status != WorldStatusRunning {
 		panic("world is not running, must startup first.")
 	}
