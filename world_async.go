@@ -5,19 +5,19 @@ import (
 	"time"
 )
 
-type SyncWrapper struct {
+type AsyncWorldAPI struct {
 	world *IWorld
 }
 
-func (g SyncWrapper) getWorld() IWorld {
+func (g AsyncWorldAPI) getWorld() IWorld {
 	return *g.world
 }
 
-func (g SyncWrapper) NewEntity() Entity {
+func (g AsyncWorldAPI) NewEntity() Entity {
 	return g.getWorld().newEntity().Entity()
 }
 
-func (g SyncWrapper) DestroyEntity(entity Entity) {
+func (g AsyncWorldAPI) DestroyEntity(entity Entity) {
 	info, ok := (*g.world).getEntityInfo(entity)
 	if !ok {
 		return
@@ -25,7 +25,7 @@ func (g SyncWrapper) DestroyEntity(entity Entity) {
 	info.Destroy(*g.world)
 }
 
-func (g SyncWrapper) Add(entity Entity, components ...IComponent) {
+func (g AsyncWorldAPI) Add(entity Entity, components ...IComponent) {
 	info, ok := (*g.world).getEntityInfo(entity)
 	if !ok {
 		return
@@ -33,7 +33,7 @@ func (g SyncWrapper) Add(entity Entity, components ...IComponent) {
 	info.Add(*g.world, components...)
 }
 
-func (g SyncWrapper) Remove(entity Entity, components ...IComponent) {
+func (g AsyncWorldAPI) Remove(entity Entity, components ...IComponent) {
 	info, ok := (*g.world).getEntityInfo(entity)
 	if !ok {
 		return
@@ -43,7 +43,7 @@ func (g SyncWrapper) Remove(entity Entity, components ...IComponent) {
 
 type syncTask struct {
 	wait chan struct{}
-	fn   func(wrapper SyncWrapper) error
+	fn   func(wrapper AsyncWorldAPI)
 }
 
 type AsyncWorld struct {
@@ -103,12 +103,13 @@ func (w *AsyncWorld) dispatch() {
 	w.lock.Lock()
 	defer w.lock.Unlock()
 
-	gaw := SyncWrapper{}
+	gaw := AsyncWorldAPI{}
 	ig := IWorld(w)
 	gaw.world = &ig
 	for _, task := range w.syncQueue {
 		err := TryAndReport(func() error {
-			return task.fn(gaw)
+			task.fn(gaw)
+			return nil
 		})
 		if err != nil {
 			Log.Error(err)
@@ -123,7 +124,7 @@ func (w *AsyncWorld) dispatch() {
 	gaw.world = nil
 }
 
-func (w *AsyncWorld) Sync(fn func(g SyncWrapper) error) {
+func (w *AsyncWorld) Sync(fn func(g AsyncWorldAPI)) {
 	w.lock.Lock()
 	defer w.lock.Unlock()
 
@@ -133,7 +134,7 @@ func (w *AsyncWorld) Sync(fn func(g SyncWrapper) error) {
 	})
 }
 
-func (w *AsyncWorld) Wait(fn func(g SyncWrapper) error) {
+func (w *AsyncWorld) Wait(fn func(g AsyncWorldAPI)) {
 	w.lock.Lock()
 	wait := make(chan struct{})
 	w.syncQueue = append(w.syncQueue, syncTask{

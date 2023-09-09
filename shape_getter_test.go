@@ -26,13 +26,14 @@ type __ShapeGetter_Test_S_1 struct {
 	getter1 *Shape[__ShapeGetter_Test_Shape_1]
 }
 
-func (t *__ShapeGetter_Test_S_1) Init(initializer SystemInitConstraint) {
+func (t *__ShapeGetter_Test_S_1) Init(initializer SystemInitConstraint) (err error) {
 	t.SetRequirements(initializer, &__ShapeGetter_Test_C_1{}, &__ShapeGetter_Test_C_2{})
 
-	t.getter1 = NewShape[__ShapeGetter_Test_Shape_1](initializer)
-	if t.getter1 == nil {
-		initializer.SetBroken("invalid getter")
+	t.getter1, err = NewShape[__ShapeGetter_Test_Shape_1](initializer)
+	if err == nil {
+		return err
 	}
+	return nil
 }
 
 func (t *__ShapeGetter_Test_S_1) Update(event Event) {

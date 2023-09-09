@@ -1,6 +1,7 @@
 package ecs
 
 import (
+	"errors"
 	"reflect"
 	"unsafe"
 )
@@ -36,24 +37,21 @@ type ShapeIndices struct {
 
 type Shape[T any] struct {
 	shapeBase
-	initializer  SystemInitConstraint
 	mainKeyIndex int
 	subTypes     []uint16
 	subOffset    []uintptr
 	containers   []IComponentSet
 	readOnly     []bool
 	cur          *T
-	valid        bool
 }
 
-func NewShape[T any](initializer SystemInitConstraint) *Shape[T] {
+func NewShape[T any](initializer SystemInitConstraint) (*Shape[T], error) {
 	if initializer.isValid() {
 		panic("out of initialization stage")
 	}
 	sys := initializer.getSystem()
 	getter := &Shape[T]{
-		shapeBase:   shapeBase{sys: sys},
-		initializer: initializer,
+		shapeBase: shapeBase{sys: sys},
 	}
 
 	typ := reflect.TypeOf(getter)
@@ -61,7 +59,7 @@ func NewShape[T any](initializer SystemInitConstraint) *Shape[T] {
 
 	sysReq := sys.GetRequirements()
 	if sysReq == nil {
-		return nil
+		return nil, errors.New("no component this system needed")
 	}
 
 	getter.cur = new(T)
@@ -86,16 +84,10 @@ func NewShape[T any](initializer SystemInitConstraint) *Shape[T] {
 	getter.containers = make([]IComponentSet, len(getter.subTypes))
 
 	if len(getter.subTypes) == 0 {
-		return nil
+		return nil, errors.New("new shape with no valid component")
 	}
 
-	getter.valid = true
-
-	return getter
-}
-
-func (s *Shape[T]) IsValid() bool {
-	return s.valid
+	return getter, nil
 }
 
 func (s *Shape[T]) getType() reflect.Type {
@@ -107,10 +99,6 @@ func (s *Shape[T]) getType() reflect.Type {
 
 func (s *Shape[T]) Get() IShapeIterator[T] {
 	s.executeNum++
-
-	if !s.valid {
-		return EmptyShapeIter[T]()
-	}
 
 	var mainComponent IComponentSet
 	var mainKeyIndex int
@@ -142,9 +130,6 @@ func (s *Shape[T]) Get() IShapeIterator[T] {
 }
 
 func (s *Shape[T]) GetSpecific(entity Entity) (*T, bool) {
-	if !s.valid {
-		return s.cur, false
-	}
 	for i := 0; i < len(s.subTypes); i++ {
 		subPointer := s.containers[i].getPointerByEntity(entity)
 		if subPointer == nil {
@@ -160,7 +145,7 @@ func (s *Shape[T]) GetSpecific(entity Entity) (*T, bool) {
 }
 
 func (s *Shape[T]) SetGuide(component IComponent) *Shape[T] {
-	meta := s.initializer.getSystem().World().getComponentMetaInfoByType(component.Type())
+	meta := s.sys.World().getComponentMetaInfoByType(component.Type())
 	for i, r := range s.subTypes {
 		if r == meta.it {
 			s.mainKeyIndex = i

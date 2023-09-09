@@ -10,11 +10,14 @@ func RegisterSystem[T SystemObject, TP SystemPointer[T]](world IWorld, order ...
 	if len(order) > 0 {
 		sys.setOrder(order[0])
 	}
-	world.registerSystem(sys)
+	err := world.registerSystem(sys)
+	if err != nil {
+		Log.Fatal(err)
+	}
 }
 
-func AddFreeComponent[T FreeComponentObject, TP FreeComponentPointer[T]](world IWorld, component *T) {
-	world.addFreeComponent(TP(component))
+func AddFreeComponent[T FreeComponentObject, TP FreeComponentPointer[T]](world IWorld, component *T) error {
+	return world.addFreeComponent(TP(component))
 }
 
 func GetComponent[T ComponentObject](sys ISystem, entity Entity) *T {

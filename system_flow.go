@@ -301,18 +301,20 @@ func (p *systemFlow) run(event Event) {
 }
 
 // register method only in world init or func init(){}
-func (p *systemFlow) register(system ISystem) {
+func (p *systemFlow) register(system ISystem) error {
 	if p.world.getStatus() != WorldStatusInitialized {
 		panic("system register only in world init")
 	}
 
 	//init function call
-	system.baseInit(p.world, system)
+	err := system.baseInit(p.world, system)
+	if err != nil {
+		return err
+	}
 
 	order := system.Order()
 	if order > OrderAppend {
-		Log.Errorf("system order must less then %d, resort order to %d", OrderAppend+1, OrderAppend)
-		order = OrderAppend
+		return fmt.Errorf("system order must less than %d", OrderAppend)
 	}
 
 	for _, period := range p.stageList {
@@ -344,6 +346,8 @@ func (p *systemFlow) register(system ISystem) {
 	}
 
 	p.systems[system.Type()] = system
+
+	return nil
 }
 
 func (p *systemFlow) isImpEvent(system ISystem, period Stage) bool {

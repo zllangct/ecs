@@ -43,10 +43,15 @@ type MoveSystem struct {
 	getter    *ecs.Shape[MoveSystemData]
 }
 
-func (m *MoveSystem) Init(si ecs.SystemInitConstraint) {
+func (m *MoveSystem) Init(si ecs.SystemInitConstraint) error {
 	m.SetRequirements(si, &Position{}, &Movement{})
 	ecs.BindUtility[MoveSystemUtility](si)
-	m.getter = ecs.NewShape[MoveSystemData](si)
+	getter, err := ecs.NewShape[MoveSystemData](si)
+	if err != nil {
+		return err
+	}
+	m.getter = getter
+	return nil
 }
 
 func (m *MoveSystem) UpdateTimeScale(timeScale []interface{}) error {

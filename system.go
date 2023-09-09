@@ -29,11 +29,6 @@ func (s *SystemInitConstraint) getSystem() ISystem {
 	return *s.sys
 }
 
-func (s *SystemInitConstraint) SetBroken(reason string) {
-	(*s.sys).setBroken()
-	panic(reason)
-}
-
 func (s *SystemInitConstraint) isValid() bool {
 	return *s.sys == nil
 }
@@ -60,10 +55,10 @@ type ISystem interface {
 	isThreadSafe() bool
 	setExecuting(isExecuting bool)
 	isExecuting() bool
-	baseInit(world *ecsWorld, ins ISystem)
+	baseInit(world *ecsWorld, ins ISystem) error
 	getOptimizer() *OptimizerReporter
 	getGetterCache() *GetterCache
-	setBroken()
+	setInvalid()
 	isValid() bool
 	setUtility(u IUtility)
 }
@@ -190,7 +185,7 @@ func (s *System[T]) setState(state SystemState) {
 	s.state = state
 }
 
-func (s *System[T]) setBroken() {
+func (s *System[T]) setInvalid() {
 	s.valid = false
 }
 
@@ -219,7 +214,7 @@ func (s *System[T]) isRequire(typ reflect.Type) bool {
 	return ok
 }
 
-func (s *System[T]) baseInit(world *ecsWorld, ins ISystem) {
+func (s *System[T]) baseInit(world *ecsWorld, ins ISystem) error {
 	s.requirements = map[reflect.Type]IRequirement{}
 	s.getterCache = NewGetterCache(len(s.requirements))
 
@@ -238,13 +233,14 @@ func (s *System[T]) baseInit(world *ecsWorld, ins ISystem) {
 			return i.Init(initializer)
 		})
 		if err != nil {
-			Log.Error(err)
+			return err
 		}
 	}
 	*initializer.sys = nil
 	initializer.sys = nil
 
 	s.state = SystemStateStart
+	return nil
 }
 
 func (s *System[T]) getPointer() unsafe.Pointer {

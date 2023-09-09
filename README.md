@@ -92,9 +92,10 @@ type TestSystem struct {
 }
 
 // 系统Init事件
-func (w *TestSystem) Init(si SystemInitializer) {
+func (w *TestSystem) Init(si ecs.SystemInitializer) (err error) {
 	// 申明系统感兴趣的组件, 系统内无法获取未申明的组件
 	w.SetRequirements(si, &TestComponent1{}, &TestComponent2{}, &TestComponent3{})
+    return
 }
 
 func (w *TestSystem) Update(event Event) {
@@ -267,7 +268,7 @@ type TestSystem struct {
 // 所有系统事件都是可选的，如果不需要某个事件，可以不实现
 
 // 系统Init事件
-func (w *TestSystem) Init(sic SystemInitConstraint) error {}
+func (w *TestSystem) Init(sic SystemInitConstraint) (err error) { return }
 
 // 系统Start事件
 func (w *TestSystem) Start(event Event) {}
@@ -356,9 +357,10 @@ func main() {
 ```
 需要注意的是，Utility与System是一一对应的， 需要再TestSystem的Init事件中绑定Utility,当然在不需要时可省略。
 ```go
-func (s *TestSystem) Init(si SystemInitializer) {
+func (s *TestSystem) Init(si SystemInitializer) (err error) {
     // 绑定Utility
     ecs.BindUtility[TestUtility](si)
+    return
 }
 ```
 ### ECS与外围系统交互
@@ -491,8 +493,9 @@ type TestSystem1 struct {
     ecs.System[TestSystem1]
 }
 
-func (s *TestSystem1) Init(si SystemInitConstraint) error {
+func (s *TestSystem1) Init(si SystemInitConstraint) (err error) {
     Log.Info("TestSystem1 Init")
+    return
 }
 
 func (s *TestSystem1) Start(event Event) {
@@ -583,9 +586,10 @@ type TestSystem1 struct {
     ecs.System[TestSystem1]
 }
 
-func (s *TestSystem1) Init(si SystemInitConstraint) error {
+func (s *TestSystem1) Init(si SystemInitConstraint) (err error) {
     // 设置系统感兴趣的组件
     s.SetRequirements(si, &TestComponent1{}, &TestComponent1{}, &TestComponent1{})
+    return
 }
 
 func (s *TestSystem1) Update(event Event) {
@@ -616,11 +620,12 @@ type TestSystem1 struct {
 	shp *ecs.Shape[Shape1]
 }
 
-func (s *TestSystem1) Init(si SystemInitConstraint) {
+func (s *TestSystem1) Init(si SystemInitConstraint) (err error)  {
     // 设置系统感兴趣的组件
     s.SetRequirements(si, &TestComponent1{}, &TestComponent1{}, &TestComponent1{})
     // 初始化ShapeGetter
     s.shp = NewShape[Shape1](si)
+    return
 }
 
 func (s *TestSystem1) Update(event Event) {

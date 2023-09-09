@@ -48,22 +48,21 @@ func (f *FakeGame) InitEcs() {
 }
 
 func (f *FakeGame) EnterGame(sess *Session) {
-	f.world.Wait(func(gaw ecs.SyncWrapper) error {
-		e := gaw.NewEntity()
-		gaw.Add(e, &PlayerComponent{
+	f.world.Wait(func(api ecs.AsyncWorldAPI) {
+		e := api.NewEntity()
+		api.Add(e, &PlayerComponent{
 			SessionID: sess.SessionID,
 		})
-		gaw.Add(e, &Position{
+		api.Add(e, &Position{
 			X: 100,
 			Y: 100,
 			Z: 100,
 		})
-		gaw.Add(e, &Movement{
+		api.Add(e, &Movement{
 			V:   2000,
 			Dir: [3]int{1, 0, 0},
 		})
 		sess.Entity = e
-		return nil
 	})
 }
 
@@ -154,12 +153,17 @@ func (f *FakeGame) Move(entity ecs.Entity, v int, dir [3]int) {
 	if f.world == nil {
 		return
 	}
-	f.world.Sync(func(gaw ecs.SyncWrapper) error {
-		u, ok := ecs.GetUtility[MoveSystemUtility](gaw)
+	f.world.Sync(func(api ecs.AsyncWorldAPI) {
+		u, ok := ecs.GetUtility[MoveSystemUtility](api)
 		if !ok {
-			return errors.New("can not find MoveSystemUtility")
+			ecs.Log.Error(errors.New("can not find MoveSystemUtility"))
+			return
 		}
-		return u.Move(entity, v, dir)
+		err := u.Move(entity, v, dir)
+		if err != nil {
+			ecs.Log.Error(err)
+			return
+		}
 	})
 }
 
@@ -167,12 +171,17 @@ func (f *FakeGame) ChangeMovementTimeScale(timeScale float64) {
 	if f.world == nil {
 		return
 	}
-	f.world.Sync(func(gaw ecs.SyncWrapper) error {
-		u, ok := ecs.GetUtility[MoveSystemUtility](gaw)
+	f.world.Sync(func(api ecs.AsyncWorldAPI) {
+		u, ok := ecs.GetUtility[MoveSystemUtility](api)
 		if !ok {
-			return errors.New("can not find MoveSystemUtility")
+			ecs.Log.Error(errors.New("can not find MoveSystemUtility"))
+			return
 		}
-		return u.UpdateTimeScale(timeScale)
+		err := u.UpdateTimeScale(timeScale)
+		if err != nil {
+			ecs.Log.Error(err)
+			return
+		}
 	})
 }
 

@@ -124,42 +124,40 @@ func Test_ecsWorld_World_launcher(t *testing.T) {
 
 	wg.Add(1)
 	entities := make([]Entity, __worldTest_Entity_Count)
-	world.Sync(func(gaw SyncWrapper) error {
+	world.Sync(func(api AsyncWorldAPI) {
 		for i := 0; i < __worldTest_Entity_Count; i++ {
-			e1 := gaw.NewEntity()
-			gaw.Add(e1, &__world_Test_C_1{}, &__world_Test_C_2{}, &__world_Test_C_3{})
+			e1 := api.NewEntity()
+			api.Add(e1, &__world_Test_C_1{}, &__world_Test_C_2{}, &__world_Test_C_3{})
 			entities[i] = e1
 		}
 		wg.Done()
-		return nil
 	})
 
 	wg.Wait()
 
 	wg.Add(1)
-	world.Sync(func(gaw SyncWrapper) error {
-		u, ok := GetUtility[__world_Test_U_Input](gaw)
+	world.Sync(func(api AsyncWorldAPI) {
+		u, ok := GetUtility[__world_Test_U_Input](api)
 		if !ok {
-			return errors.New("utility not found")
+			Log.Error(errors.New("utility not found"))
+			return
 		}
 		u.ChangeName(entities[0], "name1")
-		gaw.DestroyEntity(entities[1])
-		gaw.Remove(entities[2], &__world_Test_C_2{})
+		api.DestroyEntity(entities[1])
+		api.Remove(entities[2], &__world_Test_C_2{})
 		wg.Done()
-		return nil
 	})
 
 	wg.Wait()
 
 	wg.Add(1)
-	world.Sync(func(gaw SyncWrapper) error {
-		u, ok := GetUtility[__world_Test_U_Input](gaw)
+	world.Sync(func(api AsyncWorldAPI) {
+		u, ok := GetUtility[__world_Test_U_Input](api)
 		if !ok {
-			return errors.New("Utility not found")
+			Log.Error(errors.New("utility not found"))
 		}
 		u.ChangeName(entities[0], "name2")
 		wg.Done()
-		return nil
 	})
 
 	wg.Wait()

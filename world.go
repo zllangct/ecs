@@ -1,6 +1,8 @@
 package ecs
 
 import (
+	"errors"
+	"fmt"
 	"reflect"
 	"runtime"
 	"sync/atomic"
@@ -50,8 +52,8 @@ func NewDefaultWorldConfig() *WorldConfig {
 type IWorld interface {
 	getStatus() WorldStatus
 	getID() int64
-	addFreeComponent(component IComponent)
-	registerSystem(system ISystem)
+	addFreeComponent(component IComponent) error
+	registerSystem(system ISystem) error
 	registerComponent(component IComponent)
 	getMetrics() *Metrics
 	getEntityInfo(id Entity) (*EntityInfo, bool)
@@ -219,9 +221,9 @@ func (w *ecsWorld) getMetrics() *Metrics {
 	return w.metrics
 }
 
-func (w *ecsWorld) registerSystem(system ISystem) {
+func (w *ecsWorld) registerSystem(system ISystem) error {
 	w.checkMainThread()
-	w.systemFlow.register(system)
+	return w.systemFlow.register(system)
 }
 
 func (w *ecsWorld) registerComponent(component IComponent) {
@@ -298,14 +300,14 @@ func (w *ecsWorld) deleteComponentByIntType(entity Entity, it uint16) {
 	w.components.deleteOperate(CollectionOperateDelete, entity, it)
 }
 
-func (w *ecsWorld) addFreeComponent(component IComponent) {
+func (w *ecsWorld) addFreeComponent(component IComponent) error {
 	switch component.getComponentType() {
 	case ComponentTypeFree, ComponentTypeFreeDisposable:
 	default:
-		Log.Errorf("component not free type, %s", component.Type().String())
-		return
+		return errors.New(fmt.Sprintf("component not free type, %s", component.Type().String()))
 	}
 	w.addComponent(0, component)
+	return nil
 }
 
 func (w *ecsWorld) checkMainThread() {
