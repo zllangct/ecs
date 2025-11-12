@@ -1,28 +1,29 @@
 package ecs
 
+import (
+	"iter"
+)
+
 type SparseArray[K Integer, V any] struct {
-	UnorderedCollection[V]
+	USet[V]
 	indices         []int32
-	idx2Key         map[int32]int32
+	idx2Key         []int32
 	maxKey          K
 	shrinkThreshold int32
 	initSize        int
+	isKOrder        bool
 }
 
 func NewSparseArray[K Integer, V any](initSize ...int) *SparseArray[K, V] {
-	typ := TypeOf[V]()
-	eleSize := typ.Size()
-	size := InitMaxSize / eleSize
+	size := 0
 	if len(initSize) > 0 {
-		size = uintptr(initSize[0]) / eleSize
+		size = initSize[0]
 	}
 	c := &SparseArray[K, V]{
-		UnorderedCollection: UnorderedCollection[V]{
-			data:    make([]V, 0, size),
-			eleSize: eleSize,
-		},
-		idx2Key:  map[int32]int32{},
+		idx2Key:  []int32{},
 		initSize: int(size),
+		USet:     *NewUSet[V](size),
+		isKOrder: true,
 	}
 
 	if size > 0 {
@@ -41,114 +42,174 @@ func NewSparseArray[K Integer, V any](initSize ...int) *SparseArray[K, V] {
 	return c
 }
 
-func (g *SparseArray[K, V]) Add(key K, value *V) *V {
-	length := len(g.indices)
+func (s *SparseArray[K, V]) Add(key K, value *V) *V {
+	length := len(s.indices)
 	// already existed
-	if key < K(length) && g.indices[key] != 0 {
+	if key < K(length) && s.indices[key] != 0 {
 		return nil
 	}
-	_, idx := g.UnorderedCollection.Add(value)
+	_, idx := s.USet.Add(value)
 	if key >= K(length) {
 		m := K(0)
 		if length == 0 {
 			m = key + 1
-		} else if length < int(g.shrinkThreshold) {
+		} else if length < int(s.shrinkThreshold) {
 			m = key * 2
 		} else {
 			m = key * 5 / 4
 		}
 		newIndices := make([]int32, m)
-		count := copy(newIndices, g.indices)
+		count := copy(newIndices, s.indices)
 		if count != length {
 			panic("copy failed")
 		}
-		g.indices = newIndices
+		s.indices = newIndices
+	}
+	if int(idx) < len(s.idx2Key) {
+		s.idx2Key[int32(idx)] = int32(key)
+	} else {
+		s.idx2Key = append(s.idx2Key, int32(key))
+	}
+	s.indices[key] = int32(idx + 1)
+	if key > s.maxKey {
+		s.maxKey = key
 	}
 
-	g.idx2Key[int32(idx)] = int32(key)
-	g.indices[key] = int32(idx + 1)
-	if key > g.maxKey {
-		g.maxKey = key
-	}
+	s.isKOrder = false
 
-	return &g.data[idx]
+	return &s.data[idx]
 }
 
-func (g *SparseArray[K, V]) Remove(key K) *V {
-	if key > g.maxKey {
+func (s *SparseArray[K, V]) Remove(key K) *V {
+	if key > s.maxKey {
 		return nil
 	}
-	idx := g.indices[key] - 1
-	removed, oldIndex, newIndex := g.UnorderedCollection.Remove(int64(idx))
+	idx := s.indices[key] - 1
+	removed, oldIndex, newIndex := s.USet.Remove(int64(idx))
 
-	lastKey := g.idx2Key[int32(oldIndex)]
-	g.indices[lastKey] = int32(newIndex + 1)
-	g.indices[key] = 0
-	g.idx2Key[idx] = lastKey
-	delete(g.idx2Key, int32(oldIndex))
+	lastKey := s.idx2Key[int32(oldIndex)]
+	s.indices[lastKey] = int32(newIndex + 1)
+	s.indices[key] = 0
+	s.idx2Key[idx] = lastKey
 
-	g.shrink(key)
+	// swap
+	s.idx2Key[newIndex], s.idx2Key[oldIndex] = s.idx2Key[oldIndex], s.idx2Key[newIndex]
+	// remove last
+	s.idx2Key = s.idx2Key[:len(s.idx2Key)]
+
+	s.shrink(key)
+
+	s.isKOrder = false
 
 	return removed
 }
 
-func (g *SparseArray[K, V]) Exist(key K) bool {
-	if key > g.maxKey {
+func (s *SparseArray[K, V]) Exist(key K) bool {
+	if key > s.maxKey {
 		return false
 	}
-	return !(g.indices[key] == 0)
+	return !(s.indices[key] == 0)
 }
 
-func (g *SparseArray[K, V]) Get(key K) *V {
-	if key > g.maxKey {
+func (s *SparseArray[K, V]) Get(key K) *V {
+	if key > s.maxKey {
 		return nil
 	}
-	idx := g.indices[key] - 1
+	idx := s.indices[key] - 1
 	if idx < 0 {
 		return nil
 	}
-	return g.UnorderedCollection.Get(int64(idx))
+	return s.USet.Get(int64(idx))
 }
 
-func (g *SparseArray[K, V]) Clear() {
-	if g.Len() == 0 {
+func (s *SparseArray[K, V]) Reset() {
+	if s.Len() == 0 {
 		return
 	}
-	g.UnorderedCollection.Clear()
-	if int(g.maxKey) < 1024 {
-		for i := 0; i < len(g.indices); i++ {
-			g.indices[i] = 0
+	s.USet.Reset()
+	if int(s.maxKey) < 1024 {
+		for i := 0; i < len(s.indices); i++ {
+			s.indices[i] = 0
 		}
 	} else {
-		g.indices = make([]int32, 0, g.initSize)
+		s.indices = make([]int32, 0, s.initSize)
 	}
-	g.maxKey = 0
-	g.idx2Key = map[int32]int32{}
+	s.maxKey = 0
+	s.idx2Key = []int32{}
+	s.isKOrder = true
 }
 
-func (g *SparseArray[K, V]) shrink(key K) {
-	if key < g.maxKey {
+func (s *SparseArray[K, V]) Less(i, j int) bool {
+	return s.idx2Key[i] < s.idx2Key[j]
+}
+
+func (s *SparseArray[K, V]) Swap(i, j int) {
+	Key := s.idx2Key[j]
+	s.USet.Swap(int64(i), int64(j))
+	// swap
+	s.idx2Key[i], s.idx2Key[j] = s.idx2Key[j], s.idx2Key[i]
+	s.indices[Key], s.indices[i] = s.indices[i], s.indices[Key]
+}
+
+func (s *SparseArray[K, V]) Sort() {
+	if s.isKOrder {
+		return
+	}
+	seq := int64(0)
+	for i, index := range s.indices {
+		if index == 0 {
+			continue
+		}
+		idx := index - 1
+		if idx != s.idx2Key[seq] {
+			Key := s.idx2Key[seq]
+			s.USet.Swap(int64(idx), seq)
+			// swap
+			s.idx2Key[idx], s.idx2Key[seq] = s.idx2Key[seq], s.idx2Key[idx]
+			s.indices[Key], s.indices[i] = s.indices[i], s.indices[Key]
+		}
+		seq++
+	}
+	s.isKOrder = true
+}
+
+func (s *SparseArray[K, V]) shrink(key K) {
+	if key < s.maxKey {
 		return
 	}
 
-	g.maxKey = 0
+	s.maxKey = 0
 	for i := key; i > 0; i-- {
-		if g.indices[i] != 0 {
-			g.maxKey = i
+		if s.indices[i] != 0 {
+			s.maxKey = i
 			break
 		}
 	}
 
-	if int32(g.maxKey) < g.shrinkThreshold {
-		g.maxKey = K(g.shrinkThreshold)
+	if int32(s.maxKey) < s.shrinkThreshold {
+		s.maxKey = K(s.shrinkThreshold)
 	}
 
-	if len(g.indices) > 1024 && int(g.maxKey) < len(g.indices)/2 {
-		m := (g.maxKey + 1) * 5 / 4
+	if len(s.indices) > 1024 && int(s.maxKey) < len(s.indices)/2 {
+		m := (s.maxKey + 1) * 5 / 4
 		newIndices := make([]int32, m)
-		count := copy(newIndices, g.indices[:m])
-		if count != int(m) {
-			panic("copy failed")
+		copy(newIndices, s.indices[:m])
+	}
+}
+
+func (s *SparseArray[K, V]) Iter() iter.Seq2[K, *V] {
+	return func(yield func(K, *V) bool) {
+		for i := 0; i < int(s.len); i++ {
+			yield(K(s.idx2Key[i]), &s.data[i])
+		}
+	}
+}
+
+func (s *SparseArray[K, V]) IterReadOnly() iter.Seq2[K, *V] {
+	return func(yield func(K, *V) bool) {
+		for i := 0; i < int(s.len); i++ {
+			cpy := s.data[i]
+			yield(K(s.idx2Key[i]), &cpy)
 		}
 	}
 }

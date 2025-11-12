@@ -1,11 +1,8 @@
 package ecs
 
 import (
-	"reflect"
 	"runtime"
-	"sync/atomic"
 	"time"
-	"unsafe"
 )
 
 type WorldStatus int
@@ -17,302 +14,268 @@ const (
 	WorldStatusStop
 )
 
+type WorldExecuteMode uint8
+
+const (
+	ExecuteModeInvalid WorldExecuteMode = iota
+	ExecuteModeLinear
+	ExecuteModeParallel
+)
+
+type TaskExecutor func(task func()) error
+
+type TaskExecutorFactory func() TaskExecutor
+
+type World interface {
+	Update() error
+	Destroy() error
+	NewEntity(opts ...EntityOption) *EntityInfo
+	RegisterLight(system LightSystem, Option ...SystemOption) error
+	RegisterStandard(system SystemStandard) error
+	Optimize(t time.Duration, force bool) error
+}
+
+type WorldOption func(config *WorldConfig)
+
 type WorldConfig struct {
-	Debug              bool //Debug模式
-	MetaInfoDebugPrint bool
-	MainThreadCheck    bool
-	IsMetrics          bool
-	IsMetricsPrint     bool
-	CpuNum             int    //使用的最大cpu数量
-	MaxPoolThread      uint32 //线程池最大线程数量
-	MaxPoolJobQueue    uint32 //线程池最大任务队列长度
-	HashCount          int    //容器桶数量
-	CollectionVersion  int
-	FrameInterval      time.Duration //帧间隔
-	StopCallback       func(world *ecsWorld)
+	ExecuteMode  WorldExecuteMode
+	AutoOptimize bool
+	Rate         int
 }
 
-func NewDefaultWorldConfig() *WorldConfig {
-	return &WorldConfig{
-		Debug:              true,
-		MetaInfoDebugPrint: true,
-		MainThreadCheck:    true,
-		IsMetrics:          true,
-		IsMetricsPrint:     false,
-		CpuNum:             runtime.NumCPU(),
-		MaxPoolThread:      uint32(runtime.NumCPU() * 2),
-		MaxPoolJobQueue:    10,
-		HashCount:          runtime.NumCPU() * 4,
-		FrameInterval:      time.Millisecond * 33,
+func (s *WorldConfig) initDefault() {
+	s.ExecuteMode = ExecuteModeLinear
+	s.AutoOptimize = false
+	s.Rate = 30
+}
+
+func WithWorldSyncMode() WorldOption {
+	return func(config *WorldConfig) {
+		config.ExecuteMode = ExecuteModeLinear
 	}
 }
 
-type IWorld interface {
-	getStatus() WorldStatus
-	getID() int64
-	addFreeComponent(component IComponent)
-	registerSystem(system ISystem)
-	registerComponent(component IComponent)
-	getMetrics() *Metrics
-	getEntityInfo(id Entity) (*EntityInfo, bool)
-	newEntity() *EntityInfo
-	deleteEntity(entity Entity)
-	getComponentMetaInfoByType(typ reflect.Type) *ComponentMetaInfo
-	optimize(t time.Duration, force bool)
-	getSystem(sys reflect.Type) (ISystem, bool)
-	addUtility(utility IUtility)
-	getUtilityForT(typ reflect.Type) (unsafe.Pointer, bool)
-	update()
-	setStatus(status WorldStatus)
-	addComponent(entity Entity, component IComponent)
-	deleteComponent(entity Entity, component IComponent)
-	deleteComponentByIntType(entity Entity, it uint16)
-	getComponentSet(typ reflect.Type) IComponentSet
-	getComponentSetByIntType(typ uint16) IComponentSet
-	getComponentCollection() IComponentCollection
-	getComponentMeta() *componentMeta
-	getOrCreateComponentMetaInfo(component IComponent) *ComponentMetaInfo
-	checkMainThread()
-	base() *ecsWorld
+func WithWorldASyncMode() WorldOption {
+	return func(config *WorldConfig) {
+		config.ExecuteMode = ExecuteModeParallel
+	}
 }
 
-type ecsWorld struct {
-	id              int64
-	status          WorldStatus
-	config          *WorldConfig
-	systemFlow      *systemFlow
-	components      IComponentCollection
-	entities        *EntitySet
-	optimizer       *optimizer
-	idGenerator     *EntityIDGenerator
-	componentMeta   *componentMeta
-	utilities       map[reflect.Type]IUtility
-	workPool        *Pool
-	metrics         *Metrics
-	frame           uint64
-	ts              time.Time
-	delta           time.Duration
-	pureUpdateDelta time.Duration
-	mainThreadID    int64
+func WithWorldAutoOptimize() WorldOption {
+	return func(config *WorldConfig) {
+		config.AutoOptimize = true
+	}
 }
 
-func (w *ecsWorld) init(config *WorldConfig) *ecsWorld {
-	w.id = LocalUniqueID()
-	w.systemFlow = nil
-	w.config = config
-	w.entities = NewEntityCollection()
-	w.ts = time.Now()
+func WithWorldDefaultUpdateRate(rate int) WorldOption {
+	return func(config *WorldConfig) {
+		config.Rate = rate
+	}
+}
 
-	if w.config.MaxPoolThread <= 0 {
-		w.config.MaxPoolThread = uint32(runtime.NumCPU())
+type world struct {
+	status              WorldStatus
+	config              *WorldConfig
+	idGenerator         *EntityIDGenerator
+	taskExecutorFactory TaskExecutorFactory
+	optimizer           *optimizer
+	opLog               *OpLog
+
+	entities   *EntitySet
+	components map[ComponentIntType]ComponentSet
+	systems    *flow
+
+	disposableTypes []ComponentIntType
+	nomadicTypes    []ComponentIntType
+
+	frame      uint64
+	lastUpdate time.Time
+	delta      time.Duration
+}
+
+func NewWorld(opts ...WorldOption) World {
+	c := &WorldConfig{}
+	c.initDefault()
+	for _, opt := range opts {
+		opt(c)
 	}
 
-	if w.config.MaxPoolJobQueue <= 0 {
-		w.config.MaxPoolJobQueue = 20
-	}
-
-	w.workPool = NewPool(config.MaxPoolThread, config.MaxPoolJobQueue)
-
+	w := &world{}
+	w.status = WorldStatusInitializing
+	w.config = c
 	w.idGenerator = NewEntityIDGenerator(1024, 10)
-
-	w.componentMeta = NewComponentMeta(w)
-	w.utilities = make(map[reflect.Type]IUtility)
-
-	w.metrics = NewMetrics(w.config.IsMetrics, w.config.IsMetricsPrint)
-
-	w.components = NewComponentCollection(w, config.HashCount)
+	w.entities = NewEntitySet()
+	w.components = map[ComponentIntType]ComponentSet{}
+	flowExecOpt := WithFlowSyncMode()
+	if c.ExecuteMode == ExecuteModeParallel {
+		flowExecOpt = WithFlowASyncMode()
+	}
+	w.systems = newSystemFlow(w, flowExecOpt)
+	w.opLog = NewOpLog(w, runtime.NumCPU())
 	w.optimizer = newOptimizer(w)
-
-	if w.config.FrameInterval <= 0 {
-		w.config.FrameInterval = time.Millisecond * 33
-	}
-
-	if w.config.HashCount == 0 {
-		w.config.HashCount = config.CpuNum
-	}
-
-	sf := newSystemFlow(w)
-	w.systemFlow = sf
-
-	w.setStatus(WorldStatusInitialized)
-
+	w.status = WorldStatusInitialized
 	return w
 }
 
-func (w *ecsWorld) base() *ecsWorld {
-	return w
+func (w *world) NewEntity(opts ...EntityOption) *EntityInfo {
+	return w.newEntity(opts...)
 }
 
-func (w *ecsWorld) getID() int64 {
-	return w.id
+func (w *world) newEntity(opts ...EntityOption) *EntityInfo {
+	config := EntityConfig{}
+	config.initDefault()
+	for _, opt := range opts {
+		opt(&config)
+	}
+	ins := w.entities.Add(EntityInfo{
+		world:    w,
+		entity:   w.idGenerator.NewID(),
+		compound: NewCompound(4),
+	})
+	if len(config.comps) > 0 {
+		ins.Add(config.comps...)
+	}
+	return ins
 }
 
-func (w *ecsWorld) switchMainThread() {
-	atomic.StoreInt64(&w.mainThreadID, goroutineID())
+func (w *world) getTaskExecutor() TaskExecutor {
+	if w.taskExecutorFactory != nil {
+
+	}
+	return w.taskExecutorFactory()
 }
 
-func (w *ecsWorld) startup() {
-	if w.getStatus() != WorldStatusInitialized {
-		panic("world is not initialized or already running.")
-	}
-
-	if w.config.MetaInfoDebugPrint || w.config.Debug {
-		w.systemFlow.SystemInfoPrint()
-		w.componentMeta.ComponentMetaInfoPrint()
-	}
-
-	w.switchMainThread()
-	w.workPool.Start()
-	w.setStatus(WorldStatusRunning)
+func (w *world) getComponentSet(it ComponentIntType) (ComponentSet, bool) {
+	s, ok := w.components[it]
+	return s, ok
 }
 
-func (w *ecsWorld) update() {
-	if w.config.MetaInfoDebugPrint {
-		w.checkMainThread()
+func (w *world) componentOp(op Operate) {
+	w.opLog.operate(op)
+}
+
+func (w *world) AddNomadic(comps ...Component) {
+	for _, comp := range comps {
+		if !comp.IsNomadic() {
+			continue
+		}
+		op := Operate{
+			Op:   ComponentOperateAdd,
+			Comp: comp,
+		}
+		w.componentOp(op)
 	}
-	w.switchMainThread()
-	if w.status != WorldStatusRunning {
-		panic("world is not running, must startup first.")
+}
+
+func (w *world) Update() error {
+	if w.lastUpdate.IsZero() {
+		w.lastUpdate = time.Now()
 	}
-	e := Event{Delta: w.delta, Frame: w.frame}
-	start := time.Now()
-	w.systemFlow.run(e)
-	now := time.Now()
-	w.delta = now.Sub(w.ts)
-	w.pureUpdateDelta = now.Sub(start)
-	w.ts = now
+
 	w.frame++
+	now := time.Now()
+	w.delta = now.Sub(w.lastUpdate)
+	e := Event{
+		Frame: w.frame,
+		Delta: w.delta,
+	}
+	err := w.systems.Execute(e)
+	if err != nil {
+		return err
+	}
+
+	if w.config.AutoOptimize {
+		elapsed := now.Sub(w.lastUpdate)
+		t := (time.Second / time.Duration(w.config.Rate)) - elapsed
+		err = w.Optimize(t, false)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
-func (w *ecsWorld) optimize(t time.Duration, force bool) {
+func (w *world) Destroy() error {
+	return nil
+}
+
+func (w *world) Optimize(t time.Duration, force bool) error {
+	if w.optimizer == nil || t < 0 {
+		return nil
+	}
 	w.optimizer.optimize(t, force)
+	return nil
 }
 
-func (w *ecsWorld) stop() {
-	w.workPool.Release()
+func (w *world) RegisterStandard(system SystemStandard) error {
+	s := newSystem(w, system, SystemTypeStandard)
+	s.setState(SystemStateInit)
+
+	ctx := &SystemInitContext{
+		b: *s.getContext(),
+	}
+	ctx.b.constraint.reset()
+	err := TryAndReport(func() error {
+		return system.Init(ctx)
+	})
+	ctx.b.constraint.setOutdated()
+	if err != nil {
+		return err
+	}
+
+	s.init(ctx.opts...)
+	w.systems.register(s)
+	return nil
 }
 
-func (w *ecsWorld) setStatus(status WorldStatus) {
+func (w *world) RegisterLight(system LightSystem, opts ...SystemOption) error {
+	s := newSystem(w, system, SystemTypeLight)
+	s.setState(SystemStateInit)
+	s.init(opts...)
+	w.systems.register(s)
+	return nil
+}
+
+func (w *world) flushPendingOperate() ([]func(), func()) {
+	return w.opLog.getOpTasks()
+}
+
+func (w *world) clearDisposable() error {
+	for _, it := range w.disposableTypes {
+		set, ok := w.getComponentSet(it)
+		if !ok {
+			continue
+		}
+		for _, index := range set.EntityIndexes() {
+			e := w.entities.getByIndex(index)
+			e.compound.Remove(it)
+		}
+
+		set.Reset()
+	}
+	return nil
+}
+
+func (w *world) clearNomadic() error {
+	for _, it := range w.nomadicTypes {
+		set, ok := w.getComponentSet(it)
+		if !ok {
+			continue
+		}
+		set.Reset()
+	}
+	return nil
+}
+
+func (w *world) setStatus(status WorldStatus) {
 	w.status = status
 }
 
-func (w *ecsWorld) getUtilityGetter() UtilityGetter {
-	ug := UtilityGetter{}
-	iw := IWorld(w)
-	ug.world = &iw
-	return ug
-}
-
-func (w *ecsWorld) addUtility(utility IUtility) {
-	w.utilities[utility.Type()] = utility
-}
-func (w *ecsWorld) getUtilityForT(typ reflect.Type) (unsafe.Pointer, bool) {
-	u, ok := w.utilities[typ]
-	return u.getPointer(), ok
-}
-
-func (w *ecsWorld) getStatus() WorldStatus {
+func (w *world) getStatus() WorldStatus {
 	return w.status
 }
 
-func (w *ecsWorld) getMetrics() *Metrics {
-	return w.metrics
-}
-
-func (w *ecsWorld) registerSystem(system ISystem) {
-	w.checkMainThread()
-	w.systemFlow.register(system)
-}
-
-func (w *ecsWorld) registerComponent(component IComponent) {
-	w.checkMainThread()
-	w.componentMeta.GetOrCreateComponentMetaInfo(component)
-}
-
-func (w *ecsWorld) getSystem(sys reflect.Type) (ISystem, bool) {
-	s, ok := w.systemFlow.systems[sys]
-	if ok {
-		return s.(ISystem), ok
-	}
-	return nil, ok
-}
-
-func (w *ecsWorld) addJob(job func(), hashKey ...uint32) {
-	w.workPool.Add(job, hashKey...)
-}
-
-func (w *ecsWorld) addEntity(info EntityInfo) *EntityInfo {
-	return w.entities.Add(info)
-}
-
-func (w *ecsWorld) getEntityInfo(entity Entity) (*EntityInfo, bool) {
-	return w.entities.GetEntityInfo(entity)
-}
-
-func (w *ecsWorld) deleteEntity(entity Entity) {
-	w.entities.Remove(entity)
-}
-
-func (w *ecsWorld) getComponentSet(typ reflect.Type) IComponentSet {
-	return w.components.getComponentSet(typ)
-}
-
-func (w *ecsWorld) getComponentSetByIntType(it uint16) IComponentSet {
-	return w.components.getComponentSetByIntType(it)
-}
-
-func (w *ecsWorld) getComponentMetaInfoByType(typ reflect.Type) *ComponentMetaInfo {
-	return w.componentMeta.GetComponentMetaInfoByType(typ)
-}
-
-func (w *ecsWorld) getComponentCollection() IComponentCollection {
-	return w.components
-}
-
-func (w *ecsWorld) getComponentMeta() *componentMeta {
-	return w.componentMeta
-}
-
-func (w *ecsWorld) getOrCreateComponentMetaInfo(component IComponent) *ComponentMetaInfo {
-	return w.componentMeta.GetOrCreateComponentMetaInfo(component)
-}
-
-func (w *ecsWorld) newEntity() *EntityInfo {
-	info := EntityInfo{entity: w.idGenerator.NewID(), compound: NewCompound(4)}
-	return w.addEntity(info)
-}
-
-func (w *ecsWorld) addComponent(entity Entity, component IComponent) {
-	typ := component.Type()
-	if !w.componentMeta.Exist(typ) {
-		w.componentMeta.CreateComponentMetaInfo(component.Type(), component.getComponentType())
-	}
-	w.components.operate(CollectionOperateAdd, entity, component)
-}
-
-func (w *ecsWorld) deleteComponent(entity Entity, component IComponent) {
-	w.components.operate(CollectionOperateDelete, entity, component)
-}
-
-func (w *ecsWorld) deleteComponentByIntType(entity Entity, it uint16) {
-	w.components.deleteOperate(CollectionOperateDelete, entity, it)
-}
-
-func (w *ecsWorld) addFreeComponent(component IComponent) {
-	switch component.getComponentType() {
-	case ComponentTypeFree, ComponentTypeFreeDisposable:
-	default:
-		Log.Errorf("component not free type, %s", component.Type().String())
-		return
-	}
-	w.addComponent(0, component)
-}
-
-func (w *ecsWorld) checkMainThread() {
-	if !w.config.MainThreadCheck {
-		return
-	}
-	if id := atomic.LoadInt64(&w.mainThreadID); id != goroutineID() && id > 0 {
-		panic("not main thread")
-	}
+func (w *world) getEntityInfo(entity Entity) (*EntityInfo, bool) {
+	return w.entities.Get(entity)
 }

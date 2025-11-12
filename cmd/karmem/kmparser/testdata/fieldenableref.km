@@ -1,0 +1,11 @@
+karmem demo @golang.field.enable_ref();
+
+struct Point inline {
+    X float32;
+    Y float32;
+}
+
+struct Position inline  @golang.field.enable_ref(false) {
+    X float32;
+    Y float32;
+}

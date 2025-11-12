@@ -1,0 +1,5 @@
+karmem case_string_setter @golang.package(`karmemtest`) @packed();
+
+struct BaseS table @id(`9956155639035161441`) {
+    NN8    []uint8;
+}

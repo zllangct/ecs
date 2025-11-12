@@ -1,0 +1,15 @@
+{{define "fixed_string" }}
+	package {{ .PackageName }}
+
+	// Generate by ecs_internal_gen, DON'T EDIT IT.
+
+	{{ range $size, $v := .MaxSize }}
+		type FixedBytes{{ $size }} [{{ $size }}]byte
+		type Fixed{{ $size }} = FixedString[FixedBytes{{ $size }}]
+		func NewFixed{{ $size }}(str string) Fixed{{ $size }} {
+			f := FixedString[FixedBytes{{ $size }}]{}
+			f.Set(str)
+			return Fixed{{ $size }}(f)
+		}
+	{{- end}}
+{{- end}}

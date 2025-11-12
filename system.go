@@ -1,9 +1,15 @@
 package ecs
 
 import (
-	"reflect"
-	"sync"
-	"unsafe"
+	"fmt"
+)
+
+type SystemType uint8
+
+const (
+	SystemTypeInvalid SystemType = iota
+	SystemTypeLight
+	SystemTypeStandard
 )
 
 type SystemState uint8
@@ -18,275 +24,190 @@ const (
 	SystemStateDestroyed
 )
 
-type SystemInitConstraint struct {
-	sys *ISystem
-}
-
-func (s *SystemInitConstraint) getSystem() ISystem {
-	if s.sys == nil {
-		panic("out of initialization stage")
-	}
-	return *s.sys
-}
-
-func (s *SystemInitConstraint) SetBroken(reason string) {
-	(*s.sys).setBroken()
-	panic(reason)
-}
-
-func (s *SystemInitConstraint) isValid() bool {
-	return *s.sys == nil
-}
-
-type ISystem interface {
-	Type() reflect.Type
-	Order() Order
-	World() IWorld
-	GetRequirements() map[reflect.Type]IRequirement
-	IsRequire(component IComponent) bool
-	ID() int64
-	GetUtility() IUtility
-
-	pause()
-	resume()
-	stop()
-	getPointer() unsafe.Pointer
-	isRequire(componentType reflect.Type) bool
-	setOrder(order Order)
-	setRequirements(initializer SystemInitConstraint, rqs ...IRequirement)
+type SystemInfo interface {
+	isValid() bool
 	getState() SystemState
 	setState(state SystemState)
-	setSecurity(isSafe bool)
-	isThreadSafe() bool
-	setExecuting(isExecuting bool)
-	isExecuting() bool
-	baseInit(world *ecsWorld, ins ISystem)
-	getOptimizer() *OptimizerReporter
-	getGetterCache() *GetterCache
-	setBroken()
-	isValid() bool
-	setUtility(u IUtility)
+	getType() SystemType
+	getDeps() []Dependency
+	id() uint64
+	name() string
+	getOrder() Order
+	getRaw() any
+	impl(stage Stage) bool
+	getContext() *SystemContext
+	getDep(intType ComponentIntType) (Dependency, bool)
+	getOptReporter() *optReporter
 }
 
-type SystemObject interface {
-	__SystemIdentification()
+type SystemConfig struct {
+	name         string
+	dependencies []Dependency
+	stage        Stage
+	order        Order
 }
 
-type SystemPointer[T SystemObject] interface {
-	ISystem
-	*T
+func (s *SystemConfig) initDefault() {
+	s.name = "unnamed"
+	s.stage = StageUpdate
+	s.order = OrderAppend
 }
 
-type systemIdentification struct{}
+type SystemOption func(config *SystemConfig)
 
-func (s systemIdentification) __SystemIdentification() {}
-
-type System[T SystemObject] struct {
-	systemIdentification
-	lock              sync.Mutex
-	requirements      map[reflect.Type]IRequirement
-	getterCache       *GetterCache
-	order             Order
-	optimizerReporter *OptimizerReporter
-	world             *ecsWorld
-	utility           IUtility
-	realType          reflect.Type
-	state             SystemState
-	valid             bool
-	isSafe            bool
-	executing         bool
-	id                int64
-}
-
-func (s *System[T]) instance() (sys ISystem) {
-	(*iface)(unsafe.Pointer(&sys)).data = unsafe.Pointer(s)
-	return
-}
-
-func (s *System[T]) rawInstance() *T {
-	return (*T)(unsafe.Pointer(s))
-}
-
-func (s *System[T]) ID() int64 {
-	if s.id == 0 {
-		s.id = LocalUniqueID()
-	}
-	return s.id
-}
-
-func (s *System[T]) SetRequirements(initializer SystemInitConstraint, rqs ...IRequirement) {
-	if initializer.isValid() {
-		panic("out of initialization stage")
-	}
-	s.setRequirements(initializer, rqs...)
-}
-
-func (s *System[T]) setRequirementsInternal(rqs ...IRequirement) {
-	if s.requirements == nil {
-		s.requirements = map[reflect.Type]IRequirement{}
-	}
-	var typ reflect.Type
-	for _, value := range rqs {
-		typ = value.Type()
-		s.requirements[typ] = value
+func WithDeps(comp ...Dependency) SystemOption {
+	return func(c *SystemConfig) {
+		c.dependencies = append(c.dependencies, comp...)
 	}
 }
 
-func (s *System[T]) isInitialized() bool {
-	return s.state >= SystemStateInit
-}
-
-func (s *System[T]) setRequirements(initializer SystemInitConstraint, rqs ...IRequirement) {
-	if s.requirements == nil {
-		s.requirements = map[reflect.Type]IRequirement{}
-	}
-	var typ reflect.Type
-	for _, value := range rqs {
-		typ = value.Type()
-		value.check(initializer)
-		s.requirements[typ] = value
-		s.World().getComponentMetaInfoByType(typ)
+func WithDep[T ComponentObject, TP ComponentPointer[T]](writable ...Writable) SystemOption {
+	return func(c *SystemConfig) {
+		c.dependencies = append(c.dependencies, Dep[T, TP](writable...))
 	}
 }
 
-func (s *System[T]) setUtility(u IUtility) {
-	s.utility = u
-}
-
-func (s *System[T]) setSecurity(isSafe bool) {
-	s.isSafe = isSafe
-}
-func (s *System[T]) isThreadSafe() bool {
-	return s.isSafe
-}
-
-func (s *System[T]) GetUtility() IUtility {
-	return s.utility
-}
-
-func (s *System[T]) pause() {
-	if s.getState() == SystemStateUpdate {
-		s.setState(SystemStatePause)
+func WithStage(stage Stage) SystemOption {
+	return func(c *SystemConfig) {
+		c.stage = stage
 	}
 }
 
-func (s *System[T]) resume() {
-	if s.getState() == SystemStatePause {
-		s.setState(SystemStateUpdate)
+func WithOrder(order Order) SystemOption {
+	return func(c *SystemConfig) {
+		c.order = order
 	}
 }
 
-func (s *System[T]) stop() {
-	if s.getState() < SystemStateDestroy {
-		s.setState(SystemStateDestroy)
+func WithName(name string) SystemOption {
+	return func(c *SystemConfig) {
+		c.name = name
 	}
 }
 
-func (s *System[T]) getState() SystemState {
+type SystemConstraint struct {
+	outdated bool
+}
+
+func (s *SystemConstraint) isValid() bool {
+	return s.outdated
+}
+
+func (s *SystemConstraint) reset() {
+	s.outdated = true
+}
+
+func (s *SystemConstraint) setOutdated() {
+	s.outdated = false
+}
+
+type SystemContext struct {
+	constraint SystemConstraint
+	world      *world
+	info       SystemInfo
+}
+
+type SystemInfoInstance struct {
+	systemId   uint64
+	systemName string
+	impls      uint16
+	config     *SystemConfig
+	state      SystemState
+	ctx        SystemContext
+	typ        SystemType
+	world      *world
+	reporter   *optReporter
+	raw        any
+}
+
+func newSystem(world *world, system any, typ SystemType) *SystemInfoInstance {
+	c := &SystemConfig{}
+	c.initDefault()
+	impls := implsCheck(system)
+	info := &SystemInfoInstance{
+		config:   c,
+		systemId: LocalUniqueID(),
+		typ:      typ,
+		raw:      system,
+		impls:    impls,
+		world:    world,
+		reporter: newOptReporter(),
+	}
+	return info
+}
+
+func (s *SystemInfoInstance) init(opts ...SystemOption) {
+	for _, opt := range opts {
+		opt(s.config)
+	}
+}
+
+func (s *SystemInfoInstance) getDep(it ComponentIntType) (Dependency, bool) {
+	for _, d := range s.config.dependencies {
+		if d.intType() == it {
+			return d, true
+		}
+	}
+	return 0, false
+}
+
+func (s *SystemInfoInstance) getContext() *SystemContext {
+	if s.ctx.world == nil {
+		s.ctx.world = s.world
+	}
+	if s.ctx.info == nil {
+		s.ctx.info = s
+	}
+	return &s.ctx
+}
+
+func (s *SystemInfoInstance) isValid() bool {
+	return true
+}
+
+func (s *SystemInfoInstance) getState() SystemState {
 	return s.state
 }
 
-func (s *System[T]) setState(state SystemState) {
+func (s *SystemInfoInstance) setState(state SystemState) {
 	s.state = state
 }
 
-func (s *System[T]) setBroken() {
-	s.valid = false
+func (s *SystemInfoInstance) getType() SystemType {
+	return s.typ
 }
 
-func (s *System[T]) isValid() bool {
-	return s.valid
+func (s *SystemInfoInstance) getRaw() any {
+	return s.raw
 }
 
-func (s *System[T]) setExecuting(isExecuting bool) {
-	s.executing = isExecuting
+func (s *SystemInfoInstance) getDeps() []Dependency {
+	return s.config.dependencies
 }
 
-func (s *System[T]) isExecuting() bool {
-	return s.executing
+func (s *SystemInfoInstance) id() uint64 {
+	return s.systemId
 }
 
-func (s *System[T]) GetRequirements() map[reflect.Type]IRequirement {
-	return s.requirements
+func (s *SystemInfoInstance) impl(stage Stage) bool {
+	return s.impls>>stage&1 == 1
 }
 
-func (s *System[T]) IsRequire(com IComponent) bool {
-	return s.isRequire(com.Type())
-}
-
-func (s *System[T]) isRequire(typ reflect.Type) bool {
-	_, ok := s.requirements[typ]
-	return ok
-}
-
-func (s *System[T]) baseInit(world *ecsWorld, ins ISystem) {
-	s.requirements = map[reflect.Type]IRequirement{}
-	s.getterCache = NewGetterCache(len(s.requirements))
-
-	if ins.Order() == OrderInvalid {
-		s.setOrder(OrderDefault)
-	}
-	s.world = world
-
-	s.valid = true
-
-	initializer := SystemInitConstraint{}
-	is := ISystem(s)
-	initializer.sys = &is
-	if i, ok := ins.(InitReceiver); ok {
-		err := TryAndReport(func() error {
-			return i.Init(initializer)
-		})
-		if err != nil {
-			Log.Error(err)
+func (s *SystemInfoInstance) name() string {
+	if len(s.systemName) == 0 {
+		if s.config.name == "unnamed" {
+			s.systemName = fmt.Sprintf("[%d]unnamed", s.systemId)
+		} else {
+			s.systemName = s.config.name
 		}
 	}
-	*initializer.sys = nil
-	initializer.sys = nil
-
-	s.state = SystemStateStart
+	return s.systemName
 }
 
-func (s *System[T]) getPointer() unsafe.Pointer {
-	return unsafe.Pointer(s)
+func (s *SystemInfoInstance) getOrder() Order {
+	return s.config.order
 }
 
-func (s *System[T]) Type() reflect.Type {
-	if s.realType == nil {
-		s.realType = TypeOf[T]()
-	}
-	return s.realType
-}
-
-func (s *System[T]) setOrder(order Order) {
-	if s.isInitialized() {
-		return
-	}
-
-	s.order = order
-}
-
-func (s *System[T]) Order() Order {
-	return s.order
-}
-
-func (s *System[T]) World() IWorld {
-	return s.world
-}
-
-func (s *System[T]) GetEntityInfo(entity Entity) (*EntityInfo, bool) {
-	return s.world.getEntityInfo(entity)
-}
-
-// get optimizer
-func (s *System[T]) getOptimizer() *OptimizerReporter {
-	if s.optimizerReporter == nil {
-		s.optimizerReporter = &OptimizerReporter{}
-		s.optimizerReporter.init()
-	}
-	return s.optimizerReporter
-}
-
-func (s *System[T]) getGetterCache() *GetterCache {
-	return s.getterCache
+func (s *SystemInfoInstance) getOptReporter() *optReporter {
+	return s.reporter
 }

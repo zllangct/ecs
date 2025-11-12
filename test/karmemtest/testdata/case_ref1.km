@@ -1,0 +1,19 @@
+karmem case_refone @golang.package(`karmemtest`) @packed();
+
+
+struct BIR table @id(`626714986465469827`) {
+    Value int64;
+}
+
+struct BIRR table @golang.field.enable_ref() @id(`9649917901262869840`) {
+    Data  BIR;
+    Data2 BIR;
+}
+
+struct BII inline @id(`4427636902920729320`) {
+    Value int64;
+}
+
+struct BIIR table @golang.field.enable_ref() @id(`11194102834194897860`) {
+    Data BII;
+}

@@ -1,10 +1,14 @@
 package ecs
 
 import (
+	"errors"
 	"fmt"
-	"reflect"
+	"iter"
 	"sync"
 )
+
+// Stage system execute period:start->pre_update->update->pre_destroy->destroy
+type Stage uint8
 
 const (
 	StageSyncBeforeStart Stage = iota
@@ -28,8 +32,7 @@ const (
 	StageSyncAfterDestroy
 )
 
-// Stage system execute period:start->pre_update->update->pre_destroy->destroy
-type Stage uint32
+const StageMaxIndex = StageSyncAfterDestroy
 
 // Order default suborder of system
 type Order int32
@@ -41,312 +44,404 @@ const (
 	OrderDefault Order = OrderAppend
 )
 
-// SystemGroupList extension of system group slice
-type SystemGroupList []*SystemGroup
+type ExecuteErrors struct {
+	lock    sync.Mutex
+	Err     error
+	SubErrs []error
+}
+
+func (e *ExecuteErrors) Error() string {
+	return e.Err.Error()
+}
+
+func (e *ExecuteErrors) Append(err error) {
+	e.SubErrs = append(e.SubErrs, err)
+}
+
+func (e *ExecuteErrors) AppendWithLock(err error) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+	e.Append(err)
+}
+
+type SystemTraverserList []SystemTraverser
+
+type FlowConfig struct {
+	ExecuteMode WorldExecuteMode
+}
+
+func (f *FlowConfig) initDefault() {
+	f.ExecuteMode = ExecuteModeLinear
+}
+
+type FlowOption func(*FlowConfig)
+
+func WithFlowSyncMode() FlowOption {
+	return func(config *FlowConfig) {
+		config.ExecuteMode = ExecuteModeLinear
+	}
+}
+
+func WithFlowASyncMode() FlowOption {
+	return func(config *FlowConfig) {
+		config.ExecuteMode = ExecuteModeParallel
+	}
+}
+
+type SystemTaskContext struct {
+	isValid bool
+	fn      func(ctx *SystemContext, event Event) error
+	isAsync bool
+}
 
 // system execute flow
-type systemFlow struct {
-	world     *ecsWorld
-	stages    map[Stage]SystemGroupList
-	stageList []Stage
-	systems   map[reflect.Type]ISystem
-	wg        *sync.WaitGroup
+type flow struct {
+	config           *FlowConfig
+	world            *world
+	traverserFactory func() SystemTraverser
+	stages           map[Stage]SystemTraverserList
+	systems          map[uint64]SystemInfo
 }
 
-func newSystemFlow(runtime *ecsWorld) *systemFlow {
-	sf := &systemFlow{
-		world:   runtime,
-		systems: map[reflect.Type]ISystem{},
-		wg:      &sync.WaitGroup{},
+func newSystemFlow(world *world, opt ...FlowOption) *flow {
+	config := &FlowConfig{}
+	config.initDefault()
+
+	for _, option := range opt {
+		option(config)
 	}
-	sf.init()
-	return sf
-}
 
-// initialize the system flow
-func (p *systemFlow) init() {
-	p.stageList = []Stage{
-		StageSyncBeforeStart,
-		StageStart,
-		StageSyncAfterStart,
-
-		StageSyncBeforePreUpdate,
-		StagePreUpdate,
-		StageSyncAfterPreUpdate,
-
-		StageSyncBeforeUpdate,
-		StageUpdate,
-		StageSyncAfterUpdate,
-
-		StageSyncBeforePostUpdate,
-		StagePostUpdate,
-		StageSyncAfterPostUpdate,
-
-		StageSyncBeforeDestroy,
-		StageDestroy,
-		StageSyncAfterDestroy,
+	f := &flow{
+		config:  config,
+		world:   world,
+		systems: map[uint64]SystemInfo{},
 	}
-	p.reset()
+	f.reset()
+	return f
 }
 
-func (p *systemFlow) reset() {
-	p.stages = make(map[Stage]SystemGroupList)
-	for _, value := range p.stageList {
-		p.stages[value] = SystemGroupList{}
-		sgFront := NewSystemGroup()
-		sgFront.order = OrderFront
-		sgAppend := NewSystemGroup()
-		sgAppend.order = OrderAppend
-		p.stages[value] = append(p.stages[value], sgFront, sgAppend)
+func (p *flow) reset() {
+	p.stages = make(map[Stage]SystemTraverserList)
+	if p.config.ExecuteMode == ExecuteModeLinear {
+		p.traverserFactory = NewSystemDefaultList
+	} else {
+		p.traverserFactory = NewSystemRelatedGroups
+	}
+	for stage := range StageMaxIndex {
+		p.stages[stage] = SystemTraverserList{}
+		stlFront := p.traverserFactory()
+		stlFront.setOrder(OrderFront)
+		stlAppend := p.traverserFactory()
+		stlAppend.setOrder(OrderAppend)
+		p.stages[stage] = append(p.stages[stage], stlFront, stlAppend)
 	}
 }
 
-func (p *systemFlow) flushTempTask() {
-	tasks := p.world.components.getTempTasks()
-	p.wg.Add(len(tasks))
-	for _, task := range tasks {
-		wg := p.wg
-		fn := task
-		p.world.addJob(func() {
-			fn()
-			wg.Done()
-		})
+func (p *flow) flushTempTask() error {
+	wg := &sync.WaitGroup{}
+	tasks, clean := p.world.flushPendingOperate()
+	defer clean()
+
+	switch p.config.ExecuteMode {
+	case ExecuteModeLinear:
+		for _, task := range tasks {
+			task()
+		}
+	case ExecuteModeParallel:
+		wg.Add(len(tasks))
+		for _, task := range tasks {
+			fn := func() {
+				task()
+				wg.Done()
+			}
+			go fn()
+		}
+		wg.Wait()
+	default:
+		return fmt.Errorf("invalid flow mode: %d", p.config.ExecuteMode)
 	}
-	p.wg.Wait()
+	return nil
 }
 
-func (p *systemFlow) systemUpdate(event Event) {
-	var sq SystemGroupList
-	var sys ISystem
+func (p *flow) Execute(event Event) error {
+	var err error
+	err = p.flushTempTask()
+	if err != nil {
+		return err
+	}
+	switch p.config.ExecuteMode {
+	case ExecuteModeLinear:
+		err = p.executeLinear(event)
+	case ExecuteModeParallel:
+		err = p.executeParallel(event)
+	default:
+		err = fmt.Errorf("invalid flow mode: %d", p.config.ExecuteMode)
+	}
+	if err != nil {
+		return err
+	}
+	err = p.world.clearDisposable()
+	if err != nil {
+		return err
+	}
+	err = p.flushTempTask()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p *flow) getSystemTask(info SystemInfo, stage Stage) (ctx SystemTaskContext, err error) {
+	if !info.isValid() {
+		err = errors.New("invalid system")
+		return
+	}
 	var imp bool = false
 	var runSync bool = false
-	var fn func(event Event)
-	for _, period := range p.stageList {
-		sq = p.stages[period]
-		for _, sl := range sq {
-			if sl.systemCount() == 0 {
+	var fn func(ctx *SystemContext, event Event) error
+
+	state := info.getState()
+	sys := info.getRaw()
+
+	if stage > StageSyncAfterStart {
+		if state == SystemStateStart {
+			state = SystemStateUpdate
+			info.setState(SystemStateUpdate)
+		}
+	}
+
+	if state == SystemStateStart {
+		if stage > StageSyncAfterStart {
+			return
+		}
+		switch stage {
+		case StageSyncBeforeStart:
+			system, ok := sys.(SyncBeforeStartReceiver)
+			fn = system.SyncBeforeStart
+			imp = ok
+			runSync = true
+		case StageStart:
+			system, ok := sys.(StartReceiver)
+			fn = system.Start
+			imp = ok
+			runSync = false
+		case StageSyncAfterStart:
+			system, ok := sys.(SyncAfterStartReceiver)
+			fn = system.SyncAfterStart
+			imp = ok
+			runSync = true
+		}
+	} else if state == SystemStateUpdate {
+		if stage < StageSyncBeforePreUpdate || stage > StageSyncAfterPostUpdate {
+			return
+		}
+		switch stage {
+		case StageSyncBeforePreUpdate:
+			system, ok := sys.(SyncBeforePreUpdateReceiver)
+			fn = system.SyncBeforePreUpdate
+			imp = ok
+			runSync = true
+		case StagePreUpdate:
+			system, ok := sys.(PreUpdateReceiver)
+			fn = system.PreUpdate
+			imp = ok
+			runSync = true
+		case StageSyncAfterPreUpdate:
+			system, ok := sys.(SyncAfterPreUpdateReceiver)
+			fn = system.SyncAfterPreUpdate
+			imp = ok
+			runSync = true
+
+		case StageSyncBeforeUpdate:
+			system, ok := sys.(SyncBeforeUpdateReceiver)
+			fn = system.SyncBeforeUpdate
+			imp = ok
+			runSync = true
+		case StageUpdate:
+			system, ok := sys.(UpdateReceiver)
+			fn = system.Update
+			imp = ok
+			runSync = false
+		case StageSyncAfterUpdate:
+			system, ok := sys.(SyncAfterUpdateReceiver)
+			fn = system.SyncAfterUpdate
+			imp = ok
+			runSync = true
+
+		case StageSyncBeforePostUpdate:
+			system, ok := sys.(SyncBeforePostUpdateReceiver)
+			fn = system.SyncBeforePostUpdate
+			imp = ok
+			runSync = true
+		case StagePostUpdate:
+			system, ok := sys.(PostUpdateReceiver)
+			fn = system.PostUpdate
+			imp = ok
+			runSync = false
+		case StageSyncAfterPostUpdate:
+			system, ok := sys.(SyncAfterPostUpdateReceiver)
+			fn = system.SyncAfterPostUpdate
+			imp = ok
+			runSync = true
+		}
+	} else if state == SystemStateDestroy {
+		if stage < StageSyncBeforeDestroy {
+			return
+		}
+		switch stage {
+		case StageSyncBeforeDestroy:
+			system, ok := sys.(SyncBeforeDestroyReceiver)
+			fn = system.SyncBeforeDestroy
+			imp = ok
+			runSync = true
+		case StageDestroy:
+			system, ok := sys.(DestroyReceiver)
+			fn = system.Destroy
+			imp = ok
+			runSync = false
+		case StageSyncAfterDestroy:
+			system, ok := sys.(SyncAfterPostDestroyReceiver)
+			fn = system.SyncAfterDestroy
+			imp = ok
+			runSync = true
+
+			info.setState(SystemStateDestroyed)
+		}
+	}
+
+	if !imp {
+		return
+	}
+
+	return SystemTaskContext{
+		fn:      fn,
+		isAsync: !runSync,
+		isValid: true,
+	}, nil
+}
+
+func (p *flow) executeLinear(event Event) error {
+	errs := &ExecuteErrors{}
+	for stage, sl := range p.traverserIter() {
+		for _, info := range sl.all() {
+			task, err := p.getSystemTask(info, stage)
+			if err != nil {
+				errs.Append(err)
 				continue
 			}
-			for ss := sl.Begin(); !sl.End(); ss = sl.Next() {
-				if systemCount := len(ss); systemCount != 0 {
-					for i := 0; i < systemCount; i++ {
-						sys = ss[i]
-
-						if !sys.isValid() {
-							continue
-						}
-
-						imp = false
-						runSync = false
-						state := ss[i].getState()
-
-						if period > StageSyncAfterStart {
-							if state == SystemStateStart {
-								state = SystemStateUpdate
-								sys.setState(SystemStateUpdate)
-							}
-						}
-
-						if state == SystemStateStart {
-							if period > StageSyncAfterStart {
-								continue
-							}
-							switch period {
-							case StageSyncBeforeStart:
-								system, ok := sys.(SyncBeforeStartReceiver)
-								fn = system.SyncBeforeStart
-								imp = ok
-								runSync = true
-							case StageStart:
-								system, ok := sys.(StartReceiver)
-								fn = system.Start
-								imp = ok
-								runSync = false
-							case StageSyncAfterStart:
-								system, ok := sys.(SyncAfterStartReceiver)
-								fn = system.SyncAfterStart
-								imp = ok
-								runSync = true
-							}
-						} else if state == SystemStateUpdate {
-							if period < StageSyncBeforePreUpdate || period > StageSyncAfterPostUpdate {
-								continue
-							}
-							switch period {
-							case StageSyncBeforePreUpdate:
-								system, ok := sys.(SyncBeforePreUpdateReceiver)
-								fn = system.SyncBeforePreUpdate
-								imp = ok
-								runSync = true
-							case StagePreUpdate:
-								system, ok := sys.(PreUpdateReceiver)
-								fn = system.PreUpdate
-								imp = ok
-								runSync = true
-							case StageSyncAfterPreUpdate:
-								system, ok := sys.(SyncAfterPreUpdateReceiver)
-								fn = system.SyncAfterPreUpdate
-								imp = ok
-								runSync = true
-
-							case StageSyncBeforeUpdate:
-								system, ok := sys.(SyncBeforeUpdateReceiver)
-								fn = system.SyncBeforeUpdate
-								imp = ok
-								runSync = true
-							case StageUpdate:
-								system, ok := sys.(UpdateReceiver)
-								fn = system.Update
-								imp = ok
-								runSync = false
-							case StageSyncAfterUpdate:
-								system, ok := sys.(SyncAfterUpdateReceiver)
-								fn = system.SyncAfterUpdate
-								imp = ok
-								runSync = true
-
-							case StageSyncBeforePostUpdate:
-								system, ok := sys.(SyncBeforePostUpdateReceiver)
-								fn = system.SyncBeforePostUpdate
-								imp = ok
-								runSync = true
-							case StagePostUpdate:
-								system, ok := sys.(PostUpdateReceiver)
-								fn = system.PostUpdate
-								imp = ok
-								runSync = false
-							case StageSyncAfterPostUpdate:
-								system, ok := sys.(SyncAfterPostUpdateReceiver)
-								fn = system.SyncAfterPostUpdate
-								imp = ok
-								runSync = true
-							}
-						} else if state == SystemStateDestroy {
-							if period < StageSyncBeforeDestroy {
-								continue
-							}
-							switch period {
-							case StageSyncBeforeDestroy:
-								system, ok := sys.(SyncBeforeDestroyReceiver)
-								fn = system.SyncBeforeDestroy
-								imp = ok
-								runSync = true
-							case StageDestroy:
-								system, ok := sys.(DestroyReceiver)
-								fn = system.Destroy
-								imp = ok
-								runSync = false
-							case StageSyncAfterDestroy:
-								system, ok := sys.(SyncAfterPostDestroyReceiver)
-								fn = system.SyncAfterDestroy
-								imp = ok
-								runSync = true
-
-								sys.setState(SystemStateDestroyed)
-							}
-						}
-
-						if !imp {
-							continue
-						}
-						if runSync {
-							sys.setExecuting(true)
-							sys.setSecurity(true)
-							fn(event)
-							sys.setSecurity(false)
-							sys.setExecuting(false)
-						} else {
-							wrapper := func(fn func(event2 Event), e Event) func() {
-								sys.setExecuting(true)
-								return func() {
-									defer func() {
-										sys.setExecuting(false)
-										p.wg.Done()
-									}()
-									fn(e)
-								}
-							}
-							p.wg.Add(1)
-							p.world.addJob(wrapper(fn, event))
-						}
-					}
+			if task.isValid {
+				ctx := info.getContext()
+				ctx.constraint.reset()
+				err := task.fn(ctx, event)
+				ctx.constraint.setOutdated()
+				if err != nil {
+					errs.Append(err)
+					continue
 				}
-				p.wg.Wait()
+			}
+		}
+	}
+	if len(errs.SubErrs) > 0 {
+		errs.Err = errors.New("errors found in executeLinear")
+		return errs
+	}
+	return nil
+}
+
+func (p *flow) executeParallel(event Event) error {
+	errs := &ExecuteErrors{}
+	wg := &sync.WaitGroup{}
+	for stage, sl := range p.traverserIter() {
+		for batch := range sl.independentGroups() {
+			for _, info := range batch {
+				task, err := p.getSystemTask(info, stage)
+				if err != nil {
+					errs.AppendWithLock(err)
+					continue
+				}
+				ctx := info.getContext()
+				if task.isValid {
+					go func() {
+						defer wg.Done()
+						ctx.constraint.reset()
+						err := task.fn(ctx, event)
+						ctx.constraint.setOutdated()
+						if err != nil {
+							errs.AppendWithLock(err)
+						}
+					}()
+				}
+			}
+		}
+		wg.Wait()
+	}
+	if len(errs.SubErrs) > 0 {
+		errs.Err = errors.New("errors found in executeParallel")
+		return errs
+	}
+	return nil
+}
+
+func (p *flow) traverserIter() iter.Seq2[Stage, SystemTraverser] {
+	return func(yield func(Stage, SystemTraverser) bool) {
+		for stage := range StageMaxIndex {
+			sq := p.stages[stage]
+			for _, sl := range sq {
+				if sl.count() == 0 {
+					continue
+				}
+				yield(stage, sl)
 			}
 		}
 	}
 }
 
-func (p *systemFlow) run(event Event) {
-	reporter := p.world.metrics.NewReporter("system_flow_run")
-	reporter.Start()
-
-	//Log.Info("system flow # Temp Task Execute #")
-	p.flushTempTask()
-	reporter.Sample("Temp Task Execute")
-
-	//Log.Info("system flow # Logic #")
-	p.systemUpdate(event)
-	reporter.Sample("system execute")
-
-	//Log.Info("system flow # Clear Disposable #")
-	p.world.components.clearDisposable()
-	reporter.Sample("Clear Disposable")
-
-	p.flushTempTask()
-	reporter.Sample("Temp Task Execute")
-
-	reporter.Stop()
-	reporter.Print()
-}
-
 // register method only in world init or func init(){}
-func (p *systemFlow) register(system ISystem) {
+func (p *flow) register(system SystemInfo) {
 	if p.world.getStatus() != WorldStatusInitialized {
 		panic("system register only in world init")
 	}
 
-	//init function call
-	system.baseInit(p.world, system)
-
-	order := system.Order()
+	order := system.getOrder()
 	if order > OrderAppend {
-		Log.Errorf("system order must less then %d, resort order to %d", OrderAppend+1, OrderAppend)
 		order = OrderAppend
 	}
 
-	for _, period := range p.stageList {
+	for stage := range StageMaxIndex {
 
-		if !p.isImpEvent(system, period) {
+		if !system.impl(stage) {
 			continue
 		}
 
-		sl := p.stages[period]
+		sl := p.stages[stage]
 		if order == OrderFront {
-			p.stages[period][0].insert(system)
+			p.stages[stage][0].add(system)
 		} else if order == OrderAppend {
-			p.stages[period][len(sl)-1].insert(system)
+			p.stages[stage][len(sl)-1].add(system)
 		} else {
 			for i, v := range sl {
-				if order == v.order {
-					v.insert(system)
+				if order == v.getOrder() {
+					v.add(system)
 					break
-				} else if order < v.order {
-					sg := NewSystemGroup()
-					sg.order = order
-					sg.insert(system)
-					temp := append(SystemGroupList{}, sl[i-1:]...)
-					p.stages[period] = append(append(sl[:i-1], sg), temp...)
+				} else if order < v.getOrder() {
+					sg := p.traverserFactory()
+					sg.setOrder(order)
+					sg.add(system)
+					temp := append(SystemTraverserList{}, sl[i-1:]...)
+					p.stages[stage] = append(append(sl[:i-1], sg), temp...)
 					break
 				}
 			}
 		}
 	}
 
-	p.systems[system.Type()] = system
+	p.systems[system.id()] = system
+
+	system.setState(SystemStateStart)
 }
 
-func (p *systemFlow) isImpEvent(system ISystem, period Stage) bool {
+func (p *flow) isImpEvent(info SystemInfo, period Stage) bool {
+	system := info.getRaw()
 	imp := false
 	switch period {
 	case StageSyncBeforeStart:
@@ -383,11 +478,11 @@ func (p *systemFlow) isImpEvent(system ISystem, period Stage) bool {
 	return imp
 }
 
-func (p *systemFlow) stop() {
+func (p *flow) stop() {
 	p.reset()
 }
 
-func (p *systemFlow) SystemInfoPrint() {
+func (p *flow) DebugInfo() {
 	m := map[Stage]string{
 		StageSyncBeforeStart: "StageSyncBeforeStart",
 		StageStart:           "StageStart",
@@ -409,28 +504,27 @@ func (p *systemFlow) SystemInfoPrint() {
 		StageDestroy:           "StageDestroy",
 		StageSyncAfterDestroy:  "StageSyncAfterDestroy",
 	}
-	Log.Infof("┌──────────────── # System Info # ─────────────────")
-	Log.Infof("├─ Total: %d", len(p.systems))
+	var debugStr string
+	debugStr += "┌──────────────── # System Info # ─────────────────\n"
+	debugStr += fmt.Sprintf("├─ Total: %d\n", len(p.systems))
 
 	var output []string
-	var sq SystemGroupList
-	for pi, period := range p.stageList {
+	var sq SystemTraverserList
+	for stage := range StageMaxIndex {
 		var slContent []string
-		sq = p.stages[period]
+		sq = p.stages[stage]
 		for i, sl := range sq {
-			sl.resort()
-			batchTotal := sl.batchCount()
+			batchTotal := sl.getBatchCount()
 			batch := 0
 			var batchContent []string
-			for ss := sl.Begin(); !sl.End(); ss = sl.Next() {
+			for ss := range sl.independentGroups() {
 				if systemCount := len(ss); systemCount != 0 {
-
 					str := "│     │  └─ "
 					if batch == batchTotal-1 {
 						str = "│        └─ "
 					}
 					for i := 0; i < systemCount; i++ {
-						str += fmt.Sprintf("%s ", ss[i].Type().Name())
+						str += fmt.Sprintf("%s ", ss[i].name())
 					}
 					if batch == batchTotal-1 {
 						batchContent = append(batchContent, fmt.Sprintf("│     └─ Batch %d", batch))
@@ -454,10 +548,10 @@ func (p *systemFlow) SystemInfoPrint() {
 		}
 		if len(slContent) > 0 {
 			s := make([]string, 0, len(slContent)+1)
-			if pi == len(p.stageList)-1 {
-				s = append(s, fmt.Sprintf("└─ Stage %s", m[period]))
+			if stage == StageMaxIndex {
+				s = append(s, fmt.Sprintf("└─ Stage %s", m[stage]))
 			} else {
-				s = append(s, fmt.Sprintf("├─ Stage %s", m[period]))
+				s = append(s, fmt.Sprintf("├─ Stage %s", m[stage]))
 			}
 			s = append(s, slContent...)
 			output = append(output, s...)
@@ -465,7 +559,7 @@ func (p *systemFlow) SystemInfoPrint() {
 	}
 
 	for _, v := range output {
-		Log.Info(v)
+		debugStr += v + "\n"
 	}
-	Log.Infof("└────────────── # System Info End # ───────────────")
+	debugStr += "└────────────── # System Info End # ───────────────\n"
 }

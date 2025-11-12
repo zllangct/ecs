@@ -76,72 +76,99 @@
 go install github.com/zllangct/ecs
 ```
 ### 简单示例
-这是一个不完整的示例，但可以帮助您快速了解如何在你的程序中接入和使用ecs框架。
+这是一个简单但完整的示例，可以帮助您快速了解如何在你的程序中接入和使用ecs框架。
+
+#### 定义Component
+使用ecs自定义序列化文件定义Component，内容如下
+```aiignore
+karmem components @golang.package(`testdata`);
+
+component Point {
+    X float32;
+    Y float32;
+    Z float32;
+}
+
+component Position {
+    X float32;
+    Y float32;
+    Z float32;
+}
+```
+#### 生成Component代码
+```shell
+go run ./command/karmem/main.go build -golang -o ./testdata/ testdata/components.km
+```
+#### ECS示例
 ```go
 package main
 
 import (
     "fmt"
     "github.com/zllangct/ecs"
-    "time"
 )
 
-// 定义你的系统, 需要嵌套ecs.System[T]，T为你的System类型
-type TestSystem struct {
-	ecs.System[TestSystem]
+// standard system
+type _testStandardSystem struct {}
+
+func (t *_testStandardSystem) Update(ctx *ecs.SystemContext, event ecs.Event) error {
+    for i, p := range ecs.GetComponents[testdata.Point](ctx) {
+        fmt.Printf("StandardExample, EnityIndex: %d, P:%v\n", i, p)
+    }
+    return nil
 }
 
-// 系统Init事件
-func (w *TestSystem) Init(si SystemInitializer) {
-	// 申明系统感兴趣的组件, 系统内无法获取未申明的组件
-	w.SetRequirements(si, &TestComponent1{}, &TestComponent2{}, &TestComponent3{})
-}
-
-func (w *TestSystem) Update(event Event) {
-	// 获取系统感兴趣的组件, 作为遍历的索引，也可以叫做key组件
-	iter := ecs.GetComponentAll[TestComponent1](w)
-	for c := iter.Begin(); !iter.End(); c = iter.Next() {
-		// 获取关联组件，他们和key组件属于同一实体，也有人称之为"兄弟组件"
-		c2 := ecs.GetRelated[TestComponent2](w, c.owner)
-		if c2 == nil {
-			continue
-		}
-		
-		// 一些简单的处理逻辑
-		for i := 0; i < testOptimizerDummyMaxFor; i++ {
-			c.Field1 += i
-		}
-
-		for i := 0; i < testOptimizerDummyMaxFor; i++ {
-			c2.Field2 += i
-		}
-	}
+func (t *_testStandardSystem) Init(ctx *ecs.SystemInitContext) error {
+    ctx.SetOption(
+        ecs.WithName("StandardExample"),
+        ecs.WithDep[testdata.Point](),
+        ecs.WithDep[testdata.Position](),
+    )
+    return nil
 }
 
 func main() {
-	// 创建一个世界需要的配置
-	config := ecs.NewDefaultWorldConfig()
-	// 创建一个世界
-	world := ecs.NewSyncWorld(config)
-	// 注册系统
-	ecs.RegisterSystem[TestSystem](world)
+    // new world
+    world := ecs.NewWorld()
+	
+    // new entity
+    e := world.NewEntity()
+	
+    // new component with default data
+    point1 := testdata.Point{X: 1, Y: 2, Z: 3}
+    pos1 := testdata.Position{X: 7}
+	
+    // add component to entity
+    e.Add(&point1)
+    e.Add(&pos1)
+	
+    // define light system 
+    sys := func(ctx *ecs.SystemContext, event ecs.Event) error {
+        // get single components by ecs.GetComponents
+        for i, p := range ecs.GetComponents[testdata.Point](ctx) {
+            pos, _ := ecs.GetBuddy[testdata.Position](ctx, i)
+            fmt.Printf("LightExample 1, EnityIndex: %d, P:%v, Pos:%v\n", i, p, pos)
+        }
+        
+        //get components by ecs.Query
+        r := ecs.Query(ctx, ecs.WithComp[testdata.Point](), ecs.WithComp[testdata.Position]())
+        for idx, _ := range r.Iter() {
+            p, _ := ecs.GetBuddy[testdata.Point](ctx, idx)
+            pos, _ := ecs.GetBuddy[testdata.Position](ctx, idx)
+            name, _ := ecs.GetBuddy[testdata.Name](ctx, idx)
+            fmt.Printf("LightExample 2, EnityIndex: %d, P:%v, Pos:%v, Name:%s\n", idx, p, pos, name.Value.String())
+        }
 
-	// 启动你的世界
-	world.Startup()
-
-	// 为你的世界添加实体
-	entities := make([]Entity, count)
-	for i := 0; i < count; i++ {
-		e1 := world.NewEntity()
-		world.Add(e1, &TestComponent1{}, &TestComponent2{}, &TestComponent3{})
-		entities[i] = e1
-	}
-
-	// 持续更新你的世界
-	for {
-		world.Update()
-		time.Sleep(time.Second)
-	}
+        return nil
+    }
+	
+    // register light system
+    world.RegisterLight(sys, ecs.WithName("LightExample2"), ecs.WithDep[testdata.Point](), ecs.WithDep[testdata.Position](ecs.ReadWrite))
+    // register standard system
+    world.RegisterStandard(&_testStandardSystem{})
+	
+    // update your world
+    world.Update()
 }
 ```
 示例中的 ```__world_Test_S_1``` ```__world_Test_C_1```为系统和组件，后面会详细介绍，完整的代码请移步 [ world_test.go ](./world_test.go)。

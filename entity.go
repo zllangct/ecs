@@ -11,53 +11,59 @@ func (e Entity) ToInt64() int64 {
 	return int64(e)
 }
 
-func (e Entity) ToRealID() RealID {
-	return *(*RealID)(unsafe.Pointer(&e))
+func (e Entity) toReuseID() ReuseID {
+	return *(*ReuseID)(unsafe.Pointer(&e))
 }
 
-type RealID struct {
-	index int32
+func (e Entity) Index() EntityIndex {
+	return (*(*ReuseID)(unsafe.Pointer(&e))).index
+}
+
+type EntityIndex int32
+
+type ReuseID struct {
+	index EntityIndex
 	reuse int32
 }
 
-func (r *RealID) ToInt64() int64 {
+func (r *ReuseID) ToInt64() int64 {
 	return *(*int64)(unsafe.Pointer(r))
 }
 
-func (r *RealID) ToEntity() Entity {
+func (r *ReuseID) ToEntity() Entity {
 	return *(*Entity)(unsafe.Pointer(r))
 }
 
 type EntityIDGenerator struct {
-	ids     []RealID
-	free    int32
-	pending int32
+	ids     []ReuseID
+	free    EntityIndex
+	pending EntityIndex
 	len     int32
 
-	removeDelay []RealID
+	removeDelay []ReuseID
 	delayFree   int32
 	delayCap    int32
 }
 
 func NewEntityIDGenerator(initSize int, delayCap int) *EntityIDGenerator {
 	g := &EntityIDGenerator{}
-	g.ids = make([]RealID, initSize)
+	g.ids = make([]ReuseID, initSize)
 	for i := 0; i < len(g.ids); i++ {
-		g.ids[i].index = int32(i + 1)
+		g.ids[i].index = EntityIndex(i + 1)
 	}
 	g.free = 1
-	g.pending = int32(initSize)
+	g.pending = EntityIndex(initSize)
 	g.len = 0
-	g.removeDelay = make([]RealID, delayCap)
+	g.removeDelay = make([]ReuseID, delayCap)
 	g.delayCap = int32(delayCap)
 	g.delayFree = 0
 	return g
 }
 
 func (e *EntityIDGenerator) NewID() Entity {
-	id := RealID{}
+	id := ReuseID{}
 	if e.free == e.pending {
-		e.ids = append(e.ids, RealID{index: e.free, reuse: 0})
+		e.ids = append(e.ids, ReuseID{index: e.free, reuse: 0})
 		id = e.ids[e.pending]
 		e.free++
 		e.pending++
@@ -74,7 +80,7 @@ func (e *EntityIDGenerator) NewID() Entity {
 func (e *EntityIDGenerator) FreeID(entity Entity) {
 	e.len--
 
-	realID := entity.ToRealID()
+	realID := entity.toReuseID()
 	e.ids[realID.index].index = -1
 	e.ids[realID.index].reuse++
 
@@ -83,7 +89,7 @@ func (e *EntityIDGenerator) FreeID(entity Entity) {
 	if e.delayFree >= e.delayCap {
 		e.delayFlush()
 	}
-	if e.pending > 1024 && e.pending < int32(len(e.ids))/2 {
+	if e.pending > 1024 && e.pending < EntityIndex(len(e.ids))/2 {
 		e.ids = e.ids[:e.len*5/8]
 	}
 }

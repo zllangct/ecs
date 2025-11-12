@@ -1,0 +1,51 @@
+{{- define "component_imports_extension"}}
+    {{- if .HasComponent}}
+        ecs "github.com/zllangct/ecs"
+    {{- end}}
+{{- end}}
+
+{{- define "component_header_extension"}}
+{{/*    {{range $root := .Structs}}*/}}
+{{/*        {{- if $root.Data.IsComponent }}*/}}
+{{/*        {{- end}}*/}}
+{{/*    {{- end }}*/}}
+{{- end}}
+
+{{- define "component_init_extension"}}
+{{/*    {{range $root := .Structs}}*/}}
+{{/*        {{- if $root.Data.IsComponent }}*/}}
+{{/*            var {{$root.Data.Name}}Meta*/}}
+{{/*        {{- end}}*/}}
+{{/*    {{- end }}*/}}
+{{- end}}
+
+{{define "component_extension"}}
+    {{- println "//component extension"}}
+    {{- $root := .Value}}
+
+	func (x {{$root.Data.Name}}) ComponentObjectIdentifier() {}
+
+    func (x *{{$root.Data.Name}}) GetComponentSeq() int32 {
+        return {{ ComponentSeq }}
+    }
+
+    func (x *{{$root.Data.Name}}) NewComponentSet() ecs.ComponentSet {
+        return ecs.NewCSet[{{$root.Data.Name}}]()
+    }
+
+    func (x *{{$root.Data.Name}}) IsNomadic() bool {
+        {{- if HasTag $root.Data.Tags "nomadic" }}
+            return true
+        {{- else}}
+            return false
+        {{- end}}
+    }
+
+    func (x *{{$root.Data.Name}}) IsDisposable() bool {
+        {{- if HasTag $root.Data.Tags "disposable" }}
+            return true
+        {{- else}}
+            return false
+        {{- end}}
+    }
+{{end}}

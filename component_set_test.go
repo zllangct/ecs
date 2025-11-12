@@ -5,70 +5,45 @@ import (
 	"testing"
 )
 
-func TestComponentSet_Sort(t *testing.T) {
-	//准备数据
+func TestComponentSet(t *testing.T) {
+	//prepare test data
 	caseCount := 50
-	var srcList []__unorderedCollection_Test_item
+	var srcList []dummyComponent
 	for i := 0; i < caseCount; i++ {
-		srcList = append(srcList, __unorderedCollection_Test_item{
-			Component: Component[__unorderedCollection_Test_item]{
-				seq:   uint32(caseCount - i),
-				owner: Entity(i),
-			},
-			ItemID: int64(i),
-			Arr:    [3]int{1, 2, 3},
+		srcList = append(srcList, dummyComponent{
+			Seq: int32(i),
 		})
 	}
 
-	//创建容器(无序数据集)
-	c := NewComponentSet[__unorderedCollection_Test_item](&ComponentMetaInfo{})
+	//create component container
+	c := NewCSet[dummyComponent]()
 
-	//添加数据
+	//add test data
 	for i := 0; i < caseCount; i++ {
-		_ = c.Add(&srcList[i], srcList[i].Owner())
+		_ = c.Add(Entity(i), &srcList[i])
 	}
 
-	i := 0
-	c.Range(func(item IComponent) bool {
-		if item.(*__unorderedCollection_Test_item).seq != uint32(caseCount-i) {
-			t.Errorf("sort error, want %d, got %d", caseCount, item.(*__unorderedCollection_Test_item).seq)
-			return false
+	i := int32(0)
+	for entity, comp := range c.Iter() {
+		if comp.Seq != i {
+			t.Errorf("error 1, want %d, got %d", i, comp.Seq)
+		}
+		if int32(entity) != i {
+			t.Errorf("error 2, want %d, got %d", Entity(i), entity)
 		}
 		i++
-		return true
-	})
-
-	//排序
-	c.Sort()
-
-	//验证
-	i = 1
-	c.Range(func(item IComponent) bool {
-		if item.(*__unorderedCollection_Test_item).seq != uint32(i) {
-			t.Errorf("sort error, want %d, got %d", i, item.(*__unorderedCollection_Test_item).seq)
-			return false
-		}
-		i++
-		return true
-	})
-}
-
-func TestNewComponentSet(t *testing.T) {
-	cs := NewComponentSet[__unorderedCollection_Test_item](&ComponentMetaInfo{})
-	if cs.GetElementMeta().it != 0 {
-		t.Error("element meta error")
 	}
 }
 
 func BenchmarkComponentSet_Read(b *testing.B) {
-	c := NewComponentSet[__unorderedCollection_Test_item](&ComponentMetaInfo{})
+	c := NewCSet[dummyComponent]()
 	var ids []int64
 	total := 1000000
 	for n := 0; n < total; n++ {
-		item := &__unorderedCollection_Test_item{
-			ItemID: int64(n),
+		item := &dummyComponent{
+			Seq: int32(n),
 		}
-		_ = c.Add(item, Entity(n))
+		_ = c.Add(Entity(n), item)
 		ids = append(ids, int64(n+1))
 	}
 

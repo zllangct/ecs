@@ -1,0 +1,28 @@
+karmem demo @packed();
+
+struct Base table @id(`9956155639035161441`) {
+    Data [10]int64;
+    ANC  [64]char;
+}
+
+struct Base2 inline @id(`9956155639035161441`) {
+    Data [10]int64;
+}
+
+struct Base3 inline @id(`9956155639035161441`) @golang.field.enable_ref() {
+    Value int64;
+    Data  Base;
+}
+
+struct Ref2 table @id(`12539141064469261489`) @golang.field.enable_ref() {
+    ID   int64;
+    P    int64;
+    Arr  Base2;
+    Arr2 []Base2;
+}
+
+struct Ref3 table @id(`12539141064469261489`) @golang.field.enable_ref() {
+    ID   int64;
+    Arr  Base3;
+    Arr2 []Base3;
+}

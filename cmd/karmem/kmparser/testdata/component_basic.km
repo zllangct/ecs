@@ -1,0 +1,22 @@
+karmem demo;
+
+component Point inline {
+    X float32;
+    Y float32;
+    Name [20]char;
+}
+
+component Line inline {
+	Start Point;
+	End   Point;
+}
+
+struct PointE table {
+    X float32;
+    Y float32;
+}
+
+component LineE {
+	Start PointE;
+	End   PointE;
+}

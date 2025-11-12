@@ -1,0 +1,18 @@
+karmem components @golang.package(`karmemtest`) @packed() @golang.field.enable_ref();
+
+
+component Point inline @id(`12809409023221035873`) {
+    X float32;
+    Y float32;
+    Z float32;
+}
+
+component Container inline @id(`8006837439125283466`) {
+    Comp [3]Point;
+}
+
+component Position inline @id(`14274740599321850262`) {
+    X float32;
+    Y float32;
+    Z float32;
+}

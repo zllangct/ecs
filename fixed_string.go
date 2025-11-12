@@ -1,14 +1,14 @@
 package ecs
 
 import (
-	"fmt"
 	"unsafe"
 )
 
 const (
-	__FixedMax = 128
+	__FixedMax = 1024
 )
 
+//go:generate go run ./cmd/ecs_internal_gen/main.go FixedString -p "ecs"
 type FixedString[T any] struct {
 	data T
 	len  int
@@ -31,9 +31,6 @@ func (f *FixedString[T]) String() string {
 }
 
 func (f *FixedString[T]) Set(s string) {
-	if len(s) > int(unsafe.Sizeof(f.data)) {
-		panic(fmt.Sprintf("fixed string max size: %d, received size: %d", unsafe.Sizeof(f.data), len(s)))
-	}
 	f.len = len(s)
 	if f.len != 0 {
 		copy((*(*[__FixedMax]byte)(unsafe.Pointer(&(f.data))))[:unsafe.Sizeof(f.data)], s)

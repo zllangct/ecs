@@ -1,0 +1,31 @@
+{{define "fixed_compound" }}
+	package {{ .PackageName }}
+
+	// Generate by ecs_internal_gen, DON'T EDIT IT.
+
+	import(
+		"unsafe"
+	)
+
+	func NewFixedCompound(compound Compound) FixedCompound {
+		switch len(compound) {
+		{{- range $size, $v := .MaxSize }}
+			{{- if ne $size 0 }}
+			case {{ $size }}:
+				return *(*FixedCompound{{ $size }})(unsafe.Pointer(unsafe.SliceData(compound)))
+			{{- end}}
+        {{- end}}
+			default:
+				return nil
+		}
+	}
+
+	{{ range $size, $v := .MaxSize }}
+        {{- if ne $size 0 }}
+		type FixedCompound{{ $size }} [{{ $size }}]ComponentIntType
+		func (f FixedCompound{{ $size }})Compound() Compound {
+			return unsafe.Slice(&f[0], {{ $size }})
+		}
+		{{- end}}
+	{{- end}}
+{{- end}}

@@ -1,0 +1,20 @@
+karmem components @golang.package(`testdata`);
+
+
+component Point inline @id(`12809409023221035873`) {
+    X float32;
+    Y float32;
+    Z float32;
+}
+
+component Position inline @id(`12809409023221035873`) {
+    X float32;
+    Y float32;
+    Z float32;
+}
+
+component Name inline @id(`7328248172266787231`) {
+    Value  [16]char;
+    Points [2]Point;
+    Arr    [2]int32;
+}

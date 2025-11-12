@@ -1,0 +1,47 @@
+{{- define "header"}}karmem {{.Name}} {{- range $tag := .Tags }} @{{$tag.Name}}({{- if $tag.Value}}`{{$tag.Value}}`{{- end}}){{- end }};
+{{end}}
+{{- define "enums"}}
+{{- /*gotype: github.com/zllangct/ecs/command/karmem/kmparser.File*/ -}}
+{{- range $root := .Enums}}
+enum {{$root.Data.Name}} {{$root.Data.Type.Schema}}{{range $tag := $root.Data.Tags }} @{{$tag.Name}}(`{{$tag.Value}}`){{ end }} {
+{{- if $root.Data.IsSequential}}
+    {{- range $field := $root.Data.Fields}}
+    {{ToNamePadding $field $root}} {{- range $tag := $field.Data.Tags }} @{{$tag.Name}}({{- if $tag.Value}}`{{$tag.Value}}`{{- end}}){{ end }};
+    {{- end}}
+{{- else}}
+    {{- range $field := $root.Data.Fields}}
+    {{ToNamePadding $field $root}} = {{$field.Data.Value}} {{- range $tag := $field.Data.Tags }} @{{$tag.Name}}({{- if $tag.Value}}`{{$tag.Value}}`{{- end}}){{ end }};
+    {{- end}}
+{{- end}}
+}
+{{ end }}
+{{ end }}
+{{- define "blocks"}}
+{{- $Top := .}}
+{{- range $item := .Blocks }}
+{{- if eq $item.BlockType 1}}
+{{- $root := ( IndexStruct $Top.Structs $item.Index)}}
+component {{$root.Data.Name}} {{FromStructClass $root.Data.Class}}{{range $tag := $root.Data.Tags }} @{{$tag.Name}}({{- if $tag.Value}}`{{$tag.Value}}`{{- end}}){{ end }} {
+{{- range $field := $root.Data.Fields}}
+    {{ToNamePadding $field $root}} {{$field.Data.Type.Schema}} {{- range $tag := $field.Data.Tags }} @{{$tag.Name}}({{- if $tag.Value}}`{{$tag.Value}}`{{- end}}){{ end }};
+{{- end}}
+}
+{{- println}}
+{{- else if eq $item.BlockType 2}}
+{{- $root := ( IndexStruct $Top.Structs $item.Index)}}
+struct {{$root.Data.Name}} {{FromStructClass $root.Data.Class}}{{range $tag := $root.Data.Tags }} @{{$tag.Name}}({{- if $tag.Value}}`{{$tag.Value}}`{{- end}}){{ end }} {
+{{- range $field := $root.Data.Fields}}
+    {{ToNamePadding $field $root}} {{$field.Data.Type.Schema}} {{- range $tag := $field.Data.Tags }} @{{$tag.Name}}({{- if $tag.Value}}`{{$tag.Value}}`{{- end}}){{ end }};
+{{- end }}
+}
+{{- println}}
+{{- else if eq $item.BlockType 3}}
+    {{- $root := ( IndexEnum $Top.Enums $item.Index)}}
+{{- else if eq $item.BlockType 4}}
+    {{- $root := ( IndexComment $Top.Comments $item.Index)}}
+{{- range $comment := $root.Value}}
+{{ $comment.Value -}}
+{{- end}}
+{{- end}}
+{{- end }}
+{{- end }}

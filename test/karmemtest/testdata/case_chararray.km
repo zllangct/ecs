@@ -1,0 +1,7 @@
+karmem case_chararray @golang.package(`karmemtest`);
+
+
+struct B table @id(`9956155639035161441`) {
+    ANC  [20]char;
+    ANCS []char;
+}

@@ -8,65 +8,131 @@ type Event struct {
 }
 
 type InitReceiver interface {
-	Init(initializer SystemInitConstraint) error
+	Init(ctx *SystemInitContext) error
 }
 
 type SyncBeforeStartReceiver interface {
-	SyncBeforeStart(event Event)
+	SyncBeforeStart(ctx *SystemContext, event Event) error
 }
 
 type StartReceiver interface {
-	Start(event Event)
+	Start(ctx *SystemContext, event Event) error
 }
 
 type SyncAfterStartReceiver interface {
-	SyncAfterStart(event Event)
+	SyncAfterStart(ctx *SystemContext, event Event) error
 }
 
 type SyncBeforePreUpdateReceiver interface {
-	SyncBeforePreUpdate(event Event)
+	SyncBeforePreUpdate(ctx *SystemContext, event Event) error
 }
 
 type PreUpdateReceiver interface {
-	PreUpdate(event Event)
+	PreUpdate(ctx *SystemContext, event Event) error
 }
 
 type SyncAfterPreUpdateReceiver interface {
-	SyncAfterPreUpdate(event Event)
+	SyncAfterPreUpdate(ctx *SystemContext, event Event) error
 }
 
 type SyncBeforeUpdateReceiver interface {
-	SyncBeforeUpdate(event Event)
+	SyncBeforeUpdate(ctx *SystemContext, event Event) error
 }
 
 type UpdateReceiver interface {
-	Update(event Event)
+	Update(ctx *SystemContext, event Event) error
 }
 
 type SyncAfterUpdateReceiver interface {
-	SyncAfterUpdate(event Event)
+	SyncAfterUpdate(ctx *SystemContext, event Event) error
 }
 
 type SyncBeforePostUpdateReceiver interface {
-	SyncBeforePostUpdate(event Event)
+	SyncBeforePostUpdate(ctx *SystemContext, event Event) error
 }
 
 type PostUpdateReceiver interface {
-	PostUpdate(event Event)
+	PostUpdate(ctx *SystemContext, event Event) error
 }
 
 type SyncAfterPostUpdateReceiver interface {
-	SyncAfterPostUpdate(event Event)
+	SyncAfterPostUpdate(ctx *SystemContext, event Event) error
 }
 
 type SyncBeforeDestroyReceiver interface {
-	SyncBeforeDestroy(event Event)
+	SyncBeforeDestroy(ctx *SystemContext, event Event) error
 }
 
 type DestroyReceiver interface {
-	Destroy(event Event)
+	Destroy(ctx *SystemContext, event Event) error
 }
 
 type SyncAfterPostDestroyReceiver interface {
-	SyncAfterDestroy(event Event)
+	SyncAfterDestroy(ctx *SystemContext, event Event) error
+}
+
+func implsCheck(system any) uint16 {
+	var impls uint16
+	imp := false
+	_, imp = system.(SyncBeforeStartReceiver)
+	if imp {
+		impls = impls | 1<<StageSyncBeforeStart
+	}
+	_, imp = system.(StartReceiver)
+	if imp {
+		impls = impls | 1<<StageStart
+	}
+	_, imp = system.(SyncAfterStartReceiver)
+	if imp {
+		impls = impls | 1<<StageSyncAfterStart
+	}
+	_, imp = system.(SyncBeforePreUpdateReceiver)
+	if imp {
+		impls = impls | 1<<StageSyncBeforePreUpdate
+	}
+	_, imp = system.(PreUpdateReceiver)
+	if imp {
+		impls = impls | 1<<StagePreUpdate
+	}
+	_, imp = system.(SyncAfterPreUpdateReceiver)
+	if imp {
+		impls = impls | 1<<StageSyncAfterPreUpdate
+	}
+	_, imp = system.(SyncBeforeUpdateReceiver)
+	if imp {
+		impls = impls | 1<<StageSyncBeforeUpdate
+	}
+	_, imp = system.(UpdateReceiver)
+	if imp {
+		impls = impls | 1<<StageUpdate
+	}
+	_, imp = system.(SyncAfterUpdateReceiver)
+	if imp {
+		impls = impls | 1<<StageSyncAfterUpdate
+	}
+	_, imp = system.(SyncBeforePostUpdateReceiver)
+	if imp {
+		impls = impls | 1<<StageSyncBeforePostUpdate
+	}
+	_, imp = system.(PostUpdateReceiver)
+	if imp {
+		impls = impls | 1<<StagePostUpdate
+	}
+	_, imp = system.(SyncAfterPostUpdateReceiver)
+	if imp {
+		impls = impls | 1<<StageSyncAfterPostUpdate
+	}
+	_, imp = system.(SyncBeforeDestroyReceiver)
+	if imp {
+		impls = impls | 1<<StageSyncBeforeDestroy
+	}
+	_, imp = system.(DestroyReceiver)
+	if imp {
+		impls = impls | 1<<StageDestroy
+	}
+	_, imp = system.(SyncAfterPostDestroyReceiver)
+	if imp {
+		impls = impls | 1<<StageSyncAfterDestroy
+	}
+	return impls
 }

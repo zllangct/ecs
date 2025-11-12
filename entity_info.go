@@ -1,60 +1,40 @@
 package ecs
 
+type EntityOption func(config *EntityConfig)
+
+type EntityConfig struct {
+	comps []Component
+}
+
+func (s *EntityConfig) initDefault() {
+}
+
+func WithComponents(comp ...Component) EntityOption {
+	return func(config *EntityConfig) {
+		config.comps = comp
+	}
+}
+
 type EntityInfo struct {
 	entity   Entity
 	compound Compound
+	world    *world
 }
 
-func (e *EntityInfo) Destroy(world IWorld) {
-	for i := 0; i < len(e.compound); i++ {
-		world.deleteComponentByIntType(e.entity, e.compound[i])
-	}
-	// must be last
-	world.deleteEntity(e.entity)
-}
-
-func (e *EntityInfo) Entity() Entity {
-	return e.entity
-}
-
-func (e *EntityInfo) Add(world IWorld, components ...IComponent) {
-	for _, c := range components {
-		if !e.compound.Exist(world.getComponentMetaInfoByType(c.Type()).it) {
-			world.addComponent(e.entity, c)
+func (e *EntityInfo) Add(comps ...Component) *EntityInfo {
+	for _, comp := range comps {
+		if e.compound.Exist(GetIntTypeByComp(comp)) {
+			continue
 		}
-	}
-}
-
-func (e *EntityInfo) Has(its ...uint16) bool {
-	for i := 0; i < len(its); i++ {
-		if !e.compound.Exist(its[i]) {
-			return false
+		if comp.IsNomadic() {
+			continue
 		}
-	}
-	return true
-}
-
-func (e *EntityInfo) HasType(world *ecsWorld, components ...IComponent) bool {
-	for i := 0; i < len(components); i++ {
-		if !e.compound.Exist(world.getComponentMetaInfoByType(components[i].Type()).it) {
-			return false
+		op := Operate{
+			Entity: e.entity,
+			Op:     ComponentOperateAdd,
+			Comp:   comp,
 		}
+		e.world.componentOp(op)
 	}
-	return true
-}
-
-func (e *EntityInfo) addToCompound(it uint16) {
-	e.compound.Add(it)
-}
-
-func (e *EntityInfo) removeFromCompound(it uint16) {
-	e.compound.Remove(it)
-}
-
-func (e *EntityInfo) Remove(world IWorld, components ...IComponent) {
-	for _, c := range components {
-		if e.compound.Exist(world.getComponentMetaInfoByType(c.Type()).it) {
-			world.deleteComponent(e.entity, c)
-		}
-	}
+	return e
 }

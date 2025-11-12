@@ -1,54 +1,12 @@
 package ecs
 
 import (
-	"bufio"
-	"fmt"
-	"os"
 	"testing"
 )
 
-func Test_getCompoundType(t *testing.T) {
-	return
-	filePath := "./compound_utils.go"
-	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE, 0666)
-	if err != nil {
-		fmt.Println("文件打开失败", err)
-	}
-	defer file.Close()
-	write := bufio.NewWriter(file)
-	h1 := `
-package ecs
-
-import (
-	"unsafe"
-)
-
-func getCompoundType(compound Compound) interface{} {
-	length := len(compound)
-	if length == 0 || length > 255 {
-		return nil
-	}
-	switch length {`
-	write.WriteString(h1)
-	h2 := `
-	case %d:
-		return *(*[%d]uint16)(unsafe.Pointer(&compound[0]))`
-	for i := 1; i < 256; i++ {
-		write.WriteString(fmt.Sprintf(h2, i, i))
-	}
-
-	h3 := `
-	}
-
-	return nil
-}`
-	write.WriteString(h3)
-	write.Flush()
-}
-
 func TestCompound_find(t *testing.T) {
 	type args struct {
-		it uint16
+		it ComponentIntType
 	}
 	tests := []struct {
 		name string
@@ -65,7 +23,7 @@ func TestCompound_find(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.c.Find(tt.args.it); got != tt.want {
+			if got, _ := tt.c.Find(tt.args.it); got != tt.want {
 				t.Errorf("Find() = %v, want %v", got, tt.want)
 			}
 		})
@@ -75,7 +33,7 @@ func TestCompound_find(t *testing.T) {
 
 func TestCompound_insertIndex(t *testing.T) {
 	type args struct {
-		it uint16
+		it ComponentIntType
 	}
 	tests := []struct {
 		name string
@@ -122,7 +80,7 @@ func TestCompound_insertIndex(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.c.InsertIndex(tt.args.it); got != tt.want {
+			if got := tt.c.FindIndexToInsert(tt.args.it, 0); got != tt.want {
 				t.Errorf("insertIndex() = %v, want %v", got, tt.want)
 			}
 		})
@@ -131,7 +89,7 @@ func TestCompound_insertIndex(t *testing.T) {
 
 func TestCompound_Add(t *testing.T) {
 	type args struct {
-		it uint16
+		it ComponentIntType
 	}
 	tests := []struct {
 		name    string
@@ -157,7 +115,7 @@ func TestCompound_Add(t *testing.T) {
 
 func TestCompound_Remove(t *testing.T) {
 	type args struct {
-		it uint16
+		it ComponentIntType
 	}
 	tests := []struct {
 		name string
@@ -180,45 +138,33 @@ func TestCompound_Remove(t *testing.T) {
 func BenchmarkCompound_Add(b *testing.B) {
 	c := Compound{}
 	for i := 0; i < b.N; i++ {
-		c.Add(uint16(i % 65535))
+		c.Add(ComponentIntType(i % 65535))
 	}
 }
-
-const (
-	CompoundSize = 20
-)
 
 func BenchmarkCompound_Find(b *testing.B) {
+	var compoundSize = 100
 	c := Compound{}
-	for i := 0; i < CompoundSize; i++ {
-		c.Add(uint16(i % CompoundSize))
+	for i := 0; i < compoundSize; i++ {
+		c.Add(ComponentIntType(i % compoundSize))
 	}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		c.Find(uint16(i % CompoundSize))
+	m := map[ComponentIntType]struct{}{}
+	for i := 0; i < compoundSize; i++ {
+		m[(ComponentIntType(i % compoundSize))] = struct{}{}
 	}
-}
 
-func BenchmarkCompound_MapFind(b *testing.B) {
-	m := map[uint16]struct{}{}
-	for i := 0; i < CompoundSize; i++ {
-		m[(uint16(i % CompoundSize))] = struct{}{}
-	}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, ok := m[(uint16(i % CompoundSize))]
-		_ = ok
-	}
-}
+	b.Run("c", func(b *testing.B) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			c.Find(ComponentIntType(i % compoundSize))
+		}
+	})
 
-func BenchmarkCompound_BigMapFind(b *testing.B) {
-	m := map[int]struct{}{}
-	for i := 0; i < 50000; i++ {
-		m[i] = struct{}{}
-	}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, ok := m[i%50000]
-		_ = ok
-	}
+	b.Run("m", func(b *testing.B) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_, ok := m[(ComponentIntType(i % compoundSize))]
+			_ = ok
+		}
+	})
 }

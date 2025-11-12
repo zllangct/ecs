@@ -1,0 +1,9 @@
+karmem ecs @golang.package(`ecs`);
+
+
+struct SerializableUSetData inline @id(`14494556342195307757`) {
+    EleSize  uint64;
+    Len      int64;
+    InitSize int64;
+    Data     []byte;
+}

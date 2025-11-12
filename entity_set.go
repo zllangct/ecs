@@ -1,23 +1,23 @@
 package ecs
 
 type EntitySet struct {
-	SparseArray[int32, EntityInfo]
+	SparseArray[EntityIndex, EntityInfo]
 }
 
-func NewEntityCollection() *EntitySet {
+func NewEntitySet() *EntitySet {
 	return &EntitySet{
-		SparseArray: *NewSparseArray[int32, EntityInfo](),
+		SparseArray: *NewSparseArray[EntityIndex, EntityInfo](),
 	}
 }
 
 func (c *EntitySet) Exist(entity Entity) bool {
-	index := entity.ToRealID().index
+	index := entity.Index()
 	return c.SparseArray.Exist(index)
 }
 
-func (c *EntitySet) GetEntityInfo(entity Entity) (*EntityInfo, bool) {
-	index := entity.ToRealID().index
-	info := c.Get(index)
+func (c *EntitySet) Get(entity Entity) (*EntityInfo, bool) {
+	index := entity.Index()
+	info := c.SparseArray.Get(index)
 	if info == nil {
 		return nil, false
 	}
@@ -25,11 +25,15 @@ func (c *EntitySet) GetEntityInfo(entity Entity) (*EntityInfo, bool) {
 }
 
 func (c *EntitySet) Add(entityInfo EntityInfo) *EntityInfo {
-	index := entityInfo.entity.ToRealID().index
+	index := entityInfo.entity.Index()
 	return c.SparseArray.Add(index, &entityInfo)
 }
 
 func (c *EntitySet) Remove(entity Entity) *EntityInfo {
-	index := entity.ToRealID().index
+	index := entity.Index()
 	return c.SparseArray.Remove(index)
+}
+
+func (c *EntitySet) getByIndex(index EntityIndex) *EntityInfo {
+	return c.SparseArray.Get(index)
 }

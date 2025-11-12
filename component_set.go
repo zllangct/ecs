@@ -1,164 +1,78 @@
 package ecs
 
 import (
-	"sort"
 	"unsafe"
 )
 
-type IComponentSet interface {
+type ComponentSet interface {
 	Len() int
-	Range(fn func(com IComponent) bool)
-	Clear()
-	GetByEntity(entity Entity) any
-	GetElementMeta() *ComponentMetaInfo
-	GetComponent(entity Entity) IComponent
-	GetComponentRaw(entity Entity) unsafe.Pointer
+	Reset()
+	Add(entity Entity, comp Component) Component
+	Get(entity Entity) Component
 	Remove(entity Entity)
+	RemoveAndReturn(entity Entity) Component
+	EntityIndexes() []EntityIndex
+	get(index EntityIndex) unsafe.Pointer
 	Sort()
-
-	getPointerByIndex(index int64) unsafe.Pointer
-	changeCount() int64
-	changeReset()
-	pointer() unsafe.Pointer
-	getPointerByEntity(entity Entity) unsafe.Pointer
 }
 
-type ComponentSet[T ComponentObject] struct {
-	SparseArray[int32, T]
-	change int64
-	meta   *ComponentMetaInfo
+type CSet[T ComponentObject] struct {
+	SparseArray[EntityIndex, T]
 }
 
-func NewComponentSet[T ComponentObject](meta *ComponentMetaInfo, initSize ...int) *ComponentSet[T] {
-	c := &ComponentSet[T]{
-		SparseArray: *NewSparseArray[int32, T](initSize...),
-		meta:        meta,
+func NewCSet[T ComponentObject](initSize ...int) *CSet[T] {
+	c := &CSet[T]{
+		SparseArray: *NewSparseArray[EntityIndex, T](initSize...),
 	}
 	return c
 }
 
-func (c *ComponentSet[T]) Add(element *T, entity Entity) *T {
-	index := entity.ToRealID().index
-	data := c.SparseArray.Add(index, element)
+func (c *CSet[T]) EntityIndexes() []EntityIndex {
+	return *(*[]EntityIndex)(unsafe.Pointer(&c.idx2Key))
+}
+
+func (c *CSet[T]) Add(entity Entity, comp Component) Component {
+	index := entity.Index()
+	data := c.SparseArray.Add(index, (*T)((*iface)(unsafe.Pointer(&comp)).data))
 	if data == nil {
 		return nil
 	}
-	c.change++
-	return data
+	return any(data).(Component)
 }
 
-func (c *ComponentSet[T]) remove(entity Entity) *T {
-	index := entity.ToRealID().index
+func (c *CSet[T]) remove(entity Entity) *T {
+	index := entity.Index()
 	return c.SparseArray.Remove(index)
 }
 
-func (c *ComponentSet[T]) Remove(entity Entity) {
+func (c *CSet[T]) Remove(entity Entity) {
 	data := c.remove(entity)
 	if data == nil {
 		return
 	}
-	c.change++
 }
 
-func (c *ComponentSet[T]) RemoveAndReturn(entity Entity) *T {
+func (c *CSet[T]) RemoveAndReturn(entity Entity) Component {
 	cpy := *c.remove(entity)
-	return &cpy
+	return any(&cpy).(Component)
 }
 
-func (c *ComponentSet[T]) getByEntity(entity Entity) *T {
-	return c.SparseArray.Get(entity.ToRealID().index)
-}
-
-func (c *ComponentSet[T]) getPointerByEntity(entity Entity) unsafe.Pointer {
-	return unsafe.Pointer(c.getByEntity(entity))
-}
-
-func (c *ComponentSet[T]) GetByEntity(entity Entity) any {
-	return c.getByEntity(entity)
-}
-
-func (c *ComponentSet[T]) Get(entity Entity) *T {
-	return c.getByEntity(entity)
-}
-
-func (c *ComponentSet[T]) pointer() unsafe.Pointer {
-	return unsafe.Pointer(c)
-}
-
-func (c *ComponentSet[T]) changeCount() int64 {
-	return c.change
-}
-
-func (c *ComponentSet[T]) changeReset() {
-	c.change = 0
-}
-
-func (c *ComponentSet[T]) Sort() {
-	if c.changeCount() == 0 {
-		return
+func (c *CSet[T]) Get(entity Entity) Component {
+	data := c.SparseArray.Get(entity.Index())
+	if data == nil {
+		return nil
 	}
-	var zeroSeq = SeqMax
-	seq2id := map[uint32]int64{}
-	var cp *Component[T]
-	for i := int64(0); i < int64(c.Len()); i++ {
-		cp = (*Component[T])(unsafe.Pointer(&(c.data[i])))
-		if cp.seq == 0 {
-			zeroSeq--
-			cp.seq = zeroSeq
-		}
-		seq2id[cp.seq] = cp.owner.ToInt64()
+	return any(data).(Component)
+}
+
+func (c *CSet[T]) get(entityIndex EntityIndex) unsafe.Pointer {
+	data := c.SparseArray.Get(entityIndex)
+	if data == nil {
+		return nil
 	}
-	sort.Slice(c.data, func(i, j int) bool {
-		return (*Component[T])(unsafe.Pointer(&(c.data[i]))).seq < (*Component[T])(unsafe.Pointer(&(c.data[j]))).seq
-	})
-	for i := int32(0); i < int32(c.Len()); i++ {
-		cp = (*Component[T])(unsafe.Pointer(&(c.data[i])))
-		c.indices[cp.owner.ToRealID().index] = i + 1
-	}
-	c.changeReset()
+	return unsafe.Pointer(data)
 }
 
-func (c *ComponentSet[T]) GetComponent(entity Entity) IComponent {
-	return c.GetByEntity(entity).(IComponent)
-}
-
-func (c *ComponentSet[T]) GetComponentRaw(entity Entity) unsafe.Pointer {
-	return unsafe.Pointer(c.getByEntity(entity))
-}
-
-func (c *ComponentSet[T]) getPointerByIndex(index int64) unsafe.Pointer {
-	return unsafe.Pointer(c.SparseArray.UnorderedCollection.Get(index))
-}
-
-func (c *ComponentSet[T]) GetElementMeta() *ComponentMetaInfo {
-	return c.meta
-}
-
-func (c *ComponentSet[T]) Range(fn func(com IComponent) bool) {
-	c.SparseArray.Range(func(com *T) bool {
-		return fn(any(com).(IComponent))
-	})
-}
-
-func NewComponentSetIterator[T ComponentObject](collection *ComponentSet[T], readOnly ...bool) Iterator[T] {
-	iter := &Iter[T]{
-		data:    collection.data,
-		len:     collection.Len(),
-		eleSize: collection.eleSize,
-		offset:  0,
-	}
-	if len(readOnly) > 0 {
-		iter.readOnly = readOnly[0]
-	}
-	if iter.len != 0 {
-		iter.head = unsafe.Pointer(&collection.data[0])
-		if iter.readOnly {
-			iter.curTemp = collection.data[0]
-			iter.cur = &iter.curTemp
-		} else {
-			iter.cur = &(collection.data[0])
-		}
-	}
-
-	return iter
+func (c *CSet[T]) getByIndex(index EntityIndex) *T {
+	return c.SparseArray.Get(index)
 }
