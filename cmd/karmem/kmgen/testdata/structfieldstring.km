@@ -1,6 +1,0 @@
-karmem demo @golang.package(hello);
-
-struct SFSL inline {
-	Data1 [5]char;
-	Data2 []char;
-}

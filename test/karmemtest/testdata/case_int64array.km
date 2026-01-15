@@ -1,7 +1,0 @@
-karmem case_intarray @golang.package(`karmemtest`) @packed();
-
-
-struct BI table @id(`12307522458191621139`) {
-    ANC  [20]int64;
-    ANCS []char;
-}
