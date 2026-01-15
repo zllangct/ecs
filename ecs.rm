@@ -1,0 +1,5 @@
+rockmem ecs @package("ecs");
+
+struct FixedString inline {
+    Data string
+}

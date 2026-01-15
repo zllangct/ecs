@@ -1,0 +1,19 @@
+rockmem testdata @package("testdata") @component();
+
+struct Point inline {
+    x float32;
+    y float32;
+    z float32;
+}
+
+struct Position inline {
+    x float32;
+    y float32;
+    z float32;
+}
+
+struct Name inline {
+    value  [16]byte @string();
+    points [2]Point;
+    arr    [2]int32;
+}

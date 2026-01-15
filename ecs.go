@@ -46,7 +46,6 @@ func Query(ctx *SystemContext, opt ...QueryOption) QueryIterator {
 
 func GetComponents[T ComponentObject, TP ComponentPointer[T]](ctx *SystemContext) iter.Seq2[EntityIndex, *T] {
 	empty := func(yield func(EntityIndex, *T) bool) {
-		return
 	}
 	if !ctx.constraint.isValid() {
 		return empty

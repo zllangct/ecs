@@ -27,8 +27,7 @@ func (t *_testStandardSystem) Init(ctx *ecs.SystemInitContext) error {
 	return nil
 }
 
-//go:generate go run ../../cmd/karmem/main.go build -golang -o ./testdata/ testdata/components.km
-//go:generate go run ../../cmd/karmem/main.go fmt -s testdata/components.km
+//go:generate ../../../bin/rockmem-ecs.exe generate -o ./testdata/ ./testdata/components.rm
 func TestCmpMain(t *testing.T) {
 	world := ecs.NewWorld(ecs.WithWorldAutoOptimize())
 
@@ -42,9 +41,8 @@ func TestCmpMain(t *testing.T) {
 		X: 7,
 	}
 
-	name1 := testdata.Name{
-		Value: ecs.NewFixed16("hello"),
-	}
+	name1 := testdata.Name{}
+	name1.SetValueString("hello")
 
 	e.Add(&point1)
 	e.Add(&pos1)
@@ -70,7 +68,7 @@ func TestCmpMain(t *testing.T) {
 			p, _ := ecs.GetBuddy[testdata.Point](ctx, idx)
 			pos, _ := ecs.GetBuddy[testdata.Position](ctx, idx)
 			name, _ := ecs.GetBuddy[testdata.Name](ctx, idx)
-			fmt.Printf("LightExample 2, EnityIndex: %d, P:%v, Pos:%v, Name:%s\n", idx, p, pos, name.Value.String())
+			fmt.Printf("LightExample 2, EnityIndex: %d, P:%v, Pos:%v, Name:%s\n", idx, p, pos, name.GetValueString())
 		}
 
 		return nil
