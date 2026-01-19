@@ -17,6 +17,9 @@ var _Null_testdata = [56]byte{}
 var _NullReader_testdata = rockmem.NewReader(_Null_testdata[:])
 
 func init() {
+	ecs.RegisterComponent[Point]((*Point)(nil))
+	ecs.RegisterComponent[Position]((*Position)(nil))
+	ecs.RegisterComponent[Name]((*Name)(nil))
 }
 
 const (
@@ -480,7 +483,7 @@ func (x *NameModifier) SetArr(v *[2]int32) {
 func (x Point) ComponentObjectIdentifier() {}
 
 func (x *Point) GetComponentSeq() int32 {
-	return 1
+	return 880530157
 }
 
 func (x *Point) NewComponentSet() ecs.ComponentSet {
@@ -500,7 +503,7 @@ func (x *Point) IsDisposable() bool {
 func (x Position) ComponentObjectIdentifier() {}
 
 func (x *Position) GetComponentSeq() int32 {
-	return 2
+	return 1445590839
 }
 
 func (x *Position) NewComponentSet() ecs.ComponentSet {
@@ -520,7 +523,7 @@ func (x *Position) IsDisposable() bool {
 func (x Name) ComponentObjectIdentifier() {}
 
 func (x *Name) GetComponentSeq() int32 {
-	return 3
+	return 1346947723
 }
 
 func (x *Name) NewComponentSet() ecs.ComponentSet {

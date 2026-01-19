@@ -74,25 +74,24 @@ func WithWorldDefaultUpdateRate(rate int) WorldOption {
 }
 
 type serializableWorld struct {
+	idGenerator     *EntityIDGenerator
+	entities        *EntitySet
+	components      map[ComponentIntType]ComponentSet
+	disposableTypes []ComponentIntType
+	nomadicTypes    []ComponentIntType
+	frame           uint64
 }
 
 type world struct {
 	serializableWorld
 	status              WorldStatus
 	config              *WorldConfig
-	idGenerator         *EntityIDGenerator
 	taskExecutorFactory TaskExecutorFactory
 	optimizer           *optimizer
 	opLog               *OpLog
 
-	entities   *EntitySet
-	components map[ComponentIntType]ComponentSet
-	systems    *flow
+	systems *flow
 
-	disposableTypes []ComponentIntType
-	nomadicTypes    []ComponentIntType
-
-	frame      uint64
 	lastUpdate time.Time
 	delta      time.Duration
 }

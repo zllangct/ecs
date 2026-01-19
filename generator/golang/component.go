@@ -2,6 +2,7 @@ package golang
 
 import (
 	"fmt"
+	"hash/fnv"
 
 	"github.com/zllangct/rockmem/common"
 	"github.com/zllangct/rockmem/generator"
@@ -16,8 +17,8 @@ type ComponentGenerator struct {
 	fileTree *parser.FileTree
 	// components 存储需要生成组件代码的结构体
 	components []*parser.Struct
-	// componentSeq 组件序列号计数器
-	componentSeq int32
+	// componentSeqs 存储每个组件的序列号
+	componentSeqs map[string]int32
 	// errors 存储验证错误
 	errors []string
 }
@@ -31,7 +32,7 @@ func (c *ComponentGenerator) Init(fileTree *parser.FileTree, file *parser.File) 
 	c.file = file
 	c.fileTree = fileTree
 	c.components = nil
-	c.componentSeq = 0
+	c.componentSeqs = make(map[string]int32)
 	c.errors = nil
 
 	// 检查文件级标签是否有 @component()
@@ -57,7 +58,10 @@ func (c *ComponentGenerator) Init(fileTree *parser.FileTree, file *parser.File) 
 				continue
 			}
 			c.components = append(c.components, st)
-			c.componentSeq++
+
+			// 计算组件序列号
+			seq := c.calculateComponentSeq(file, st)
+			c.componentSeqs[st.Name] = seq
 		}
 	}
 
@@ -70,12 +74,39 @@ func (c *ComponentGenerator) Init(fileTree *parser.FileTree, file *parser.File) 
 		return fmt.Errorf(errMsg)
 	}
 
-	// 如果有组件需要生成，添加 ecs 导入
+	// 如果有组件需要生成，添加 ecs 导入和 init 代码
 	if len(c.components) > 0 {
 		golang.AddCustomImport(file.Filename, "github.com/zllangct/ecs", "ecs")
+		// 向 init 函数添加组件注册代码
+		for _, st := range c.components {
+			code := fmt.Sprintf("ecs.RegisterComponent[%s]((*%s)(nil))", st.Name, st.Name)
+			golang.AddCustomInitCode(file.Filename, code)
+		}
 	}
 
 	return nil
+}
+
+// calculateComponentSeq 计算组件序列号
+// 优先使用 @ComSeq(n) 标签指定的值，否则基于包名+结构体名生成唯一哈希
+func (c *ComponentGenerator) calculateComponentSeq(file *parser.File, st *parser.Struct) int32 {
+	helper := parser.NewTagHelper(st.Tags)
+
+	// 优先检查 @ComSeq(n) 标签
+	if seq, hasSeq := helper.GetInt64Value("ComSeq"); hasSeq {
+		return int32(seq)
+	}
+
+	// 默认：基于包名+结构体名生成哈希，确保跨文件唯一
+	// 使用 FNV-1a 哈希算法，取低 31 位（保持正数）
+	h := fnv.New32a()
+	// 包含包名以区分不同包中同名结构体
+	fullName := file.Package.Name + "." + st.Name
+	h.Write([]byte(fullName))
+	hash := h.Sum32()
+	// 取低 31 位，确保结果为正数，范围 1 ~ 2^31-1
+	seq := int32(hash&0x7FFFFFFF) | 1 // 确保至少为 1
+	return seq
 }
 
 // validateComponentFields 验证组件字段
@@ -130,8 +161,9 @@ func (c *ComponentGenerator) Generate(fileTree *parser.FileTree, file *parser.Fi
 	w := generator.NewCodeWriter()
 
 	// 为每个组件生成代码
-	for i, st := range c.components {
-		c.generateComponentMethods(w, st, int32(i+1))
+	for _, st := range c.components {
+		seq := c.componentSeqs[st.Name]
+		c.generateComponentMethods(w, st, seq)
 		w.P()
 
 		// 生成 @string() 标签字段的字符串辅助方法
