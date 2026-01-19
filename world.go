@@ -73,7 +73,11 @@ func WithWorldDefaultUpdateRate(rate int) WorldOption {
 	}
 }
 
+type serializableWorld struct {
+}
+
 type world struct {
+	serializableWorld
 	status              WorldStatus
 	config              *WorldConfig
 	idGenerator         *EntityIDGenerator

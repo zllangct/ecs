@@ -322,3 +322,249 @@ func NewEntitySetFromData(data *SerializableEntitySetData) *EntitySet {
 func (e *EntityInfo) SetWorld(w *world) {
 	e.world = w
 }
+
+// EntityIDGenerator serialization methods
+
+// Marshal serializes EntityIDGenerator to SerializableEntityIDGeneratorData
+func (e *EntityIDGenerator) Marshal() *SerializableEntityIDGeneratorData {
+	data := &SerializableEntityIDGeneratorData{
+		Free:      int32(e.free),
+		Pending:   int32(e.pending),
+		Len:       e.len,
+		DelayFree: e.delayFree,
+		DelayCap:  e.delayCap,
+	}
+
+	// Convert ReuseID slice to int64 slice
+	if len(e.ids) > 0 {
+		data.Ids = make([]int64, len(e.ids))
+		for i, id := range e.ids {
+			data.Ids[i] = id.ToInt64()
+		}
+	}
+
+	// Convert removeDelay slice to int64 slice
+	if len(e.removeDelay) > 0 {
+		data.RemoveDelay = make([]int64, len(e.removeDelay))
+		for i, id := range e.removeDelay {
+			data.RemoveDelay[i] = id.ToInt64()
+		}
+	}
+
+	return data
+}
+
+// MarshalTo writes EntityIDGenerator to a rockmem.Writer
+func (e *EntityIDGenerator) MarshalTo(writer rockmem.Writer) (uint, error) {
+	data := e.Marshal()
+	return data.WriteAsRoot(writer)
+}
+
+// Unmarshal deserializes SerializableEntityIDGeneratorData to EntityIDGenerator
+func (e *EntityIDGenerator) Unmarshal(data *SerializableEntityIDGeneratorData) {
+	e.free = EntityIndex(data.Free)
+	e.pending = EntityIndex(data.Pending)
+	e.len = data.Len
+	e.delayFree = data.DelayFree
+	e.delayCap = data.DelayCap
+
+	// Convert int64 slice to ReuseID slice
+	if len(data.Ids) > 0 {
+		e.ids = make([]ReuseID, len(data.Ids))
+		for i, id := range data.Ids {
+			e.ids[i] = Entity(id).toReuseID()
+		}
+	} else {
+		e.ids = make([]ReuseID, 0)
+	}
+
+	// Convert int64 slice to removeDelay slice
+	if len(data.RemoveDelay) > 0 {
+		e.removeDelay = make([]ReuseID, len(data.RemoveDelay))
+		for i, id := range data.RemoveDelay {
+			e.removeDelay[i] = Entity(id).toReuseID()
+		}
+	} else {
+		e.removeDelay = make([]ReuseID, e.delayCap)
+	}
+}
+
+// UnmarshalFrom reads EntityIDGenerator from a rockmem.Reader
+func (e *EntityIDGenerator) UnmarshalFrom(reader *rockmem.Reader) {
+	data := &SerializableEntityIDGeneratorData{}
+	data.ReadAsRoot(reader)
+	e.Unmarshal(data)
+}
+
+// NewEntityIDGeneratorFromData creates a new EntityIDGenerator from SerializableEntityIDGeneratorData
+func NewEntityIDGeneratorFromData(data *SerializableEntityIDGeneratorData) *EntityIDGenerator {
+	e := &EntityIDGenerator{}
+	e.Unmarshal(data)
+	return e
+}
+
+// World serialization methods
+
+// Marshal serializes serializableWorld to SerializableWorldData
+func (w *serializableWorld) Marshal() *SerializableWorldData {
+	data := &SerializableWorldData{
+		Frame: w.frame,
+	}
+
+	// Serialize entities
+	if w.entities != nil {
+		data.Entities = *w.entities.Marshal()
+	}
+
+	// Serialize ID generator
+	if w.idGenerator != nil {
+		data.IdGenerator = *w.idGenerator.Marshal()
+	}
+
+	// Serialize component sets
+	if len(w.components) > 0 {
+		data.ComponentSets = make([]SerializableComponentSetEntry, 0, len(w.components))
+		for compType, compSet := range w.components {
+			// Cast to CSet to access Marshal method
+			if cset, ok := compSet.(interface {
+				Marshal() *SerializableSparseArrayData
+			}); ok {
+				entry := SerializableComponentSetEntry{
+					ComponentType: uint16(compType),
+					Data:          *cset.Marshal(),
+				}
+				data.ComponentSets = append(data.ComponentSets, entry)
+			}
+		}
+	}
+
+	// Serialize disposable types
+	if len(w.disposableTypes) > 0 {
+		data.DisposableTypes = make([]uint16, len(w.disposableTypes))
+		for i, t := range w.disposableTypes {
+			data.DisposableTypes[i] = uint16(t)
+		}
+	}
+
+	// Serialize nomadic types
+	if len(w.nomadicTypes) > 0 {
+		data.NomadicTypes = make([]uint16, len(w.nomadicTypes))
+		for i, t := range w.nomadicTypes {
+			data.NomadicTypes[i] = uint16(t)
+		}
+	}
+
+	return data
+}
+
+// MarshalTo writes serializableWorld to a rockmem.Writer
+func (w *serializableWorld) MarshalTo(writer rockmem.Writer) (uint, error) {
+	data := w.Marshal()
+	return data.WriteAsRoot(writer)
+}
+
+// MarshalTo writes world to a rockmem.Writer (convenience method)
+func (w *world) MarshalTo(writer rockmem.Writer) (uint, error) {
+	return w.serializableWorld.MarshalTo(writer)
+}
+
+// Marshal serializes world to SerializableWorldData (convenience method)
+func (w *world) Marshal() *SerializableWorldData {
+	return w.serializableWorld.Marshal()
+}
+
+// Unmarshal deserializes SerializableWorldData to serializableWorld
+// Note: This method requires the ComponentRegistry to have all component types registered
+// before calling. Unregistered component types will be skipped with a warning.
+func (w *serializableWorld) Unmarshal(data *SerializableWorldData) {
+	w.frame = data.Frame
+
+	// Deserialize entities
+	if w.entities == nil {
+		w.entities = NewEntitySet()
+	}
+	w.entities.Unmarshal(&data.Entities)
+
+	// Deserialize ID generator
+	if w.idGenerator == nil {
+		w.idGenerator = &EntityIDGenerator{}
+	}
+	w.idGenerator.Unmarshal(&data.IdGenerator)
+
+	// Deserialize component sets
+	if w.components == nil {
+		w.components = make(map[ComponentIntType]ComponentSet)
+	}
+	registry := GetComponentRegistry()
+	for _, entry := range data.ComponentSets {
+		compType := ComponentIntType(entry.ComponentType)
+		compSet, ok := registry.UnmarshalComponentSet(compType, &entry.Data)
+		if !ok {
+			// Component type not registered, skip
+			continue
+		}
+		w.components[compType] = compSet
+	}
+
+	// Deserialize disposable types
+	if len(data.DisposableTypes) > 0 {
+		w.disposableTypes = make([]ComponentIntType, len(data.DisposableTypes))
+		for i, t := range data.DisposableTypes {
+			w.disposableTypes[i] = ComponentIntType(t)
+		}
+	} else {
+		w.disposableTypes = nil
+	}
+
+	// Deserialize nomadic types
+	if len(data.NomadicTypes) > 0 {
+		w.nomadicTypes = make([]ComponentIntType, len(data.NomadicTypes))
+		for i, t := range data.NomadicTypes {
+			w.nomadicTypes[i] = ComponentIntType(t)
+		}
+	} else {
+		w.nomadicTypes = nil
+	}
+}
+
+// UnmarshalFrom reads serializableWorld from a rockmem.Reader
+func (w *serializableWorld) UnmarshalFrom(reader *rockmem.Reader) {
+	data := &SerializableWorldData{}
+	data.ReadAsRoot(reader)
+	w.Unmarshal(data)
+}
+
+// Unmarshal deserializes SerializableWorldData to world (convenience method)
+func (w *world) Unmarshal(data *SerializableWorldData) {
+	w.serializableWorld.Unmarshal(data)
+	// Set world pointer for all entities after deserialization
+	w.entities.SetWorldForAll(w)
+}
+
+// UnmarshalFrom reads world from a rockmem.Reader (convenience method)
+func (w *world) UnmarshalFrom(reader *rockmem.Reader) {
+	data := &SerializableWorldData{}
+	data.ReadAsRoot(reader)
+	w.Unmarshal(data)
+}
+
+// NewWorldFromData creates a new world from SerializableWorldData
+// Note: This creates a minimal world without systems, optimizer, etc.
+// The caller should configure these runtime components after deserialization.
+func NewWorldFromData(data *SerializableWorldData, opts ...WorldOption) *world {
+	c := &WorldConfig{}
+	c.initDefault()
+	for _, opt := range opts {
+		opt(c)
+	}
+
+	w := &world{}
+	w.status = WorldStatusInitializing
+	w.config = c
+
+	// Unmarshal the serializable state
+	w.Unmarshal(data)
+
+	w.status = WorldStatusInitialized
+	return w
+}

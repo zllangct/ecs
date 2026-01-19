@@ -39,3 +39,38 @@ struct SerializableEntitySetData {
     InitSize        int32;    // Initial size
     IsKOrder        bool;     // Is key-ordered
 }
+
+// EntityIDGenerator serializable data structure
+// Used for serializing ID generator state for proper ID allocation after restore
+struct SerializableEntityIDGeneratorData {
+    Ids           []int64;   // All ReuseID data (index and reuse packed as int64)
+    Free          int32;     // Next free index
+    Pending       int32;     // Pending allocation index
+    Len           int32;     // Current entity count
+    RemoveDelay   []int64;   // Delayed removal queue (ReuseID packed as int64)
+    DelayFree     int32;     // Number of delayed free entries
+    DelayCap      int32;     // Capacity of delayed removal queue
+}
+
+// ComponentSetEntry serializable data structure
+// Used for serializing a single component set with its type identifier
+struct SerializableComponentSetEntry inline {
+    ComponentType uint16;                    // Component type identifier
+    Data          SerializableSparseArrayData;  // Component set data
+}
+
+// World serializable data structure
+// Complete state of a World that can be serialized for migration
+struct SerializableWorldData {
+    // Core entity data
+    Entities       SerializableEntitySetData;   // All entities with their compounds
+    IdGenerator    SerializableEntityIDGeneratorData;  // ID generator state
+    
+    // Component data - stored as array of entries
+    ComponentSets  []SerializableComponentSetEntry;  // All component sets
+    
+    // World runtime state
+    Frame          uint64;    // Current frame number
+    DisposableTypes []uint16; // Disposable component types
+    NomadicTypes    []uint16; // Nomadic component types
+}
