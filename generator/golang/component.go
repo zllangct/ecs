@@ -2,7 +2,6 @@ package golang
 
 import (
 	"fmt"
-	"hash/fnv"
 
 	"github.com/zllangct/rockmem/common"
 	"github.com/zllangct/rockmem/generator"
@@ -17,8 +16,6 @@ type ComponentGenerator struct {
 	fileTree *parser.FileTree
 	// components 存储需要生成组件代码的结构体
 	components []*parser.Struct
-	// componentSeqs 存储每个组件的序列号
-	componentSeqs map[string]int32
 	// errors 存储验证错误
 	errors []string
 }
@@ -32,7 +29,6 @@ func (c *ComponentGenerator) Init(fileTree *parser.FileTree, file *parser.File) 
 	c.file = file
 	c.fileTree = fileTree
 	c.components = nil
-	c.componentSeqs = make(map[string]int32)
 	c.errors = nil
 
 	// 检查文件级标签是否有 @component()
@@ -59,9 +55,6 @@ func (c *ComponentGenerator) Init(fileTree *parser.FileTree, file *parser.File) 
 			}
 			c.components = append(c.components, st)
 
-			// 计算组件序列号
-			seq := c.calculateComponentSeq(file, st)
-			c.componentSeqs[st.Name] = seq
 		}
 	}
 
@@ -89,26 +82,6 @@ func (c *ComponentGenerator) Init(fileTree *parser.FileTree, file *parser.File) 
 
 // calculateComponentSeq 计算组件序列号
 // 优先使用 @ComSeq(n) 标签指定的值，否则基于包名+结构体名生成唯一哈希
-func (c *ComponentGenerator) calculateComponentSeq(file *parser.File, st *parser.Struct) int32 {
-	helper := parser.NewTagHelper(st.Tags)
-
-	// 优先检查 @ComSeq(n) 标签
-	if seq, hasSeq := helper.GetInt64Value("ComSeq"); hasSeq {
-		return int32(seq)
-	}
-
-	// 默认：基于包名+结构体名生成哈希，确保跨文件唯一
-	// 使用 FNV-1a 哈希算法，取低 31 位（保持正数）
-	h := fnv.New32a()
-	// 包含包名以区分不同包中同名结构体
-	fullName := file.Package.Name + "." + st.Name
-	h.Write([]byte(fullName))
-	hash := h.Sum32()
-	// 取低 31 位，确保结果为正数，范围 1 ~ 2^31-1
-	seq := int32(hash&0x7FFFFFFF) | 1 // 确保至少为 1
-	return seq
-}
-
 // validateComponentFields 验证组件字段
 // ECS 组件要求所有字段必须是内存连续的类型
 // 禁用以下类型（基于生成的 Go 类型判断，而非 IDL 类型）：
@@ -162,8 +135,7 @@ func (c *ComponentGenerator) Generate(fileTree *parser.FileTree, file *parser.Fi
 
 	// 为每个组件生成代码
 	for _, st := range c.components {
-		seq := c.componentSeqs[st.Name]
-		c.generateComponentMethods(w, st, seq)
+		c.generateComponentMethods(w, st)
 		w.P()
 
 		// 生成 @string() 标签字段的字符串辅助方法
@@ -239,7 +211,7 @@ func (c *ComponentGenerator) generateStringFieldMethods(w *generator.CodeWriter,
 }
 
 // generateComponentMethods 为结构体生成 Component 接口所需的方法
-func (c *ComponentGenerator) generateComponentMethods(w *generator.CodeWriter, st *parser.Struct, seq int32) {
+func (c *ComponentGenerator) generateComponentMethods(w *generator.CodeWriter, st *parser.Struct) {
 	structName := st.Name
 
 	// 检查是否有 @nomadic() 标签
@@ -254,12 +226,6 @@ func (c *ComponentGenerator) generateComponentMethods(w *generator.CodeWriter, s
 
 	// 生成 ComponentObjectIdentifier 方法
 	w.Printf("func (x %s) ComponentObjectIdentifier() {}", structName)
-	w.P()
-
-	// 生成 GetComponentSeq 方法
-	w.Printf("func (x *%s) GetComponentSeq() int32 {", structName)
-	w.Printf("	return %d", seq)
-	w.Printf("}")
 	w.P()
 
 	// 生成 NewComponentSet 方法

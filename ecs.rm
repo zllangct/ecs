@@ -29,7 +29,7 @@ struct SerializableEntitySetData {
     EntityIds       []int64;  // Entity IDs for each EntityInfo
     CompoundOffsets []int32;  // Offset into CompoundData for each EntityInfo's compound
     CompoundLengths []int32;  // Length of compound for each EntityInfo
-    CompoundData    []uint16; // Flattened compound data (all ComponentIntTypes)
+    CompoundData    []uint64; // Flattened compound data (all ComponentIntTypes)
     
     // SparseArray metadata
     Indices         []int32;  // Sparse index mapping
@@ -55,7 +55,7 @@ struct SerializableEntityIDGeneratorData {
 // ComponentSetEntry serializable data structure
 // Used for serializing a single component set with its type identifier
 struct SerializableComponentSetEntry inline {
-    ComponentType uint16;                    // Component type identifier
+    ComponentType uint64;                    // Component type identifier
     Data          SerializableSparseArrayData;  // Component set data
 }
 
@@ -71,6 +71,6 @@ struct SerializableWorldData {
     
     // World runtime state
     Frame          uint64;    // Current frame number
-    DisposableTypes []uint16; // Disposable component types
-    NomadicTypes    []uint16; // Nomadic component types
+    DisposableTypes []uint64; // Disposable component types
+    NomadicTypes    []uint64; // Nomadic component types
 }

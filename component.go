@@ -1,6 +1,8 @@
 package ecs
 
-type ComponentIntType uint16
+import rockmem "github.com/zllangct/rockmem/golang"
+
+type ComponentIntType uint64
 
 type ComponentPointer[T ComponentObject] interface {
 	Component
@@ -13,17 +15,17 @@ type ComponentObject interface {
 
 type Component interface {
 	NewComponentSet() ComponentSet
-	GetComponentSeq() int32
+	PacketIdentifier() rockmem.PacketIdentifier
 	IsNomadic() bool
 	IsDisposable() bool
 }
 
 func GetIntTypeByComp(com Component) ComponentIntType {
-	return ComponentIntType(com.GetComponentSeq())
+	return ComponentIntType(com.PacketIdentifier())
 }
 
 func GetIntType[T ComponentObject, TP ComponentPointer[T]]() ComponentIntType {
-	return ComponentIntType(TP(nil).GetComponentSeq())
+	return ComponentIntType(TP(nil).PacketIdentifier())
 }
 
 type dummyComponent struct {
@@ -34,7 +36,7 @@ func (d *dummyComponent) NewComponentSet() ComponentSet {
 	return NewCSet[dummyComponent]()
 }
 
-func (d *dummyComponent) GetComponentSeq() int32 {
+func (d *dummyComponent) PacketIdentifier() rockmem.PacketIdentifier {
 	return 65530
 }
 

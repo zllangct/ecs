@@ -588,12 +588,17 @@ type testWorldComponent struct {
 	Name  string
 }
 
+const (
+	packetIdentifierTestWorldComponent  rockmem.PacketIdentifier = 65529
+	packetIdentifierTestWorldComponent2 rockmem.PacketIdentifier = 65528
+)
+
 func (t *testWorldComponent) NewComponentSet() ComponentSet {
 	return NewCSet[testWorldComponent]()
 }
 
-func (t *testWorldComponent) GetComponentSeq() int32 {
-	return 65529 // Use a unique sequence number
+func (t *testWorldComponent) PacketIdentifier() rockmem.PacketIdentifier {
+	return packetIdentifierTestWorldComponent
 }
 
 func (t *testWorldComponent) IsNomadic() bool {
@@ -616,8 +621,8 @@ func (t *testWorldComponent2) NewComponentSet() ComponentSet {
 	return NewCSet[testWorldComponent2]()
 }
 
-func (t *testWorldComponent2) GetComponentSeq() int32 {
-	return 65528 // Use a unique sequence number
+func (t *testWorldComponent2) PacketIdentifier() rockmem.PacketIdentifier {
+	return packetIdentifierTestWorldComponent2
 }
 
 func (t *testWorldComponent2) IsNomadic() bool {

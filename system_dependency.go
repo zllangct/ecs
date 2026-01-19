@@ -12,7 +12,9 @@ type ComponentDependency interface {
 	intType() ComponentIntType
 }
 
-type Dependency uint32
+type Dependency uint64
+
+const dependencyWritableFlag Dependency = 1 << 63
 
 func NewDependency(it ComponentIntType, writable ...Writable) Dependency {
 	w := ReadOnly
@@ -20,18 +22,18 @@ func NewDependency(it ComponentIntType, writable ...Writable) Dependency {
 		w = writable[0]
 	}
 	if w {
-		return Dependency(it) | (1 << 16)
+		return Dependency(it) | dependencyWritableFlag
 	} else {
 		return Dependency(it)
 	}
 }
 
 func (r Dependency) readonly() bool {
-	return r>>16&1 == 0
+	return r&dependencyWritableFlag == 0
 }
 
 func (r Dependency) intType() ComponentIntType {
-	return ComponentIntType(r)
+	return ComponentIntType(r &^ dependencyWritableFlag)
 }
 
 type readonly[T ComponentObject, TP ComponentPointer[T]] struct{}

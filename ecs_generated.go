@@ -4,8 +4,9 @@ package ecs
 import (
 	"errors"
 	"fmt"
-	rockmem "github.com/zllangct/rockmem/golang"
 	"unsafe"
+
+	rockmem "github.com/zllangct/rockmem/golang"
 )
 
 var _ unsafe.Pointer
@@ -279,7 +280,7 @@ type SerializableEntitySetData struct {
 	EntityIds       []int64  // Entity IDs for each EntityInfo
 	CompoundOffsets []int32  // Offset into CompoundData for each EntityInfo's compound
 	CompoundLengths []int32  // Length of compound for each EntityInfo
-	CompoundData    []uint16 // Flattened compound data (all ComponentIntTypes)
+	CompoundData    []uint64 // Flattened compound data (all ComponentIntTypes)
 	//SparseArray metadata
 	Indices         []int32 // Sparse index mapping
 	Idx2Key         []int32 // Dense index to key mapping
@@ -369,7 +370,7 @@ func (x *SerializableEntitySetData) Write(writer rockmem.Writer, start uint) (of
 		}
 		writer.WriteAt(__CompoundLengthsOffset, unsafe.Slice((*byte)(unsafe.Pointer(&x.CompoundLengths[0])), __CompoundLengthsSize))
 	}
-	__CompoundDataSize := uint(2 * len(x.CompoundData))
+	__CompoundDataSize := uint(8 * len(x.CompoundData))
 	__CompoundDataCap := __CompoundDataSize
 	__CompoundDataOffset, err := writer.Alloc(__CompoundDataSize)
 	if err != nil {
@@ -378,7 +379,7 @@ func (x *SerializableEntitySetData) Write(writer rockmem.Writer, start uint) (of
 	writer.Write4At(offset+52+0, uint32(__CompoundDataOffset))
 	writer.Write4At(offset+52+4, uint32(__CompoundDataSize))
 	writer.Write4At(offset+52+8, uint32(__CompoundDataCap))
-	writer.Write4At(offset+52+12, uint32(2))
+	writer.Write4At(offset+52+12, uint32(8))
 	if len(x.CompoundData) > 0 {
 		if rockmem.IsDebugEnabled() {
 			fmt.Printf("Writing slice CompoundData: len=%d, size=%d\n", len(x.CompoundData), __CompoundDataSize)
@@ -599,9 +600,9 @@ func (x *SerializableEntityIDGeneratorData) Read(viewer *SerializableEntityIDGen
 // SerializableComponentSetEntry ComponentSetEntry serializable data structure
 // SerializableComponentSetEntry Used for serializing a single component set with its type identifier
 type SerializableComponentSetEntry struct {
-	ComponentType uint16                      // Component type identifier
+	ComponentType uint64                      // Component type identifier
 	Data          SerializableSparseArrayData // Component set data
-	_             [2]byte                     // padding for 8-byte alignment
+	_             [4]byte                     // padding for 8-byte alignment
 }
 
 // NewSerializableComponentSetEntry creates a new SerializableComponentSetEntry instance
@@ -627,7 +628,7 @@ func (x *SerializableComponentSetEntry) WriteAsRoot(writer rockmem.Writer) (offs
 // Write writes the SerializableComponentSetEntry to the writer at the specified offset
 func (x *SerializableComponentSetEntry) Write(writer rockmem.Writer, start uint) (offset uint, err error) {
 	offset = start
-	size := uint(8)
+	size := uint(16)
 	if offset == 0 {
 		offset, err = writer.Alloc(size)
 		if err != nil {
@@ -636,13 +637,13 @@ func (x *SerializableComponentSetEntry) Write(writer rockmem.Writer, start uint)
 	}
 
 	__ComponentTypeOffset := offset + 0
-	writer.Write2At(__ComponentTypeOffset, *(*uint16)(unsafe.Pointer(&x.ComponentType)))
+	writer.Write8At(__ComponentTypeOffset, *(*uint64)(unsafe.Pointer(&x.ComponentType)))
 	__DataSize := uint(57)
 	__DataOffset, err := writer.Alloc(__DataSize)
 	if err != nil {
 		return 0, err
 	}
-	writer.Write4At(offset+2, uint32(__DataOffset))
+	writer.Write4At(offset+8, uint32(__DataOffset))
 	if _, err := x.Data.Write(writer, __DataOffset); err != nil {
 		return offset, err
 	}
@@ -653,7 +654,7 @@ func (x *SerializableComponentSetEntry) Write(writer rockmem.Writer, start uint)
 // WriteDefault writes the SerializableComponentSetEntry default value to the writer at the specified offset
 func (x *SerializableComponentSetEntry) WriteDefault(writer rockmem.Writer, start uint) (offset uint, err error) {
 	offset = start
-	size := uint(8)
+	size := uint(16)
 	if offset == 0 {
 		offset, err = writer.Alloc(size)
 		if err != nil {
@@ -667,7 +668,7 @@ func (x *SerializableComponentSetEntry) WriteDefault(writer rockmem.Writer, star
 	if err != nil {
 		return 0, err
 	}
-	writer.Write4At(offset+2, uint32(__DataOffset))
+	writer.Write4At(offset+8, uint32(__DataOffset))
 	if _, err := x.Data.WriteDefault(writer, __DataOffset); err != nil {
 		return offset, err
 	}
@@ -701,8 +702,8 @@ type SerializableWorldData struct {
 	ComponentSets []SerializableComponentSetEntry // All component sets
 	//World runtime state
 	Frame           uint64   // Current frame number
-	DisposableTypes []uint16 // Disposable component types
-	NomadicTypes    []uint16 // Nomadic component types
+	DisposableTypes []uint64 // Disposable component types
+	NomadicTypes    []uint64 // Nomadic component types
 }
 
 // NewSerializableWorldData creates a new SerializableWorldData instance
@@ -755,23 +756,23 @@ func (x *SerializableWorldData) Write(writer rockmem.Writer, start uint) (offset
 	if _, err := x.IdGenerator.Write(writer, __IdGeneratorOffset); err != nil {
 		return offset, err
 	}
-	__ComponentSetsSize := uint(8 * len(x.ComponentSets))
+	__ComponentSetsSize := uint(16 * len(x.ComponentSets))
 	__ComponentSetsOffset, err := writer.Alloc(__ComponentSetsSize)
 	if err != nil {
 		return 0, err
 	}
 	writer.Write4At(offset+12, uint32(__ComponentSetsOffset))
 	writer.Write4At(offset+12+4, uint32(__ComponentSetsSize))
-	writer.Write4At(offset+12+4+4, 8)
+	writer.Write4At(offset+12+4+4, 16)
 	for i := range x.ComponentSets {
 		if _, err := x.ComponentSets[i].Write(writer, __ComponentSetsOffset); err != nil {
 			return offset, err
 		}
-		__ComponentSetsOffset += 8
+		__ComponentSetsOffset += 16
 	}
 	__FrameOffset := offset + 24
 	writer.Write8At(__FrameOffset, *(*uint64)(unsafe.Pointer(&x.Frame)))
-	__DisposableTypesSize := uint(2 * len(x.DisposableTypes))
+	__DisposableTypesSize := uint(8 * len(x.DisposableTypes))
 	__DisposableTypesCap := __DisposableTypesSize
 	__DisposableTypesOffset, err := writer.Alloc(__DisposableTypesSize)
 	if err != nil {
@@ -780,14 +781,14 @@ func (x *SerializableWorldData) Write(writer rockmem.Writer, start uint) (offset
 	writer.Write4At(offset+32+0, uint32(__DisposableTypesOffset))
 	writer.Write4At(offset+32+4, uint32(__DisposableTypesSize))
 	writer.Write4At(offset+32+8, uint32(__DisposableTypesCap))
-	writer.Write4At(offset+32+12, uint32(2))
+	writer.Write4At(offset+32+12, uint32(8))
 	if len(x.DisposableTypes) > 0 {
 		if rockmem.IsDebugEnabled() {
 			fmt.Printf("Writing slice DisposableTypes: len=%d, size=%d\n", len(x.DisposableTypes), __DisposableTypesSize)
 		}
 		writer.WriteAt(__DisposableTypesOffset, unsafe.Slice((*byte)(unsafe.Pointer(&x.DisposableTypes[0])), __DisposableTypesSize))
 	}
-	__NomadicTypesSize := uint(2 * len(x.NomadicTypes))
+	__NomadicTypesSize := uint(8 * len(x.NomadicTypes))
 	__NomadicTypesCap := __NomadicTypesSize
 	__NomadicTypesOffset, err := writer.Alloc(__NomadicTypesSize)
 	if err != nil {
@@ -796,7 +797,7 @@ func (x *SerializableWorldData) Write(writer rockmem.Writer, start uint) (offset
 	writer.Write4At(offset+48+0, uint32(__NomadicTypesOffset))
 	writer.Write4At(offset+48+4, uint32(__NomadicTypesSize))
 	writer.Write4At(offset+48+8, uint32(__NomadicTypesCap))
-	writer.Write4At(offset+48+12, uint32(2))
+	writer.Write4At(offset+48+12, uint32(8))
 	if len(x.NomadicTypes) > 0 {
 		if rockmem.IsDebugEnabled() {
 			fmt.Printf("Writing slice NomadicTypes: len=%d, size=%d\n", len(x.NomadicTypes), __NomadicTypesSize)
@@ -837,14 +838,14 @@ func (x *SerializableWorldData) WriteDefault(writer rockmem.Writer, start uint) 
 	if _, err := x.IdGenerator.WriteDefault(writer, __IdGeneratorOffset); err != nil {
 		return offset, err
 	}
-	__ComponentSetsSize := uint(8 * len(x.ComponentSets))
+	__ComponentSetsSize := uint(16 * len(x.ComponentSets))
 	__ComponentSetsOffset, err := writer.Alloc(__ComponentSetsSize)
 	if err != nil {
 		return 0, err
 	}
 	writer.Write4At(offset+12, uint32(__ComponentSetsOffset))
 	writer.Write4At(offset+12+4, uint32(__ComponentSetsSize))
-	writer.Write4At(offset+12+4+4, 8)
+	writer.Write4At(offset+12+4+4, 16)
 
 	return offset, nil
 }
@@ -1034,14 +1035,14 @@ func (x *SerializableEntitySetDataViewer) CompoundLengths(reader *rockmem.Reader
 	return unsafe.Slice((*int32)(unsafe.Add(reader.Pointer, offset)), length)
 }
 
-func (x *SerializableEntitySetDataViewer) CompoundData(reader *rockmem.Reader) (v []uint16) {
+func (x *SerializableEntitySetDataViewer) CompoundData(reader *rockmem.Reader) (v []uint64) {
 	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 52))
 	size := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 52+4))
 	if !reader.IsValidOffset(uint32(offset), size) {
-		return []uint16{}
+		return []uint64{}
 	}
-	length := uintptr(size / 2)
-	return unsafe.Slice((*uint16)(unsafe.Add(reader.Pointer, offset)), length)
+	length := uintptr(size / 8)
+	return unsafe.Slice((*uint64)(unsafe.Add(reader.Pointer, offset)), length)
 }
 
 func (x *SerializableEntitySetDataViewer) Indices(reader *rockmem.Reader) (v []int32) {
@@ -1141,10 +1142,10 @@ func (x *SerializableEntityIDGeneratorDataViewer) DelayCap() (v int32) {
 	return *(*int32)(unsafe.Add(unsafe.Pointer(x), 52))
 }
 
-type SerializableComponentSetEntryViewer [8]byte
+type SerializableComponentSetEntryViewer [16]byte
 
 func NewSerializableComponentSetEntryViewer(reader *rockmem.Reader, offset uint32) (v *SerializableComponentSetEntryViewer) {
-	if !reader.IsValidOffset(offset, 8) {
+	if !reader.IsValidOffset(offset, 16) {
 		return (*SerializableComponentSetEntryViewer)(unsafe.Pointer(&_Null_ecs[0]))
 	}
 	v = (*SerializableComponentSetEntryViewer)(unsafe.Add(reader.Pointer, offset))
@@ -1152,19 +1153,19 @@ func NewSerializableComponentSetEntryViewer(reader *rockmem.Reader, offset uint3
 }
 
 func (x *SerializableComponentSetEntryViewer) size() uint32 {
-	return 8
+	return 16
 }
 
 func (x *SerializableComponentSetEntryViewer) RockmemReader() *rockmem.Reader {
 	return rockmem.NewReader(x[:])
 }
 
-func (x *SerializableComponentSetEntryViewer) ComponentType() (v uint16) {
-	return *(*uint16)(unsafe.Add(unsafe.Pointer(x), 0))
+func (x *SerializableComponentSetEntryViewer) ComponentType() (v uint64) {
+	return *(*uint64)(unsafe.Add(unsafe.Pointer(x), 0))
 }
 
 func (x *SerializableComponentSetEntryViewer) Data(reader *rockmem.Reader) (v *SerializableSparseArrayDataViewer) {
-	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 2))
+	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 8))
 	return NewSerializableSparseArrayDataViewer(reader, offset)
 }
 
@@ -1211,7 +1212,7 @@ func (x *SerializableWorldDataViewer) ComponentSets(reader *rockmem.Reader) (v [
 	if !reader.IsValidOffset(uint32(offset), size) {
 		return []SerializableComponentSetEntryViewer{}
 	}
-	length := uintptr(size / 8)
+	length := uintptr(size / 16)
 	return unsafe.Slice((*SerializableComponentSetEntryViewer)(unsafe.Add(reader.Pointer, offset)), length)
 }
 
@@ -1219,24 +1220,24 @@ func (x *SerializableWorldDataViewer) Frame() (v uint64) {
 	return *(*uint64)(unsafe.Add(unsafe.Pointer(x), 24))
 }
 
-func (x *SerializableWorldDataViewer) DisposableTypes(reader *rockmem.Reader) (v []uint16) {
+func (x *SerializableWorldDataViewer) DisposableTypes(reader *rockmem.Reader) (v []uint64) {
 	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 32))
 	size := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 32+4))
 	if !reader.IsValidOffset(uint32(offset), size) {
-		return []uint16{}
+		return []uint64{}
 	}
-	length := uintptr(size / 2)
-	return unsafe.Slice((*uint16)(unsafe.Add(reader.Pointer, offset)), length)
+	length := uintptr(size / 8)
+	return unsafe.Slice((*uint64)(unsafe.Add(reader.Pointer, offset)), length)
 }
 
-func (x *SerializableWorldDataViewer) NomadicTypes(reader *rockmem.Reader) (v []uint16) {
+func (x *SerializableWorldDataViewer) NomadicTypes(reader *rockmem.Reader) (v []uint64) {
 	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 48))
 	size := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 48+4))
 	if !reader.IsValidOffset(uint32(offset), size) {
-		return []uint16{}
+		return []uint64{}
 	}
-	length := uintptr(size / 2)
-	return unsafe.Slice((*uint16)(unsafe.Add(reader.Pointer, offset)), length)
+	length := uintptr(size / 8)
+	return unsafe.Slice((*uint64)(unsafe.Add(reader.Pointer, offset)), length)
 }
 
 type SerializableUSetDataModifier struct {
@@ -1387,9 +1388,9 @@ func (x *SerializableEntitySetDataModifier) SetCompoundLengths(v []int32) error 
 	return nil
 }
 
-func (x *SerializableEntitySetDataModifier) SetCompoundData(v []uint16) error {
+func (x *SerializableEntitySetDataModifier) SetCompoundData(v []uint64) error {
 	cap := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 52+8))
-	newSize := 2 * uint32(len(v))
+	newSize := 8 * uint32(len(v))
 	if newSize > cap {
 		return errors.New("invalid size, new size must less than capacity")
 	}
@@ -1517,8 +1518,8 @@ func newSerializableComponentSetEntryModifierByViewer(viewer *SerializableCompon
 	return SerializableComponentSetEntryModifier{viewer}
 }
 
-func (x *SerializableComponentSetEntryModifier) SetComponentType(v uint16) {
-	*(*uint16)(unsafe.Add(unsafe.Pointer(x.SerializableComponentSetEntryViewer), 0)) = v
+func (x *SerializableComponentSetEntryModifier) SetComponentType(v uint64) {
+	*(*uint64)(unsafe.Add(unsafe.Pointer(x.SerializableComponentSetEntryViewer), 0)) = v
 }
 
 type SerializableWorldDataModifier struct {
@@ -1537,9 +1538,9 @@ func (x *SerializableWorldDataModifier) SetFrame(v uint64) {
 	*(*uint64)(unsafe.Add(unsafe.Pointer(x.SerializableWorldDataViewer), 24)) = v
 }
 
-func (x *SerializableWorldDataModifier) SetDisposableTypes(v []uint16) error {
+func (x *SerializableWorldDataModifier) SetDisposableTypes(v []uint64) error {
 	cap := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableWorldDataViewer), 32+8))
-	newSize := 2 * uint32(len(v))
+	newSize := 8 * uint32(len(v))
 	if newSize > cap {
 		return errors.New("invalid size, new size must less than capacity")
 	}
@@ -1551,9 +1552,9 @@ func (x *SerializableWorldDataModifier) SetDisposableTypes(v []uint16) error {
 	return nil
 }
 
-func (x *SerializableWorldDataModifier) SetNomadicTypes(v []uint16) error {
+func (x *SerializableWorldDataModifier) SetNomadicTypes(v []uint64) error {
 	cap := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableWorldDataViewer), 48+8))
-	newSize := 2 * uint32(len(v))
+	newSize := 8 * uint32(len(v))
 	if newSize > cap {
 		return errors.New("invalid size, new size must less than capacity")
 	}

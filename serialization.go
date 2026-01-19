@@ -202,7 +202,7 @@ func (es *EntitySet) Marshal() *SerializableEntitySetData {
 			totalCompoundSize += len(es.data[i].compound)
 		}
 
-		data.CompoundData = make([]uint16, totalCompoundSize)
+		data.CompoundData = make([]uint64, totalCompoundSize)
 
 		// Second pass: fill the arrays
 		compoundOffset := int32(0)
@@ -214,7 +214,7 @@ func (es *EntitySet) Marshal() *SerializableEntitySetData {
 
 			// Copy compound data
 			for j, ct := range info.compound {
-				data.CompoundData[int(compoundOffset)+j] = uint16(ct)
+				data.CompoundData[int(compoundOffset)+j] = uint64(ct)
 			}
 			compoundOffset += int32(len(info.compound))
 		}
@@ -430,7 +430,7 @@ func (w *serializableWorld) Marshal() *SerializableWorldData {
 				Marshal() *SerializableSparseArrayData
 			}); ok {
 				entry := SerializableComponentSetEntry{
-					ComponentType: uint16(compType),
+					ComponentType: uint64(compType),
 					Data:          *cset.Marshal(),
 				}
 				data.ComponentSets = append(data.ComponentSets, entry)
@@ -440,17 +440,17 @@ func (w *serializableWorld) Marshal() *SerializableWorldData {
 
 	// Serialize disposable types
 	if len(w.disposableTypes) > 0 {
-		data.DisposableTypes = make([]uint16, len(w.disposableTypes))
+		data.DisposableTypes = make([]uint64, len(w.disposableTypes))
 		for i, t := range w.disposableTypes {
-			data.DisposableTypes[i] = uint16(t)
+			data.DisposableTypes[i] = uint64(t)
 		}
 	}
 
 	// Serialize nomadic types
 	if len(w.nomadicTypes) > 0 {
-		data.NomadicTypes = make([]uint16, len(w.nomadicTypes))
+		data.NomadicTypes = make([]uint64, len(w.nomadicTypes))
 		for i, t := range w.nomadicTypes {
-			data.NomadicTypes[i] = uint16(t)
+			data.NomadicTypes[i] = uint64(t)
 		}
 	}
 
