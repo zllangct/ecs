@@ -581,3 +581,429 @@ func BenchmarkEntitySetSerialization(b *testing.B) {
 		}
 	})
 }
+
+// Test component for world serialization tests
+type testWorldComponent struct {
+	Value int32
+	Name  string
+}
+
+func (t *testWorldComponent) NewComponentSet() ComponentSet {
+	return NewCSet[testWorldComponent]()
+}
+
+func (t *testWorldComponent) GetComponentSeq() int32 {
+	return 65529 // Use a unique sequence number
+}
+
+func (t *testWorldComponent) IsNomadic() bool {
+	return false
+}
+
+func (t *testWorldComponent) IsDisposable() bool {
+	return false
+}
+
+func (testWorldComponent) ComponentObjectIdentifier() {}
+
+// Test component 2 for world serialization tests
+type testWorldComponent2 struct {
+	X float32
+	Y float32
+}
+
+func (t *testWorldComponent2) NewComponentSet() ComponentSet {
+	return NewCSet[testWorldComponent2]()
+}
+
+func (t *testWorldComponent2) GetComponentSeq() int32 {
+	return 65528 // Use a unique sequence number
+}
+
+func (t *testWorldComponent2) IsNomadic() bool {
+	return false
+}
+
+func (t *testWorldComponent2) IsDisposable() bool {
+	return false
+}
+
+func (testWorldComponent2) ComponentObjectIdentifier() {}
+
+func init() {
+	// Register test components for serialization
+	RegisterComponent[testWorldComponent]((*testWorldComponent)(nil))
+	RegisterComponent[testWorldComponent2]((*testWorldComponent2)(nil))
+	RegisterComponent[dummyComponent]((*dummyComponent)(nil))
+}
+
+func TestEntityIDGeneratorSerialization(t *testing.T) {
+	// Create an EntityIDGenerator with some allocated IDs
+	original := NewEntityIDGenerator(100, 10)
+
+	// Allocate some IDs
+	ids := make([]Entity, 10)
+	for i := 0; i < 10; i++ {
+		ids[i] = original.NewID()
+	}
+
+	// Free some IDs to test the free list
+	original.FreeID(ids[2])
+	original.FreeID(ids[5])
+
+	// Allocate more IDs
+	for i := 0; i < 3; i++ {
+		original.NewID()
+	}
+
+	// Serialize
+	data := original.Marshal()
+
+	// Validate serialized data
+	if data.Len != original.len {
+		t.Errorf("Len mismatch: expected %d, got %d", original.len, data.Len)
+	}
+	if data.Free != int32(original.free) {
+		t.Errorf("Free mismatch: expected %d, got %d", original.free, data.Free)
+	}
+	if data.Pending != int32(original.pending) {
+		t.Errorf("Pending mismatch: expected %d, got %d", original.pending, data.Pending)
+	}
+
+	// Deserialize
+	restored := &EntityIDGenerator{}
+	restored.Unmarshal(data)
+
+	// Validate restored data
+	if restored.len != original.len {
+		t.Errorf("Restored Len mismatch: expected %d, got %d", original.len, restored.len)
+	}
+	if restored.free != original.free {
+		t.Errorf("Restored Free mismatch: expected %d, got %d", original.free, restored.free)
+	}
+	if restored.pending != original.pending {
+		t.Errorf("Restored Pending mismatch: expected %d, got %d", original.pending, restored.pending)
+	}
+
+	// Test that new allocations work correctly after restoration
+	newID := restored.NewID()
+	if newID == 0 {
+		t.Error("Failed to allocate new ID after restoration")
+	}
+}
+
+func TestEntityIDGeneratorSerializationWithRockmem(t *testing.T) {
+	original := NewEntityIDGenerator(50, 5)
+
+	// Allocate and free some IDs
+	for i := 0; i < 20; i++ {
+		original.NewID()
+	}
+	original.FreeID(Entity(5))
+	original.FreeID(Entity(10))
+
+	// Serialize to rockmem writer
+	writer := rockmem.NewWriter()
+	_, err := original.MarshalTo(writer)
+	if err != nil {
+		t.Fatalf("MarshalTo failed: %v", err)
+	}
+
+	// Create reader from written data
+	reader := rockmem.NewReader(writer.Bytes())
+
+	// Deserialize from rockmem reader
+	restored := &EntityIDGenerator{}
+	restored.UnmarshalFrom(reader)
+
+	// Validate
+	if restored.len != original.len {
+		t.Errorf("Restored Len mismatch: expected %d, got %d", original.len, restored.len)
+	}
+}
+
+func TestWorldSerialization(t *testing.T) {
+	// Create a world with entities and components
+	original := NewWorld().(*world)
+
+	// Add some entities with components
+	for i := 0; i < 5; i++ {
+		entity := original.NewEntity()
+		entity.Add(&testWorldComponent{Value: int32(i * 100), Name: "test"})
+		if i%2 == 0 {
+			entity.Add(&testWorldComponent2{X: float32(i), Y: float32(i * 2)})
+		}
+	}
+
+	// Update frame counter
+	original.frame = 42
+
+	// Serialize
+	data := original.Marshal()
+
+	// Validate serialized data
+	if data.Frame != 42 {
+		t.Errorf("Frame mismatch: expected 42, got %d", data.Frame)
+	}
+	if len(data.Entities.EntityIds) != 5 {
+		t.Errorf("Entity count mismatch: expected 5, got %d", len(data.Entities.EntityIds))
+	}
+
+	// Deserialize
+	restored := &world{}
+	restored.Unmarshal(data)
+
+	// Validate restored data
+	if restored.frame != original.frame {
+		t.Errorf("Restored Frame mismatch: expected %d, got %d", original.frame, restored.frame)
+	}
+	if restored.entities.Len() != original.entities.Len() {
+		t.Errorf("Restored entity count mismatch: expected %d, got %d",
+			original.entities.Len(), restored.entities.Len())
+	}
+
+	// Validate component sets
+	if len(restored.components) != len(original.components) {
+		t.Errorf("Component set count mismatch: expected %d, got %d",
+			len(original.components), len(restored.components))
+	}
+
+	// Check specific component data
+	compType := GetIntType[testWorldComponent, *testWorldComponent]()
+	origSet, origOk := original.components[compType]
+	restoredSet, restoredOk := restored.components[compType]
+	if origOk && restoredOk {
+		if origSet.Len() != restoredSet.Len() {
+			t.Errorf("testWorldComponent count mismatch: expected %d, got %d",
+				origSet.Len(), restoredSet.Len())
+		}
+	} else if origOk != restoredOk {
+		t.Errorf("testWorldComponent set existence mismatch: original=%v, restored=%v", origOk, restoredOk)
+	}
+}
+
+func TestWorldSerializationWithRockmem(t *testing.T) {
+	// Create a world with entities and components
+	original := NewWorld().(*world)
+
+	// Add some entities with components
+	for i := 0; i < 10; i++ {
+		entity := original.NewEntity()
+		entity.Add(&testWorldComponent{Value: int32(i * 100), Name: "entity"})
+		entity.Add(&testWorldComponent2{X: float32(i), Y: float32(i * 2)})
+	}
+
+	original.frame = 100
+
+	// Serialize to rockmem writer
+	writer := rockmem.NewWriter()
+	_, err := original.MarshalTo(writer)
+	if err != nil {
+		t.Fatalf("MarshalTo failed: %v", err)
+	}
+
+	bytes := writer.Bytes()
+	t.Logf("Serialized world with %d entities to %d bytes", original.entities.Len(), len(bytes))
+
+	// Create reader from written data
+	reader := rockmem.NewReader(bytes)
+
+	// Deserialize from rockmem reader
+	restored := &world{}
+	restored.UnmarshalFrom(reader)
+
+	// Validate restored data
+	if restored.frame != original.frame {
+		t.Errorf("Restored Frame mismatch: expected %d, got %d", original.frame, restored.frame)
+	}
+	if restored.entities.Len() != original.entities.Len() {
+		t.Errorf("Restored entity count mismatch: expected %d, got %d",
+			original.entities.Len(), restored.entities.Len())
+	}
+}
+
+func TestWorldSerializationRoundTrip(t *testing.T) {
+	// This test simulates a complete migration scenario:
+	// 1. Create a world with state
+	// 2. Serialize it
+	// 3. Deserialize to a new world
+	// 4. Verify all state is preserved
+
+	// Create original world
+	original := NewWorld().(*world)
+
+	// Add entities with various components
+	entities := make([]*EntityInfo, 20)
+	for i := 0; i < 20; i++ {
+		entities[i] = original.NewEntity()
+		entities[i].Add(&testWorldComponent{Value: int32(i), Name: "test"})
+		if i%3 == 0 {
+			entities[i].Add(&testWorldComponent2{X: float32(i), Y: float32(i * 10)})
+		}
+	}
+
+	// Simulate some frames
+	original.frame = 500
+
+	// Add disposable types for testing
+	original.disposableTypes = []ComponentIntType{1, 2, 3}
+	original.nomadicTypes = []ComponentIntType{4, 5}
+
+	// Serialize to bytes (simulating network transfer)
+	writer := rockmem.NewWriter()
+	_, err := original.MarshalTo(writer)
+	if err != nil {
+		t.Fatalf("MarshalTo failed: %v", err)
+	}
+	networkBytes := writer.Bytes()
+
+	// "Transfer" over network and deserialize at destination
+	reader := rockmem.NewReader(networkBytes)
+	restored := &world{}
+	restored.UnmarshalFrom(reader)
+
+	// Verify all state
+	if restored.frame != original.frame {
+		t.Errorf("Frame not preserved: expected %d, got %d", original.frame, restored.frame)
+	}
+
+	if restored.entities.Len() != original.entities.Len() {
+		t.Errorf("Entity count not preserved: expected %d, got %d",
+			original.entities.Len(), restored.entities.Len())
+	}
+
+	// Verify disposable types
+	if len(restored.disposableTypes) != len(original.disposableTypes) {
+		t.Errorf("DisposableTypes count not preserved: expected %d, got %d",
+			len(original.disposableTypes), len(restored.disposableTypes))
+	}
+	for i, dt := range original.disposableTypes {
+		if i < len(restored.disposableTypes) && restored.disposableTypes[i] != dt {
+			t.Errorf("DisposableType mismatch at %d: expected %d, got %d",
+				i, dt, restored.disposableTypes[i])
+		}
+	}
+
+	// Verify nomadic types
+	if len(restored.nomadicTypes) != len(original.nomadicTypes) {
+		t.Errorf("NomadicTypes count not preserved: expected %d, got %d",
+			len(original.nomadicTypes), len(restored.nomadicTypes))
+	}
+
+	// Verify component data integrity
+	compType := GetIntType[testWorldComponent, *testWorldComponent]()
+	origSet, origExists := original.components[compType]
+	restoredSet, restoredExists := restored.components[compType]
+
+	if origExists != restoredExists {
+		t.Errorf("Component set existence mismatch: original=%v, restored=%v", origExists, restoredExists)
+	}
+
+	if origExists && restoredExists {
+		origCSet := origSet.(*CSet[testWorldComponent])
+		restoredCSet := restoredSet.(*CSet[testWorldComponent])
+
+		if origCSet.Len() != restoredCSet.Len() {
+			t.Errorf("Component set size not preserved: expected %d, got %d",
+				origCSet.Len(), restoredCSet.Len())
+		}
+	}
+}
+
+func TestEmptyWorldSerialization(t *testing.T) {
+	original := NewWorld().(*world)
+
+	// Serialize empty world
+	data := original.Marshal()
+
+	// Deserialize
+	restored := &world{}
+	restored.Unmarshal(data)
+
+	// Verify
+	if restored.entities.Len() != 0 {
+		t.Errorf("Empty world serialization failed: expected 0 entities, got %d",
+			restored.entities.Len())
+	}
+	if restored.frame != 0 {
+		t.Errorf("Empty world frame should be 0, got %d", restored.frame)
+	}
+}
+
+func TestNewWorldFromData(t *testing.T) {
+	// Create and populate original world
+	original := NewWorld().(*world)
+	for i := 0; i < 5; i++ {
+		entity := original.NewEntity()
+		entity.Add(&testWorldComponent{Value: int32(i)})
+	}
+	original.frame = 123
+
+	// Serialize
+	data := original.Marshal()
+
+	// Create new world from data
+	restored := NewWorldFromData(data)
+
+	// Verify
+	if restored.frame != original.frame {
+		t.Errorf("Frame mismatch: expected %d, got %d", original.frame, restored.frame)
+	}
+	if restored.entities.Len() != original.entities.Len() {
+		t.Errorf("Entity count mismatch: expected %d, got %d",
+			original.entities.Len(), restored.entities.Len())
+	}
+	if restored.status != WorldStatusInitialized {
+		t.Errorf("Status should be Initialized, got %d", restored.status)
+	}
+}
+
+func BenchmarkWorldSerialization(b *testing.B) {
+	// Create a world with entities and components
+	w := NewWorld().(*world)
+	for i := 0; i < 1000; i++ {
+		entity := w.NewEntity()
+		entity.Add(&testWorldComponent{Value: int32(i), Name: "benchmark"})
+		if i%2 == 0 {
+			entity.Add(&testWorldComponent2{X: float32(i), Y: float32(i * 2)})
+		}
+	}
+	w.frame = 1000
+
+	b.Run("Marshal", func(b *testing.B) {
+		for n := 0; n < b.N; n++ {
+			_ = w.Marshal()
+		}
+	})
+
+	data := w.Marshal()
+
+	b.Run("Unmarshal", func(b *testing.B) {
+		for n := 0; n < b.N; n++ {
+			restored := &world{}
+			restored.Unmarshal(data)
+		}
+	})
+
+	b.Run("MarshalTo", func(b *testing.B) {
+		writer := rockmem.NewWriter()
+		for n := 0; n < b.N; n++ {
+			writer.Reset()
+			_, _ = w.MarshalTo(writer)
+		}
+	})
+
+	writer := rockmem.NewWriter()
+	_, _ = w.MarshalTo(writer)
+	bytes := writer.Bytes()
+
+	b.Run("UnmarshalFrom", func(b *testing.B) {
+		for n := 0; n < b.N; n++ {
+			reader := rockmem.NewReader(bytes)
+			restored := &world{}
+			restored.UnmarshalFrom(reader)
+		}
+	})
+
+	b.Logf("World with %d entities serialized to %d bytes", w.entities.Len(), len(bytes))
+}

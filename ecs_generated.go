@@ -19,9 +19,12 @@ func init() {
 }
 
 const (
-	PacketIdentifierSerializableUSetData        = 14494556342195307757
-	PacketIdentifierSerializableSparseArrayData = 16579480448794251260
-	PacketIdentifierSerializableEntitySetData   = 9549003896643909816
+	PacketIdentifierSerializableUSetData              = 14494556342195307757
+	PacketIdentifierSerializableSparseArrayData       = 16579480448794251260
+	PacketIdentifierSerializableEntitySetData         = 9549003896643909816
+	PacketIdentifierSerializableEntityIDGeneratorData = 13239573087695456737
+	PacketIdentifierSerializableComponentSetEntry     = 5342222988257397387
+	PacketIdentifierSerializableWorldData             = 11535273365904318300
 )
 
 // SerializableUSetData USet serializable data structure
@@ -122,14 +125,7 @@ func (x *SerializableUSetData) Read(viewer *SerializableUSetDataViewer, reader *
 	x.EleSize = viewer.EleSize()
 	x.Len = viewer.Len()
 	x.InitSize = viewer.InitSize()
-	__DataSlice := viewer.Data(reader)
-	__DataLen := len(__DataSlice)
-	if __DataLen > cap(x.Data) {
-		x.Data = make([]byte, __DataLen)
-	} else {
-		x.Data = x.Data[:__DataLen]
-	}
-	copy(x.Data, __DataSlice)
+	x.Data = viewer.Data(reader)
 }
 
 // SerializableSparseArrayData SparseArray serializable data structure
@@ -267,22 +263,8 @@ func (x *SerializableSparseArrayData) Read(viewer *SerializableSparseArrayDataVi
 		return
 	}
 	x.USetData.Read(viewer.USetData(reader), reader)
-	__IndicesSlice := viewer.Indices(reader)
-	__IndicesLen := len(__IndicesSlice)
-	if __IndicesLen > cap(x.Indices) {
-		x.Indices = make([]int32, __IndicesLen)
-	} else {
-		x.Indices = x.Indices[:__IndicesLen]
-	}
-	copy(x.Indices, __IndicesSlice)
-	__Idx2KeySlice := viewer.Idx2Key(reader)
-	__Idx2KeyLen := len(__Idx2KeySlice)
-	if __Idx2KeyLen > cap(x.Idx2Key) {
-		x.Idx2Key = make([]int32, __Idx2KeyLen)
-	} else {
-		x.Idx2Key = x.Idx2Key[:__Idx2KeyLen]
-	}
-	copy(x.Idx2Key, __Idx2KeySlice)
+	x.Indices = viewer.Indices(reader)
+	x.Idx2Key = viewer.Idx2Key(reader)
 	x.MaxKey = viewer.MaxKey()
 	x.ShrinkThreshold = viewer.ShrinkThreshold()
 	x.InitSize = viewer.InitSize()
@@ -475,58 +457,422 @@ func (x *SerializableEntitySetData) Read(viewer *SerializableEntitySetDataViewer
 	if viewer == nil {
 		return
 	}
-	__EntityIdsSlice := viewer.EntityIds(reader)
-	__EntityIdsLen := len(__EntityIdsSlice)
-	if __EntityIdsLen > cap(x.EntityIds) {
-		x.EntityIds = make([]int64, __EntityIdsLen)
-	} else {
-		x.EntityIds = x.EntityIds[:__EntityIdsLen]
-	}
-	copy(x.EntityIds, __EntityIdsSlice)
-	__CompoundOffsetsSlice := viewer.CompoundOffsets(reader)
-	__CompoundOffsetsLen := len(__CompoundOffsetsSlice)
-	if __CompoundOffsetsLen > cap(x.CompoundOffsets) {
-		x.CompoundOffsets = make([]int32, __CompoundOffsetsLen)
-	} else {
-		x.CompoundOffsets = x.CompoundOffsets[:__CompoundOffsetsLen]
-	}
-	copy(x.CompoundOffsets, __CompoundOffsetsSlice)
-	__CompoundLengthsSlice := viewer.CompoundLengths(reader)
-	__CompoundLengthsLen := len(__CompoundLengthsSlice)
-	if __CompoundLengthsLen > cap(x.CompoundLengths) {
-		x.CompoundLengths = make([]int32, __CompoundLengthsLen)
-	} else {
-		x.CompoundLengths = x.CompoundLengths[:__CompoundLengthsLen]
-	}
-	copy(x.CompoundLengths, __CompoundLengthsSlice)
-	__CompoundDataSlice := viewer.CompoundData(reader)
-	__CompoundDataLen := len(__CompoundDataSlice)
-	if __CompoundDataLen > cap(x.CompoundData) {
-		x.CompoundData = make([]uint16, __CompoundDataLen)
-	} else {
-		x.CompoundData = x.CompoundData[:__CompoundDataLen]
-	}
-	copy(x.CompoundData, __CompoundDataSlice)
-	__IndicesSlice := viewer.Indices(reader)
-	__IndicesLen := len(__IndicesSlice)
-	if __IndicesLen > cap(x.Indices) {
-		x.Indices = make([]int32, __IndicesLen)
-	} else {
-		x.Indices = x.Indices[:__IndicesLen]
-	}
-	copy(x.Indices, __IndicesSlice)
-	__Idx2KeySlice := viewer.Idx2Key(reader)
-	__Idx2KeyLen := len(__Idx2KeySlice)
-	if __Idx2KeyLen > cap(x.Idx2Key) {
-		x.Idx2Key = make([]int32, __Idx2KeyLen)
-	} else {
-		x.Idx2Key = x.Idx2Key[:__Idx2KeyLen]
-	}
-	copy(x.Idx2Key, __Idx2KeySlice)
+	x.EntityIds = viewer.EntityIds(reader)
+	x.CompoundOffsets = viewer.CompoundOffsets(reader)
+	x.CompoundLengths = viewer.CompoundLengths(reader)
+	x.CompoundData = viewer.CompoundData(reader)
+	x.Indices = viewer.Indices(reader)
+	x.Idx2Key = viewer.Idx2Key(reader)
 	x.MaxKey = viewer.MaxKey()
 	x.ShrinkThreshold = viewer.ShrinkThreshold()
 	x.InitSize = viewer.InitSize()
 	x.IsKOrder = viewer.IsKOrder()
+}
+
+// SerializableEntityIDGeneratorData EntityIDGenerator serializable data structure
+// SerializableEntityIDGeneratorData Used for serializing ID generator state for proper ID allocation after restore
+type SerializableEntityIDGeneratorData struct {
+	Ids         []int64 // All ReuseID data (index and reuse packed as int64)
+	Free        int32   // Next free index
+	Pending     int32   // Pending allocation index
+	Len         int32   // Current entity count
+	RemoveDelay []int64 // Delayed removal queue (ReuseID packed as int64)
+	DelayFree   int32   // Number of delayed free entries
+	DelayCap    int32   // Capacity of delayed removal queue
+}
+
+// NewSerializableEntityIDGeneratorData creates a new SerializableEntityIDGeneratorData instance
+func NewSerializableEntityIDGeneratorData() *SerializableEntityIDGeneratorData {
+	return &SerializableEntityIDGeneratorData{}
+}
+
+// PacketIdentifier returns the unique identifier for SerializableEntityIDGeneratorData
+func (x *SerializableEntityIDGeneratorData) PacketIdentifier() rockmem.PacketIdentifier {
+	return PacketIdentifierSerializableEntityIDGeneratorData
+}
+
+// Reset resets all fields to their default values
+func (x *SerializableEntityIDGeneratorData) Reset() {
+	x.Read((*SerializableEntityIDGeneratorDataViewer)(unsafe.Pointer(&_Null_ecs[0])), _NullReader_ecs)
+}
+
+// WriteAsRoot writes the SerializableEntityIDGeneratorData as root object to the writer
+func (x *SerializableEntityIDGeneratorData) WriteAsRoot(writer rockmem.Writer) (offset uint, err error) {
+	return x.Write(writer, 0)
+}
+
+// Write writes the SerializableEntityIDGeneratorData to the writer at the specified offset
+func (x *SerializableEntityIDGeneratorData) Write(writer rockmem.Writer, start uint) (offset uint, err error) {
+	offset = start
+	size := uint(56)
+	if offset == 0 {
+		offset, err = writer.Alloc(size)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	writer.Write4At(offset, uint32(size))
+	__IdsSize := uint(8 * len(x.Ids))
+	__IdsCap := __IdsSize
+	__IdsOffset, err := writer.Alloc(__IdsSize)
+	if err != nil {
+		return 0, err
+	}
+	writer.Write4At(offset+4+0, uint32(__IdsOffset))
+	writer.Write4At(offset+4+4, uint32(__IdsSize))
+	writer.Write4At(offset+4+8, uint32(__IdsCap))
+	writer.Write4At(offset+4+12, uint32(8))
+	if len(x.Ids) > 0 {
+		if rockmem.IsDebugEnabled() {
+			fmt.Printf("Writing slice Ids: len=%d, size=%d\n", len(x.Ids), __IdsSize)
+		}
+		writer.WriteAt(__IdsOffset, unsafe.Slice((*byte)(unsafe.Pointer(&x.Ids[0])), __IdsSize))
+	}
+	__FreeOffset := offset + 20
+	writer.Write4At(__FreeOffset, *(*uint32)(unsafe.Pointer(&x.Free)))
+	__PendingOffset := offset + 24
+	writer.Write4At(__PendingOffset, *(*uint32)(unsafe.Pointer(&x.Pending)))
+	__LenOffset := offset + 28
+	writer.Write4At(__LenOffset, *(*uint32)(unsafe.Pointer(&x.Len)))
+	__RemoveDelaySize := uint(8 * len(x.RemoveDelay))
+	__RemoveDelayCap := __RemoveDelaySize
+	__RemoveDelayOffset, err := writer.Alloc(__RemoveDelaySize)
+	if err != nil {
+		return 0, err
+	}
+	writer.Write4At(offset+32+0, uint32(__RemoveDelayOffset))
+	writer.Write4At(offset+32+4, uint32(__RemoveDelaySize))
+	writer.Write4At(offset+32+8, uint32(__RemoveDelayCap))
+	writer.Write4At(offset+32+12, uint32(8))
+	if len(x.RemoveDelay) > 0 {
+		if rockmem.IsDebugEnabled() {
+			fmt.Printf("Writing slice RemoveDelay: len=%d, size=%d\n", len(x.RemoveDelay), __RemoveDelaySize)
+		}
+		writer.WriteAt(__RemoveDelayOffset, unsafe.Slice((*byte)(unsafe.Pointer(&x.RemoveDelay[0])), __RemoveDelaySize))
+	}
+	__DelayFreeOffset := offset + 48
+	writer.Write4At(__DelayFreeOffset, *(*uint32)(unsafe.Pointer(&x.DelayFree)))
+	__DelayCapOffset := offset + 52
+	writer.Write4At(__DelayCapOffset, *(*uint32)(unsafe.Pointer(&x.DelayCap)))
+
+	return offset, nil
+}
+
+// WriteDefault writes the SerializableEntityIDGeneratorData default value to the writer at the specified offset
+func (x *SerializableEntityIDGeneratorData) WriteDefault(writer rockmem.Writer, start uint) (offset uint, err error) {
+	offset = start
+	size := uint(56)
+	if offset == 0 {
+		offset, err = writer.Alloc(size)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	writer.Write4At(offset, uint32(size))
+
+	return offset, nil
+}
+
+func (x *SerializableEntityIDGeneratorData) ReadAsRoot(reader *rockmem.Reader) {
+	x.Read(NewSerializableEntityIDGeneratorDataViewer(reader, 0), reader)
+}
+
+func (x *SerializableEntityIDGeneratorData) ReadWithOffset(reader *rockmem.Reader, offset uint32) {
+	x.Read(NewSerializableEntityIDGeneratorDataViewer(reader, offset), reader)
+}
+
+func (x *SerializableEntityIDGeneratorData) Read(viewer *SerializableEntityIDGeneratorDataViewer, reader *rockmem.Reader) {
+	if viewer == nil {
+		return
+	}
+	x.Ids = viewer.Ids(reader)
+	x.Free = viewer.Free()
+	x.Pending = viewer.Pending()
+	x.Len = viewer.Len()
+	x.RemoveDelay = viewer.RemoveDelay(reader)
+	x.DelayFree = viewer.DelayFree()
+	x.DelayCap = viewer.DelayCap()
+}
+
+// SerializableComponentSetEntry ComponentSetEntry serializable data structure
+// SerializableComponentSetEntry Used for serializing a single component set with its type identifier
+type SerializableComponentSetEntry struct {
+	ComponentType uint16                      // Component type identifier
+	Data          SerializableSparseArrayData // Component set data
+	_             [2]byte                     // padding for 8-byte alignment
+}
+
+// NewSerializableComponentSetEntry creates a new SerializableComponentSetEntry instance
+func NewSerializableComponentSetEntry() *SerializableComponentSetEntry {
+	return &SerializableComponentSetEntry{}
+}
+
+// PacketIdentifier returns the unique identifier for SerializableComponentSetEntry
+func (x *SerializableComponentSetEntry) PacketIdentifier() rockmem.PacketIdentifier {
+	return PacketIdentifierSerializableComponentSetEntry
+}
+
+// Reset resets all fields to their default values
+func (x *SerializableComponentSetEntry) Reset() {
+	x.Read((*SerializableComponentSetEntryViewer)(unsafe.Pointer(&_Null_ecs[0])), _NullReader_ecs)
+}
+
+// WriteAsRoot writes the SerializableComponentSetEntry as root object to the writer
+func (x *SerializableComponentSetEntry) WriteAsRoot(writer rockmem.Writer) (offset uint, err error) {
+	return x.Write(writer, 0)
+}
+
+// Write writes the SerializableComponentSetEntry to the writer at the specified offset
+func (x *SerializableComponentSetEntry) Write(writer rockmem.Writer, start uint) (offset uint, err error) {
+	offset = start
+	size := uint(8)
+	if offset == 0 {
+		offset, err = writer.Alloc(size)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	__ComponentTypeOffset := offset + 0
+	writer.Write2At(__ComponentTypeOffset, *(*uint16)(unsafe.Pointer(&x.ComponentType)))
+	__DataSize := uint(57)
+	__DataOffset, err := writer.Alloc(__DataSize)
+	if err != nil {
+		return 0, err
+	}
+	writer.Write4At(offset+2, uint32(__DataOffset))
+	if _, err := x.Data.Write(writer, __DataOffset); err != nil {
+		return offset, err
+	}
+
+	return offset, nil
+}
+
+// WriteDefault writes the SerializableComponentSetEntry default value to the writer at the specified offset
+func (x *SerializableComponentSetEntry) WriteDefault(writer rockmem.Writer, start uint) (offset uint, err error) {
+	offset = start
+	size := uint(8)
+	if offset == 0 {
+		offset, err = writer.Alloc(size)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	writer.Write4At(offset, uint32(size))
+	__DataSize := uint(57)
+	__DataOffset, err := writer.Alloc(__DataSize)
+	if err != nil {
+		return 0, err
+	}
+	writer.Write4At(offset+2, uint32(__DataOffset))
+	if _, err := x.Data.WriteDefault(writer, __DataOffset); err != nil {
+		return offset, err
+	}
+
+	return offset, nil
+}
+
+func (x *SerializableComponentSetEntry) ReadAsRoot(reader *rockmem.Reader) {
+	x.Read(NewSerializableComponentSetEntryViewer(reader, 0), reader)
+}
+
+func (x *SerializableComponentSetEntry) ReadWithOffset(reader *rockmem.Reader, offset uint32) {
+	x.Read(NewSerializableComponentSetEntryViewer(reader, offset), reader)
+}
+
+func (x *SerializableComponentSetEntry) Read(viewer *SerializableComponentSetEntryViewer, reader *rockmem.Reader) {
+	if viewer == nil {
+		return
+	}
+	x.ComponentType = viewer.ComponentType()
+	x.Data.Read(viewer.Data(reader), reader)
+}
+
+// SerializableWorldData World serializable data structure
+// SerializableWorldData Complete state of a World that can be serialized for migration
+type SerializableWorldData struct {
+	//Core entity data
+	Entities    SerializableEntitySetData         // All entities with their compounds
+	IdGenerator SerializableEntityIDGeneratorData // ID generator state
+	//Component data - stored as array of entries
+	ComponentSets []SerializableComponentSetEntry // All component sets
+	//World runtime state
+	Frame           uint64   // Current frame number
+	DisposableTypes []uint16 // Disposable component types
+	NomadicTypes    []uint16 // Nomadic component types
+}
+
+// NewSerializableWorldData creates a new SerializableWorldData instance
+func NewSerializableWorldData() *SerializableWorldData {
+	return &SerializableWorldData{}
+}
+
+// PacketIdentifier returns the unique identifier for SerializableWorldData
+func (x *SerializableWorldData) PacketIdentifier() rockmem.PacketIdentifier {
+	return PacketIdentifierSerializableWorldData
+}
+
+// Reset resets all fields to their default values
+func (x *SerializableWorldData) Reset() {
+	x.Read((*SerializableWorldDataViewer)(unsafe.Pointer(&_Null_ecs[0])), _NullReader_ecs)
+}
+
+// WriteAsRoot writes the SerializableWorldData as root object to the writer
+func (x *SerializableWorldData) WriteAsRoot(writer rockmem.Writer) (offset uint, err error) {
+	return x.Write(writer, 0)
+}
+
+// Write writes the SerializableWorldData to the writer at the specified offset
+func (x *SerializableWorldData) Write(writer rockmem.Writer, start uint) (offset uint, err error) {
+	offset = start
+	size := uint(64)
+	if offset == 0 {
+		offset, err = writer.Alloc(size)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	writer.Write4At(offset, uint32(size))
+	__EntitiesSize := uint(117)
+	__EntitiesOffset, err := writer.Alloc(__EntitiesSize)
+	if err != nil {
+		return 0, err
+	}
+	writer.Write4At(offset+4, uint32(__EntitiesOffset))
+	if _, err := x.Entities.Write(writer, __EntitiesOffset); err != nil {
+		return offset, err
+	}
+	__IdGeneratorSize := uint(56)
+	__IdGeneratorOffset, err := writer.Alloc(__IdGeneratorSize)
+	if err != nil {
+		return 0, err
+	}
+	writer.Write4At(offset+8, uint32(__IdGeneratorOffset))
+	if _, err := x.IdGenerator.Write(writer, __IdGeneratorOffset); err != nil {
+		return offset, err
+	}
+	__ComponentSetsSize := uint(8 * len(x.ComponentSets))
+	__ComponentSetsOffset, err := writer.Alloc(__ComponentSetsSize)
+	if err != nil {
+		return 0, err
+	}
+	writer.Write4At(offset+12, uint32(__ComponentSetsOffset))
+	writer.Write4At(offset+12+4, uint32(__ComponentSetsSize))
+	writer.Write4At(offset+12+4+4, 8)
+	for i := range x.ComponentSets {
+		if _, err := x.ComponentSets[i].Write(writer, __ComponentSetsOffset); err != nil {
+			return offset, err
+		}
+		__ComponentSetsOffset += 8
+	}
+	__FrameOffset := offset + 24
+	writer.Write8At(__FrameOffset, *(*uint64)(unsafe.Pointer(&x.Frame)))
+	__DisposableTypesSize := uint(2 * len(x.DisposableTypes))
+	__DisposableTypesCap := __DisposableTypesSize
+	__DisposableTypesOffset, err := writer.Alloc(__DisposableTypesSize)
+	if err != nil {
+		return 0, err
+	}
+	writer.Write4At(offset+32+0, uint32(__DisposableTypesOffset))
+	writer.Write4At(offset+32+4, uint32(__DisposableTypesSize))
+	writer.Write4At(offset+32+8, uint32(__DisposableTypesCap))
+	writer.Write4At(offset+32+12, uint32(2))
+	if len(x.DisposableTypes) > 0 {
+		if rockmem.IsDebugEnabled() {
+			fmt.Printf("Writing slice DisposableTypes: len=%d, size=%d\n", len(x.DisposableTypes), __DisposableTypesSize)
+		}
+		writer.WriteAt(__DisposableTypesOffset, unsafe.Slice((*byte)(unsafe.Pointer(&x.DisposableTypes[0])), __DisposableTypesSize))
+	}
+	__NomadicTypesSize := uint(2 * len(x.NomadicTypes))
+	__NomadicTypesCap := __NomadicTypesSize
+	__NomadicTypesOffset, err := writer.Alloc(__NomadicTypesSize)
+	if err != nil {
+		return 0, err
+	}
+	writer.Write4At(offset+48+0, uint32(__NomadicTypesOffset))
+	writer.Write4At(offset+48+4, uint32(__NomadicTypesSize))
+	writer.Write4At(offset+48+8, uint32(__NomadicTypesCap))
+	writer.Write4At(offset+48+12, uint32(2))
+	if len(x.NomadicTypes) > 0 {
+		if rockmem.IsDebugEnabled() {
+			fmt.Printf("Writing slice NomadicTypes: len=%d, size=%d\n", len(x.NomadicTypes), __NomadicTypesSize)
+		}
+		writer.WriteAt(__NomadicTypesOffset, unsafe.Slice((*byte)(unsafe.Pointer(&x.NomadicTypes[0])), __NomadicTypesSize))
+	}
+
+	return offset, nil
+}
+
+// WriteDefault writes the SerializableWorldData default value to the writer at the specified offset
+func (x *SerializableWorldData) WriteDefault(writer rockmem.Writer, start uint) (offset uint, err error) {
+	offset = start
+	size := uint(64)
+	if offset == 0 {
+		offset, err = writer.Alloc(size)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	writer.Write4At(offset, uint32(size))
+	__EntitiesSize := uint(117)
+	__EntitiesOffset, err := writer.Alloc(__EntitiesSize)
+	if err != nil {
+		return 0, err
+	}
+	writer.Write4At(offset+4, uint32(__EntitiesOffset))
+	if _, err := x.Entities.WriteDefault(writer, __EntitiesOffset); err != nil {
+		return offset, err
+	}
+	__IdGeneratorSize := uint(56)
+	__IdGeneratorOffset, err := writer.Alloc(__IdGeneratorSize)
+	if err != nil {
+		return 0, err
+	}
+	writer.Write4At(offset+8, uint32(__IdGeneratorOffset))
+	if _, err := x.IdGenerator.WriteDefault(writer, __IdGeneratorOffset); err != nil {
+		return offset, err
+	}
+	__ComponentSetsSize := uint(8 * len(x.ComponentSets))
+	__ComponentSetsOffset, err := writer.Alloc(__ComponentSetsSize)
+	if err != nil {
+		return 0, err
+	}
+	writer.Write4At(offset+12, uint32(__ComponentSetsOffset))
+	writer.Write4At(offset+12+4, uint32(__ComponentSetsSize))
+	writer.Write4At(offset+12+4+4, 8)
+
+	return offset, nil
+}
+
+func (x *SerializableWorldData) ReadAsRoot(reader *rockmem.Reader) {
+	x.Read(NewSerializableWorldDataViewer(reader, 0), reader)
+}
+
+func (x *SerializableWorldData) ReadWithOffset(reader *rockmem.Reader, offset uint32) {
+	x.Read(NewSerializableWorldDataViewer(reader, offset), reader)
+}
+
+func (x *SerializableWorldData) Read(viewer *SerializableWorldDataViewer, reader *rockmem.Reader) {
+	if viewer == nil {
+		return
+	}
+	x.Entities.Read(viewer.Entities(reader), reader)
+	x.IdGenerator.Read(viewer.IdGenerator(reader), reader)
+	__ComponentSetsViewerSlice := viewer.ComponentSets(reader)
+	if len(__ComponentSetsViewerSlice) > 0 {
+		x.ComponentSets = make([]SerializableComponentSetEntry, len(__ComponentSetsViewerSlice))
+		for i := range x.ComponentSets {
+			x.ComponentSets[i].Read(&__ComponentSetsViewerSlice[i], reader)
+		}
+	}
+	x.Frame = viewer.Frame()
+	x.DisposableTypes = viewer.DisposableTypes(reader)
+	x.NomadicTypes = viewer.NomadicTypes(reader)
 }
 
 type SerializableUSetDataViewer [44]byte
@@ -734,6 +1080,165 @@ func (x *SerializableEntitySetDataViewer) IsKOrder() (v bool) {
 	return *(*bool)(unsafe.Add(unsafe.Pointer(x), 116))
 }
 
+type SerializableEntityIDGeneratorDataViewer [56]byte
+
+func NewSerializableEntityIDGeneratorDataViewer(reader *rockmem.Reader, offset uint32) (v *SerializableEntityIDGeneratorDataViewer) {
+	if !reader.IsValidOffset(offset, 56) {
+		return (*SerializableEntityIDGeneratorDataViewer)(unsafe.Pointer(&_Null_ecs[0]))
+	}
+	v = (*SerializableEntityIDGeneratorDataViewer)(unsafe.Add(reader.Pointer, offset))
+	if !reader.IsValidOffset(offset, v.size()) {
+		return (*SerializableEntityIDGeneratorDataViewer)(unsafe.Pointer(&_Null_ecs[0]))
+	}
+	return v
+}
+
+func (x *SerializableEntityIDGeneratorDataViewer) size() uint32 {
+	return *(*uint32)(unsafe.Pointer(x))
+}
+
+func (x *SerializableEntityIDGeneratorDataViewer) RockmemReader() *rockmem.Reader {
+	return rockmem.NewReader(x[:])
+}
+
+func (x *SerializableEntityIDGeneratorDataViewer) Ids(reader *rockmem.Reader) (v []int64) {
+	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 4))
+	size := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 4+4))
+	if !reader.IsValidOffset(uint32(offset), size) {
+		return []int64{}
+	}
+	length := uintptr(size / 8)
+	return unsafe.Slice((*int64)(unsafe.Add(reader.Pointer, offset)), length)
+}
+
+func (x *SerializableEntityIDGeneratorDataViewer) Free() (v int32) {
+	return *(*int32)(unsafe.Add(unsafe.Pointer(x), 20))
+}
+
+func (x *SerializableEntityIDGeneratorDataViewer) Pending() (v int32) {
+	return *(*int32)(unsafe.Add(unsafe.Pointer(x), 24))
+}
+
+func (x *SerializableEntityIDGeneratorDataViewer) Len() (v int32) {
+	return *(*int32)(unsafe.Add(unsafe.Pointer(x), 28))
+}
+
+func (x *SerializableEntityIDGeneratorDataViewer) RemoveDelay(reader *rockmem.Reader) (v []int64) {
+	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 32))
+	size := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 32+4))
+	if !reader.IsValidOffset(uint32(offset), size) {
+		return []int64{}
+	}
+	length := uintptr(size / 8)
+	return unsafe.Slice((*int64)(unsafe.Add(reader.Pointer, offset)), length)
+}
+
+func (x *SerializableEntityIDGeneratorDataViewer) DelayFree() (v int32) {
+	return *(*int32)(unsafe.Add(unsafe.Pointer(x), 48))
+}
+
+func (x *SerializableEntityIDGeneratorDataViewer) DelayCap() (v int32) {
+	return *(*int32)(unsafe.Add(unsafe.Pointer(x), 52))
+}
+
+type SerializableComponentSetEntryViewer [8]byte
+
+func NewSerializableComponentSetEntryViewer(reader *rockmem.Reader, offset uint32) (v *SerializableComponentSetEntryViewer) {
+	if !reader.IsValidOffset(offset, 8) {
+		return (*SerializableComponentSetEntryViewer)(unsafe.Pointer(&_Null_ecs[0]))
+	}
+	v = (*SerializableComponentSetEntryViewer)(unsafe.Add(reader.Pointer, offset))
+	return v
+}
+
+func (x *SerializableComponentSetEntryViewer) size() uint32 {
+	return 8
+}
+
+func (x *SerializableComponentSetEntryViewer) RockmemReader() *rockmem.Reader {
+	return rockmem.NewReader(x[:])
+}
+
+func (x *SerializableComponentSetEntryViewer) ComponentType() (v uint16) {
+	return *(*uint16)(unsafe.Add(unsafe.Pointer(x), 0))
+}
+
+func (x *SerializableComponentSetEntryViewer) Data(reader *rockmem.Reader) (v *SerializableSparseArrayDataViewer) {
+	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 2))
+	return NewSerializableSparseArrayDataViewer(reader, offset)
+}
+
+type SerializableWorldDataViewer [64]byte
+
+func NewSerializableWorldDataViewer(reader *rockmem.Reader, offset uint32) (v *SerializableWorldDataViewer) {
+	if !reader.IsValidOffset(offset, 64) {
+		return (*SerializableWorldDataViewer)(unsafe.Pointer(&_Null_ecs[0]))
+	}
+	v = (*SerializableWorldDataViewer)(unsafe.Add(reader.Pointer, offset))
+	if !reader.IsValidOffset(offset, v.size()) {
+		return (*SerializableWorldDataViewer)(unsafe.Pointer(&_Null_ecs[0]))
+	}
+	return v
+}
+
+func (x *SerializableWorldDataViewer) size() uint32 {
+	return *(*uint32)(unsafe.Pointer(x))
+}
+
+func (x *SerializableWorldDataViewer) RockmemReader() *rockmem.Reader {
+	return rockmem.NewReader(x[:])
+}
+
+func (x *SerializableWorldDataViewer) Entities(reader *rockmem.Reader) (v *SerializableEntitySetDataViewer) {
+	if 4+4 > x.size() {
+		return (*SerializableEntitySetDataViewer)(unsafe.Pointer(&_Null_ecs[0]))
+	}
+	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 4))
+	return NewSerializableEntitySetDataViewer(reader, offset)
+}
+
+func (x *SerializableWorldDataViewer) IdGenerator(reader *rockmem.Reader) (v *SerializableEntityIDGeneratorDataViewer) {
+	if 8+4 > x.size() {
+		return (*SerializableEntityIDGeneratorDataViewer)(unsafe.Pointer(&_Null_ecs[0]))
+	}
+	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 8))
+	return NewSerializableEntityIDGeneratorDataViewer(reader, offset)
+}
+
+func (x *SerializableWorldDataViewer) ComponentSets(reader *rockmem.Reader) (v []SerializableComponentSetEntryViewer) {
+	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 12))
+	size := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 12+4))
+	if !reader.IsValidOffset(uint32(offset), size) {
+		return []SerializableComponentSetEntryViewer{}
+	}
+	length := uintptr(size / 8)
+	return unsafe.Slice((*SerializableComponentSetEntryViewer)(unsafe.Add(reader.Pointer, offset)), length)
+}
+
+func (x *SerializableWorldDataViewer) Frame() (v uint64) {
+	return *(*uint64)(unsafe.Add(unsafe.Pointer(x), 24))
+}
+
+func (x *SerializableWorldDataViewer) DisposableTypes(reader *rockmem.Reader) (v []uint16) {
+	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 32))
+	size := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 32+4))
+	if !reader.IsValidOffset(uint32(offset), size) {
+		return []uint16{}
+	}
+	length := uintptr(size / 2)
+	return unsafe.Slice((*uint16)(unsafe.Add(reader.Pointer, offset)), length)
+}
+
+func (x *SerializableWorldDataViewer) NomadicTypes(reader *rockmem.Reader) (v []uint16) {
+	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 48))
+	size := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 48+4))
+	if !reader.IsValidOffset(uint32(offset), size) {
+		return []uint16{}
+	}
+	length := uintptr(size / 2)
+	return unsafe.Slice((*uint16)(unsafe.Add(reader.Pointer, offset)), length)
+}
+
 type SerializableUSetDataModifier struct {
 	*SerializableUSetDataViewer
 }
@@ -938,4 +1443,124 @@ func (x *SerializableEntitySetDataModifier) SetInitSize(v int32) {
 
 func (x *SerializableEntitySetDataModifier) SetIsKOrder(v bool) {
 	*(*bool)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 116)) = v
+}
+
+type SerializableEntityIDGeneratorDataModifier struct {
+	*SerializableEntityIDGeneratorDataViewer
+}
+
+func NewSerializableEntityIDGeneratorDataModifier(reader *rockmem.Reader, offset uint32) (v SerializableEntityIDGeneratorDataModifier) {
+	return SerializableEntityIDGeneratorDataModifier{NewSerializableEntityIDGeneratorDataViewer(reader, offset)}
+}
+
+func newSerializableEntityIDGeneratorDataModifierByViewer(viewer *SerializableEntityIDGeneratorDataViewer) (v SerializableEntityIDGeneratorDataModifier) {
+	return SerializableEntityIDGeneratorDataModifier{viewer}
+}
+
+func (x *SerializableEntityIDGeneratorDataModifier) SetIds(v []int64) error {
+	cap := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntityIDGeneratorDataViewer), 4+8))
+	newSize := 8 * uint32(len(v))
+	if newSize > cap {
+		return errors.New("invalid size, new size must less than capacity")
+	}
+	*(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntityIDGeneratorDataViewer), 4+4)) = newSize
+	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntityIDGeneratorDataViewer), 4+0))
+	srcData := unsafe.Slice((*byte)(unsafe.Pointer(&v[0])), newSize)
+	dstData := unsafe.Slice((*byte)(unsafe.Add(unsafe.Pointer(x.SerializableEntityIDGeneratorDataViewer), offset)), newSize)
+	copy(dstData, srcData)
+	return nil
+}
+
+func (x *SerializableEntityIDGeneratorDataModifier) SetFree(v int32) {
+	*(*int32)(unsafe.Add(unsafe.Pointer(x.SerializableEntityIDGeneratorDataViewer), 20)) = v
+}
+
+func (x *SerializableEntityIDGeneratorDataModifier) SetPending(v int32) {
+	*(*int32)(unsafe.Add(unsafe.Pointer(x.SerializableEntityIDGeneratorDataViewer), 24)) = v
+}
+
+func (x *SerializableEntityIDGeneratorDataModifier) SetLen(v int32) {
+	*(*int32)(unsafe.Add(unsafe.Pointer(x.SerializableEntityIDGeneratorDataViewer), 28)) = v
+}
+
+func (x *SerializableEntityIDGeneratorDataModifier) SetRemoveDelay(v []int64) error {
+	cap := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntityIDGeneratorDataViewer), 32+8))
+	newSize := 8 * uint32(len(v))
+	if newSize > cap {
+		return errors.New("invalid size, new size must less than capacity")
+	}
+	*(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntityIDGeneratorDataViewer), 32+4)) = newSize
+	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntityIDGeneratorDataViewer), 32+0))
+	srcData := unsafe.Slice((*byte)(unsafe.Pointer(&v[0])), newSize)
+	dstData := unsafe.Slice((*byte)(unsafe.Add(unsafe.Pointer(x.SerializableEntityIDGeneratorDataViewer), offset)), newSize)
+	copy(dstData, srcData)
+	return nil
+}
+
+func (x *SerializableEntityIDGeneratorDataModifier) SetDelayFree(v int32) {
+	*(*int32)(unsafe.Add(unsafe.Pointer(x.SerializableEntityIDGeneratorDataViewer), 48)) = v
+}
+
+func (x *SerializableEntityIDGeneratorDataModifier) SetDelayCap(v int32) {
+	*(*int32)(unsafe.Add(unsafe.Pointer(x.SerializableEntityIDGeneratorDataViewer), 52)) = v
+}
+
+type SerializableComponentSetEntryModifier struct {
+	*SerializableComponentSetEntryViewer
+}
+
+func NewSerializableComponentSetEntryModifier(reader *rockmem.Reader, offset uint32) (v SerializableComponentSetEntryModifier) {
+	return SerializableComponentSetEntryModifier{NewSerializableComponentSetEntryViewer(reader, offset)}
+}
+
+func newSerializableComponentSetEntryModifierByViewer(viewer *SerializableComponentSetEntryViewer) (v SerializableComponentSetEntryModifier) {
+	return SerializableComponentSetEntryModifier{viewer}
+}
+
+func (x *SerializableComponentSetEntryModifier) SetComponentType(v uint16) {
+	*(*uint16)(unsafe.Add(unsafe.Pointer(x.SerializableComponentSetEntryViewer), 0)) = v
+}
+
+type SerializableWorldDataModifier struct {
+	*SerializableWorldDataViewer
+}
+
+func NewSerializableWorldDataModifier(reader *rockmem.Reader, offset uint32) (v SerializableWorldDataModifier) {
+	return SerializableWorldDataModifier{NewSerializableWorldDataViewer(reader, offset)}
+}
+
+func newSerializableWorldDataModifierByViewer(viewer *SerializableWorldDataViewer) (v SerializableWorldDataModifier) {
+	return SerializableWorldDataModifier{viewer}
+}
+
+func (x *SerializableWorldDataModifier) SetFrame(v uint64) {
+	*(*uint64)(unsafe.Add(unsafe.Pointer(x.SerializableWorldDataViewer), 24)) = v
+}
+
+func (x *SerializableWorldDataModifier) SetDisposableTypes(v []uint16) error {
+	cap := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableWorldDataViewer), 32+8))
+	newSize := 2 * uint32(len(v))
+	if newSize > cap {
+		return errors.New("invalid size, new size must less than capacity")
+	}
+	*(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableWorldDataViewer), 32+4)) = newSize
+	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableWorldDataViewer), 32+0))
+	srcData := unsafe.Slice((*byte)(unsafe.Pointer(&v[0])), newSize)
+	dstData := unsafe.Slice((*byte)(unsafe.Add(unsafe.Pointer(x.SerializableWorldDataViewer), offset)), newSize)
+	copy(dstData, srcData)
+	return nil
+}
+
+func (x *SerializableWorldDataModifier) SetNomadicTypes(v []uint16) error {
+	cap := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableWorldDataViewer), 48+8))
+	newSize := 2 * uint32(len(v))
+	if newSize > cap {
+		return errors.New("invalid size, new size must less than capacity")
+	}
+	*(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableWorldDataViewer), 48+4)) = newSize
+	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableWorldDataViewer), 48+0))
+	srcData := unsafe.Slice((*byte)(unsafe.Pointer(&v[0])), newSize)
+	dstData := unsafe.Slice((*byte)(unsafe.Add(unsafe.Pointer(x.SerializableWorldDataViewer), offset)), newSize)
+	copy(dstData, srcData)
+	return nil
 }
