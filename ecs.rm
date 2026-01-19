@@ -1,5 +1,41 @@
 rockmem ecs @package("ecs");
 
-struct FixedString inline {
-    Data string
+// USet serializable data structure
+// Used for serializing USet[T] container, stores raw bytes of elements
+struct SerializableUSetData {
+    EleSize  uint64;  // Size of each element
+    Len      int64;   // Number of elements
+    InitSize int64;   // Initial capacity
+    Data     []byte;  // Raw bytes of all elements
+}
+
+// SparseArray serializable data structure
+// Used for serializing SparseArray[K, V] container
+struct SerializableSparseArrayData {
+    USetData        SerializableUSetData;  // Embedded USet data
+    Indices         []int32;               // Sparse index mapping
+    Idx2Key         []int32;               // Dense index to key mapping
+    MaxKey          int64;                 // Maximum key value
+    ShrinkThreshold int32;                 // Shrink threshold
+    InitSize        int32;                 // Initial size
+    IsKOrder        bool;                  // Is key-ordered
+}
+
+// EntitySet serializable data structure
+// Flattened representation for serializing EntitySet
+// EntityInfos are stored as parallel arrays for efficient serialization
+struct SerializableEntitySetData {
+    // EntityInfo data stored as parallel arrays
+    EntityIds       []int64;  // Entity IDs for each EntityInfo
+    CompoundOffsets []int32;  // Offset into CompoundData for each EntityInfo's compound
+    CompoundLengths []int32;  // Length of compound for each EntityInfo
+    CompoundData    []uint16; // Flattened compound data (all ComponentIntTypes)
+    
+    // SparseArray metadata
+    Indices         []int32;  // Sparse index mapping
+    Idx2Key         []int32;  // Dense index to key mapping
+    MaxKey          int64;    // Maximum key value
+    ShrinkThreshold int32;    // Shrink threshold
+    InitSize        int32;    // Initial size
+    IsKOrder        bool;     // Is key-ordered
 }

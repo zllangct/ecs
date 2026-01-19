@@ -136,11 +136,3 @@ func (u *USet[T]) Iter() iter.Seq2[int, *T] {
 		}
 	}
 }
-
-func (u *USet[T]) Marshall() {
-
-}
-
-func (u *USet[T]) UnMarshall() {
-
-}

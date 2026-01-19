@@ -12,21 +12,25 @@ var _ unsafe.Pointer
 var _ = errors.New("")
 var _ fmt.State
 
-var _Null_ecs = [40]byte{}
+var _Null_ecs = [117]byte{}
 var _NullReader_ecs = rockmem.NewReader(_Null_ecs[:])
 
 func init() {
 }
 
 const (
-	PacketIdentifierSerializableUSetData = 14494556342195307757
+	PacketIdentifierSerializableUSetData        = 14494556342195307757
+	PacketIdentifierSerializableSparseArrayData = 16579480448794251260
+	PacketIdentifierSerializableEntitySetData   = 9549003896643909816
 )
 
+// SerializableUSetData USet serializable data structure
+// SerializableUSetData Used for serializing USet[T] container, stores raw bytes of elements
 type SerializableUSetData struct {
-	EleSize  uint64
-	Len      int64
-	InitSize int64
-	Data     []byte
+	EleSize  uint64 // Size of each element
+	Len      int64  // Number of elements
+	InitSize int64  // Initial capacity
+	Data     []byte // Raw bytes of all elements
 }
 
 // NewSerializableUSetData creates a new SerializableUSetData instance
@@ -52,7 +56,7 @@ func (x *SerializableUSetData) WriteAsRoot(writer rockmem.Writer) (offset uint, 
 // Write writes the SerializableUSetData to the writer at the specified offset
 func (x *SerializableUSetData) Write(writer rockmem.Writer, start uint) (offset uint, err error) {
 	offset = start
-	size := uint(40)
+	size := uint(44)
 	if offset == 0 {
 		offset, err = writer.Alloc(size)
 		if err != nil {
@@ -60,27 +64,28 @@ func (x *SerializableUSetData) Write(writer rockmem.Writer, start uint) (offset 
 		}
 	}
 
-	__eleSizeOffset := offset + 0
-	writer.Write8At(__eleSizeOffset, *(*uint64)(unsafe.Pointer(&x.EleSize)))
-	__lenOffset := offset + 8
-	writer.Write8At(__lenOffset, *(*uint64)(unsafe.Pointer(&x.Len)))
-	__initSizeOffset := offset + 16
-	writer.Write8At(__initSizeOffset, *(*uint64)(unsafe.Pointer(&x.InitSize)))
-	__dataSize := uint(1 * len(x.Data))
-	__dataCap := __dataSize
-	__dataOffset, err := writer.Alloc(__dataSize)
+	writer.Write4At(offset, uint32(size))
+	__EleSizeOffset := offset + 4
+	writer.Write8At(__EleSizeOffset, *(*uint64)(unsafe.Pointer(&x.EleSize)))
+	__LenOffset := offset + 12
+	writer.Write8At(__LenOffset, *(*uint64)(unsafe.Pointer(&x.Len)))
+	__InitSizeOffset := offset + 20
+	writer.Write8At(__InitSizeOffset, *(*uint64)(unsafe.Pointer(&x.InitSize)))
+	__DataSize := uint(1 * len(x.Data))
+	__DataCap := __DataSize
+	__DataOffset, err := writer.Alloc(__DataSize)
 	if err != nil {
 		return 0, err
 	}
-	writer.Write4At(offset+24+0, uint32(__dataOffset))
-	writer.Write4At(offset+24+4, uint32(__dataSize))
-	writer.Write4At(offset+24+8, uint32(__dataCap))
-	writer.Write4At(offset+24+12, uint32(1))
+	writer.Write4At(offset+28+0, uint32(__DataOffset))
+	writer.Write4At(offset+28+4, uint32(__DataSize))
+	writer.Write4At(offset+28+8, uint32(__DataCap))
+	writer.Write4At(offset+28+12, uint32(1))
 	if len(x.Data) > 0 {
 		if rockmem.IsDebugEnabled() {
-			fmt.Printf("Writing slice data: len=%d, size=%d\n", len(x.Data), __dataSize)
+			fmt.Printf("Writing slice Data: len=%d, size=%d\n", len(x.Data), __DataSize)
 		}
-		writer.WriteAt(__dataOffset, unsafe.Slice((*byte)(unsafe.Pointer(&x.Data[0])), __dataSize))
+		writer.WriteAt(__DataOffset, unsafe.Slice((*byte)(unsafe.Pointer(&x.Data[0])), __DataSize))
 	}
 
 	return offset, nil
@@ -89,7 +94,7 @@ func (x *SerializableUSetData) Write(writer rockmem.Writer, start uint) (offset 
 // WriteDefault writes the SerializableUSetData default value to the writer at the specified offset
 func (x *SerializableUSetData) WriteDefault(writer rockmem.Writer, start uint) (offset uint, err error) {
 	offset = start
-	size := uint(40)
+	size := uint(44)
 	if offset == 0 {
 		offset, err = writer.Alloc(size)
 		if err != nil {
@@ -127,18 +132,418 @@ func (x *SerializableUSetData) Read(viewer *SerializableUSetDataViewer, reader *
 	copy(x.Data, __DataSlice)
 }
 
-type SerializableUSetDataViewer [40]byte
+// SerializableSparseArrayData SparseArray serializable data structure
+// SerializableSparseArrayData Used for serializing SparseArray[K, V] container
+type SerializableSparseArrayData struct {
+	USetData        SerializableUSetData // Embedded USet data
+	Indices         []int32              // Sparse index mapping
+	Idx2Key         []int32              // Dense index to key mapping
+	MaxKey          int64                // Maximum key value
+	ShrinkThreshold int32                // Shrink threshold
+	InitSize        int32                // Initial size
+	IsKOrder        bool                 // Is key-ordered
+}
+
+// NewSerializableSparseArrayData creates a new SerializableSparseArrayData instance
+func NewSerializableSparseArrayData() *SerializableSparseArrayData {
+	return &SerializableSparseArrayData{}
+}
+
+// PacketIdentifier returns the unique identifier for SerializableSparseArrayData
+func (x *SerializableSparseArrayData) PacketIdentifier() rockmem.PacketIdentifier {
+	return PacketIdentifierSerializableSparseArrayData
+}
+
+// Reset resets all fields to their default values
+func (x *SerializableSparseArrayData) Reset() {
+	x.Read((*SerializableSparseArrayDataViewer)(unsafe.Pointer(&_Null_ecs[0])), _NullReader_ecs)
+}
+
+// WriteAsRoot writes the SerializableSparseArrayData as root object to the writer
+func (x *SerializableSparseArrayData) WriteAsRoot(writer rockmem.Writer) (offset uint, err error) {
+	return x.Write(writer, 0)
+}
+
+// Write writes the SerializableSparseArrayData to the writer at the specified offset
+func (x *SerializableSparseArrayData) Write(writer rockmem.Writer, start uint) (offset uint, err error) {
+	offset = start
+	size := uint(57)
+	if offset == 0 {
+		offset, err = writer.Alloc(size)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	writer.Write4At(offset, uint32(size))
+	__USetDataSize := uint(44)
+	__USetDataOffset, err := writer.Alloc(__USetDataSize)
+	if err != nil {
+		return 0, err
+	}
+	writer.Write4At(offset+4, uint32(__USetDataOffset))
+	if _, err := x.USetData.Write(writer, __USetDataOffset); err != nil {
+		return offset, err
+	}
+	__IndicesSize := uint(4 * len(x.Indices))
+	__IndicesCap := __IndicesSize
+	__IndicesOffset, err := writer.Alloc(__IndicesSize)
+	if err != nil {
+		return 0, err
+	}
+	writer.Write4At(offset+8+0, uint32(__IndicesOffset))
+	writer.Write4At(offset+8+4, uint32(__IndicesSize))
+	writer.Write4At(offset+8+8, uint32(__IndicesCap))
+	writer.Write4At(offset+8+12, uint32(4))
+	if len(x.Indices) > 0 {
+		if rockmem.IsDebugEnabled() {
+			fmt.Printf("Writing slice Indices: len=%d, size=%d\n", len(x.Indices), __IndicesSize)
+		}
+		writer.WriteAt(__IndicesOffset, unsafe.Slice((*byte)(unsafe.Pointer(&x.Indices[0])), __IndicesSize))
+	}
+	__Idx2KeySize := uint(4 * len(x.Idx2Key))
+	__Idx2KeyCap := __Idx2KeySize
+	__Idx2KeyOffset, err := writer.Alloc(__Idx2KeySize)
+	if err != nil {
+		return 0, err
+	}
+	writer.Write4At(offset+24+0, uint32(__Idx2KeyOffset))
+	writer.Write4At(offset+24+4, uint32(__Idx2KeySize))
+	writer.Write4At(offset+24+8, uint32(__Idx2KeyCap))
+	writer.Write4At(offset+24+12, uint32(4))
+	if len(x.Idx2Key) > 0 {
+		if rockmem.IsDebugEnabled() {
+			fmt.Printf("Writing slice Idx2Key: len=%d, size=%d\n", len(x.Idx2Key), __Idx2KeySize)
+		}
+		writer.WriteAt(__Idx2KeyOffset, unsafe.Slice((*byte)(unsafe.Pointer(&x.Idx2Key[0])), __Idx2KeySize))
+	}
+	__MaxKeyOffset := offset + 40
+	writer.Write8At(__MaxKeyOffset, *(*uint64)(unsafe.Pointer(&x.MaxKey)))
+	__ShrinkThresholdOffset := offset + 48
+	writer.Write4At(__ShrinkThresholdOffset, *(*uint32)(unsafe.Pointer(&x.ShrinkThreshold)))
+	__InitSizeOffset := offset + 52
+	writer.Write4At(__InitSizeOffset, *(*uint32)(unsafe.Pointer(&x.InitSize)))
+	__IsKOrderOffset := offset + 56
+	writer.Write1At(__IsKOrderOffset, *(*uint8)(unsafe.Pointer(&x.IsKOrder)))
+
+	return offset, nil
+}
+
+// WriteDefault writes the SerializableSparseArrayData default value to the writer at the specified offset
+func (x *SerializableSparseArrayData) WriteDefault(writer rockmem.Writer, start uint) (offset uint, err error) {
+	offset = start
+	size := uint(57)
+	if offset == 0 {
+		offset, err = writer.Alloc(size)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	writer.Write4At(offset, uint32(size))
+	__USetDataSize := uint(44)
+	__USetDataOffset, err := writer.Alloc(__USetDataSize)
+	if err != nil {
+		return 0, err
+	}
+	writer.Write4At(offset+4, uint32(__USetDataOffset))
+	if _, err := x.USetData.WriteDefault(writer, __USetDataOffset); err != nil {
+		return offset, err
+	}
+
+	return offset, nil
+}
+
+func (x *SerializableSparseArrayData) ReadAsRoot(reader *rockmem.Reader) {
+	x.Read(NewSerializableSparseArrayDataViewer(reader, 0), reader)
+}
+
+func (x *SerializableSparseArrayData) ReadWithOffset(reader *rockmem.Reader, offset uint32) {
+	x.Read(NewSerializableSparseArrayDataViewer(reader, offset), reader)
+}
+
+func (x *SerializableSparseArrayData) Read(viewer *SerializableSparseArrayDataViewer, reader *rockmem.Reader) {
+	if viewer == nil {
+		return
+	}
+	x.USetData.Read(viewer.USetData(reader), reader)
+	__IndicesSlice := viewer.Indices(reader)
+	__IndicesLen := len(__IndicesSlice)
+	if __IndicesLen > cap(x.Indices) {
+		x.Indices = make([]int32, __IndicesLen)
+	} else {
+		x.Indices = x.Indices[:__IndicesLen]
+	}
+	copy(x.Indices, __IndicesSlice)
+	__Idx2KeySlice := viewer.Idx2Key(reader)
+	__Idx2KeyLen := len(__Idx2KeySlice)
+	if __Idx2KeyLen > cap(x.Idx2Key) {
+		x.Idx2Key = make([]int32, __Idx2KeyLen)
+	} else {
+		x.Idx2Key = x.Idx2Key[:__Idx2KeyLen]
+	}
+	copy(x.Idx2Key, __Idx2KeySlice)
+	x.MaxKey = viewer.MaxKey()
+	x.ShrinkThreshold = viewer.ShrinkThreshold()
+	x.InitSize = viewer.InitSize()
+	x.IsKOrder = viewer.IsKOrder()
+}
+
+// SerializableEntitySetData EntitySet serializable data structure
+// SerializableEntitySetData Flattened representation for serializing EntitySet
+// SerializableEntitySetData EntityInfos are stored as parallel arrays for efficient serialization
+type SerializableEntitySetData struct {
+	//EntityInfo data stored as parallel arrays
+	EntityIds       []int64  // Entity IDs for each EntityInfo
+	CompoundOffsets []int32  // Offset into CompoundData for each EntityInfo's compound
+	CompoundLengths []int32  // Length of compound for each EntityInfo
+	CompoundData    []uint16 // Flattened compound data (all ComponentIntTypes)
+	//SparseArray metadata
+	Indices         []int32 // Sparse index mapping
+	Idx2Key         []int32 // Dense index to key mapping
+	MaxKey          int64   // Maximum key value
+	ShrinkThreshold int32   // Shrink threshold
+	InitSize        int32   // Initial size
+	IsKOrder        bool    // Is key-ordered
+}
+
+// NewSerializableEntitySetData creates a new SerializableEntitySetData instance
+func NewSerializableEntitySetData() *SerializableEntitySetData {
+	return &SerializableEntitySetData{}
+}
+
+// PacketIdentifier returns the unique identifier for SerializableEntitySetData
+func (x *SerializableEntitySetData) PacketIdentifier() rockmem.PacketIdentifier {
+	return PacketIdentifierSerializableEntitySetData
+}
+
+// Reset resets all fields to their default values
+func (x *SerializableEntitySetData) Reset() {
+	x.Read((*SerializableEntitySetDataViewer)(unsafe.Pointer(&_Null_ecs[0])), _NullReader_ecs)
+}
+
+// WriteAsRoot writes the SerializableEntitySetData as root object to the writer
+func (x *SerializableEntitySetData) WriteAsRoot(writer rockmem.Writer) (offset uint, err error) {
+	return x.Write(writer, 0)
+}
+
+// Write writes the SerializableEntitySetData to the writer at the specified offset
+func (x *SerializableEntitySetData) Write(writer rockmem.Writer, start uint) (offset uint, err error) {
+	offset = start
+	size := uint(117)
+	if offset == 0 {
+		offset, err = writer.Alloc(size)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	writer.Write4At(offset, uint32(size))
+	__EntityIdsSize := uint(8 * len(x.EntityIds))
+	__EntityIdsCap := __EntityIdsSize
+	__EntityIdsOffset, err := writer.Alloc(__EntityIdsSize)
+	if err != nil {
+		return 0, err
+	}
+	writer.Write4At(offset+4+0, uint32(__EntityIdsOffset))
+	writer.Write4At(offset+4+4, uint32(__EntityIdsSize))
+	writer.Write4At(offset+4+8, uint32(__EntityIdsCap))
+	writer.Write4At(offset+4+12, uint32(8))
+	if len(x.EntityIds) > 0 {
+		if rockmem.IsDebugEnabled() {
+			fmt.Printf("Writing slice EntityIds: len=%d, size=%d\n", len(x.EntityIds), __EntityIdsSize)
+		}
+		writer.WriteAt(__EntityIdsOffset, unsafe.Slice((*byte)(unsafe.Pointer(&x.EntityIds[0])), __EntityIdsSize))
+	}
+	__CompoundOffsetsSize := uint(4 * len(x.CompoundOffsets))
+	__CompoundOffsetsCap := __CompoundOffsetsSize
+	__CompoundOffsetsOffset, err := writer.Alloc(__CompoundOffsetsSize)
+	if err != nil {
+		return 0, err
+	}
+	writer.Write4At(offset+20+0, uint32(__CompoundOffsetsOffset))
+	writer.Write4At(offset+20+4, uint32(__CompoundOffsetsSize))
+	writer.Write4At(offset+20+8, uint32(__CompoundOffsetsCap))
+	writer.Write4At(offset+20+12, uint32(4))
+	if len(x.CompoundOffsets) > 0 {
+		if rockmem.IsDebugEnabled() {
+			fmt.Printf("Writing slice CompoundOffsets: len=%d, size=%d\n", len(x.CompoundOffsets), __CompoundOffsetsSize)
+		}
+		writer.WriteAt(__CompoundOffsetsOffset, unsafe.Slice((*byte)(unsafe.Pointer(&x.CompoundOffsets[0])), __CompoundOffsetsSize))
+	}
+	__CompoundLengthsSize := uint(4 * len(x.CompoundLengths))
+	__CompoundLengthsCap := __CompoundLengthsSize
+	__CompoundLengthsOffset, err := writer.Alloc(__CompoundLengthsSize)
+	if err != nil {
+		return 0, err
+	}
+	writer.Write4At(offset+36+0, uint32(__CompoundLengthsOffset))
+	writer.Write4At(offset+36+4, uint32(__CompoundLengthsSize))
+	writer.Write4At(offset+36+8, uint32(__CompoundLengthsCap))
+	writer.Write4At(offset+36+12, uint32(4))
+	if len(x.CompoundLengths) > 0 {
+		if rockmem.IsDebugEnabled() {
+			fmt.Printf("Writing slice CompoundLengths: len=%d, size=%d\n", len(x.CompoundLengths), __CompoundLengthsSize)
+		}
+		writer.WriteAt(__CompoundLengthsOffset, unsafe.Slice((*byte)(unsafe.Pointer(&x.CompoundLengths[0])), __CompoundLengthsSize))
+	}
+	__CompoundDataSize := uint(2 * len(x.CompoundData))
+	__CompoundDataCap := __CompoundDataSize
+	__CompoundDataOffset, err := writer.Alloc(__CompoundDataSize)
+	if err != nil {
+		return 0, err
+	}
+	writer.Write4At(offset+52+0, uint32(__CompoundDataOffset))
+	writer.Write4At(offset+52+4, uint32(__CompoundDataSize))
+	writer.Write4At(offset+52+8, uint32(__CompoundDataCap))
+	writer.Write4At(offset+52+12, uint32(2))
+	if len(x.CompoundData) > 0 {
+		if rockmem.IsDebugEnabled() {
+			fmt.Printf("Writing slice CompoundData: len=%d, size=%d\n", len(x.CompoundData), __CompoundDataSize)
+		}
+		writer.WriteAt(__CompoundDataOffset, unsafe.Slice((*byte)(unsafe.Pointer(&x.CompoundData[0])), __CompoundDataSize))
+	}
+	__IndicesSize := uint(4 * len(x.Indices))
+	__IndicesCap := __IndicesSize
+	__IndicesOffset, err := writer.Alloc(__IndicesSize)
+	if err != nil {
+		return 0, err
+	}
+	writer.Write4At(offset+68+0, uint32(__IndicesOffset))
+	writer.Write4At(offset+68+4, uint32(__IndicesSize))
+	writer.Write4At(offset+68+8, uint32(__IndicesCap))
+	writer.Write4At(offset+68+12, uint32(4))
+	if len(x.Indices) > 0 {
+		if rockmem.IsDebugEnabled() {
+			fmt.Printf("Writing slice Indices: len=%d, size=%d\n", len(x.Indices), __IndicesSize)
+		}
+		writer.WriteAt(__IndicesOffset, unsafe.Slice((*byte)(unsafe.Pointer(&x.Indices[0])), __IndicesSize))
+	}
+	__Idx2KeySize := uint(4 * len(x.Idx2Key))
+	__Idx2KeyCap := __Idx2KeySize
+	__Idx2KeyOffset, err := writer.Alloc(__Idx2KeySize)
+	if err != nil {
+		return 0, err
+	}
+	writer.Write4At(offset+84+0, uint32(__Idx2KeyOffset))
+	writer.Write4At(offset+84+4, uint32(__Idx2KeySize))
+	writer.Write4At(offset+84+8, uint32(__Idx2KeyCap))
+	writer.Write4At(offset+84+12, uint32(4))
+	if len(x.Idx2Key) > 0 {
+		if rockmem.IsDebugEnabled() {
+			fmt.Printf("Writing slice Idx2Key: len=%d, size=%d\n", len(x.Idx2Key), __Idx2KeySize)
+		}
+		writer.WriteAt(__Idx2KeyOffset, unsafe.Slice((*byte)(unsafe.Pointer(&x.Idx2Key[0])), __Idx2KeySize))
+	}
+	__MaxKeyOffset := offset + 100
+	writer.Write8At(__MaxKeyOffset, *(*uint64)(unsafe.Pointer(&x.MaxKey)))
+	__ShrinkThresholdOffset := offset + 108
+	writer.Write4At(__ShrinkThresholdOffset, *(*uint32)(unsafe.Pointer(&x.ShrinkThreshold)))
+	__InitSizeOffset := offset + 112
+	writer.Write4At(__InitSizeOffset, *(*uint32)(unsafe.Pointer(&x.InitSize)))
+	__IsKOrderOffset := offset + 116
+	writer.Write1At(__IsKOrderOffset, *(*uint8)(unsafe.Pointer(&x.IsKOrder)))
+
+	return offset, nil
+}
+
+// WriteDefault writes the SerializableEntitySetData default value to the writer at the specified offset
+func (x *SerializableEntitySetData) WriteDefault(writer rockmem.Writer, start uint) (offset uint, err error) {
+	offset = start
+	size := uint(117)
+	if offset == 0 {
+		offset, err = writer.Alloc(size)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	writer.Write4At(offset, uint32(size))
+
+	return offset, nil
+}
+
+func (x *SerializableEntitySetData) ReadAsRoot(reader *rockmem.Reader) {
+	x.Read(NewSerializableEntitySetDataViewer(reader, 0), reader)
+}
+
+func (x *SerializableEntitySetData) ReadWithOffset(reader *rockmem.Reader, offset uint32) {
+	x.Read(NewSerializableEntitySetDataViewer(reader, offset), reader)
+}
+
+func (x *SerializableEntitySetData) Read(viewer *SerializableEntitySetDataViewer, reader *rockmem.Reader) {
+	if viewer == nil {
+		return
+	}
+	__EntityIdsSlice := viewer.EntityIds(reader)
+	__EntityIdsLen := len(__EntityIdsSlice)
+	if __EntityIdsLen > cap(x.EntityIds) {
+		x.EntityIds = make([]int64, __EntityIdsLen)
+	} else {
+		x.EntityIds = x.EntityIds[:__EntityIdsLen]
+	}
+	copy(x.EntityIds, __EntityIdsSlice)
+	__CompoundOffsetsSlice := viewer.CompoundOffsets(reader)
+	__CompoundOffsetsLen := len(__CompoundOffsetsSlice)
+	if __CompoundOffsetsLen > cap(x.CompoundOffsets) {
+		x.CompoundOffsets = make([]int32, __CompoundOffsetsLen)
+	} else {
+		x.CompoundOffsets = x.CompoundOffsets[:__CompoundOffsetsLen]
+	}
+	copy(x.CompoundOffsets, __CompoundOffsetsSlice)
+	__CompoundLengthsSlice := viewer.CompoundLengths(reader)
+	__CompoundLengthsLen := len(__CompoundLengthsSlice)
+	if __CompoundLengthsLen > cap(x.CompoundLengths) {
+		x.CompoundLengths = make([]int32, __CompoundLengthsLen)
+	} else {
+		x.CompoundLengths = x.CompoundLengths[:__CompoundLengthsLen]
+	}
+	copy(x.CompoundLengths, __CompoundLengthsSlice)
+	__CompoundDataSlice := viewer.CompoundData(reader)
+	__CompoundDataLen := len(__CompoundDataSlice)
+	if __CompoundDataLen > cap(x.CompoundData) {
+		x.CompoundData = make([]uint16, __CompoundDataLen)
+	} else {
+		x.CompoundData = x.CompoundData[:__CompoundDataLen]
+	}
+	copy(x.CompoundData, __CompoundDataSlice)
+	__IndicesSlice := viewer.Indices(reader)
+	__IndicesLen := len(__IndicesSlice)
+	if __IndicesLen > cap(x.Indices) {
+		x.Indices = make([]int32, __IndicesLen)
+	} else {
+		x.Indices = x.Indices[:__IndicesLen]
+	}
+	copy(x.Indices, __IndicesSlice)
+	__Idx2KeySlice := viewer.Idx2Key(reader)
+	__Idx2KeyLen := len(__Idx2KeySlice)
+	if __Idx2KeyLen > cap(x.Idx2Key) {
+		x.Idx2Key = make([]int32, __Idx2KeyLen)
+	} else {
+		x.Idx2Key = x.Idx2Key[:__Idx2KeyLen]
+	}
+	copy(x.Idx2Key, __Idx2KeySlice)
+	x.MaxKey = viewer.MaxKey()
+	x.ShrinkThreshold = viewer.ShrinkThreshold()
+	x.InitSize = viewer.InitSize()
+	x.IsKOrder = viewer.IsKOrder()
+}
+
+type SerializableUSetDataViewer [44]byte
 
 func NewSerializableUSetDataViewer(reader *rockmem.Reader, offset uint32) (v *SerializableUSetDataViewer) {
-	if !reader.IsValidOffset(offset, 40) {
+	if !reader.IsValidOffset(offset, 44) {
 		return (*SerializableUSetDataViewer)(unsafe.Pointer(&_Null_ecs[0]))
 	}
 	v = (*SerializableUSetDataViewer)(unsafe.Add(reader.Pointer, offset))
+	if !reader.IsValidOffset(offset, v.size()) {
+		return (*SerializableUSetDataViewer)(unsafe.Pointer(&_Null_ecs[0]))
+	}
 	return v
 }
 
 func (x *SerializableUSetDataViewer) size() uint32 {
-	return 40
+	return *(*uint32)(unsafe.Pointer(x))
 }
 
 func (x *SerializableUSetDataViewer) RockmemReader() *rockmem.Reader {
@@ -146,25 +551,187 @@ func (x *SerializableUSetDataViewer) RockmemReader() *rockmem.Reader {
 }
 
 func (x *SerializableUSetDataViewer) EleSize() (v uint64) {
-	return *(*uint64)(unsafe.Add(unsafe.Pointer(x), 0))
+	return *(*uint64)(unsafe.Add(unsafe.Pointer(x), 4))
 }
 
 func (x *SerializableUSetDataViewer) Len() (v int64) {
-	return *(*int64)(unsafe.Add(unsafe.Pointer(x), 8))
+	return *(*int64)(unsafe.Add(unsafe.Pointer(x), 12))
 }
 
 func (x *SerializableUSetDataViewer) InitSize() (v int64) {
-	return *(*int64)(unsafe.Add(unsafe.Pointer(x), 16))
+	return *(*int64)(unsafe.Add(unsafe.Pointer(x), 20))
 }
 
 func (x *SerializableUSetDataViewer) Data(reader *rockmem.Reader) (v []byte) {
-	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 24))
-	size := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 24+4))
+	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 28))
+	size := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 28+4))
 	if !reader.IsValidOffset(uint32(offset), size) {
 		return []byte{}
 	}
 	length := uintptr(size / 1)
 	return unsafe.Slice((*byte)(unsafe.Add(reader.Pointer, offset)), length)
+}
+
+type SerializableSparseArrayDataViewer [57]byte
+
+func NewSerializableSparseArrayDataViewer(reader *rockmem.Reader, offset uint32) (v *SerializableSparseArrayDataViewer) {
+	if !reader.IsValidOffset(offset, 57) {
+		return (*SerializableSparseArrayDataViewer)(unsafe.Pointer(&_Null_ecs[0]))
+	}
+	v = (*SerializableSparseArrayDataViewer)(unsafe.Add(reader.Pointer, offset))
+	if !reader.IsValidOffset(offset, v.size()) {
+		return (*SerializableSparseArrayDataViewer)(unsafe.Pointer(&_Null_ecs[0]))
+	}
+	return v
+}
+
+func (x *SerializableSparseArrayDataViewer) size() uint32 {
+	return *(*uint32)(unsafe.Pointer(x))
+}
+
+func (x *SerializableSparseArrayDataViewer) RockmemReader() *rockmem.Reader {
+	return rockmem.NewReader(x[:])
+}
+
+func (x *SerializableSparseArrayDataViewer) USetData(reader *rockmem.Reader) (v *SerializableUSetDataViewer) {
+	if 4+4 > x.size() {
+		return (*SerializableUSetDataViewer)(unsafe.Pointer(&_Null_ecs[0]))
+	}
+	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 4))
+	return NewSerializableUSetDataViewer(reader, offset)
+}
+
+func (x *SerializableSparseArrayDataViewer) Indices(reader *rockmem.Reader) (v []int32) {
+	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 8))
+	size := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 8+4))
+	if !reader.IsValidOffset(uint32(offset), size) {
+		return []int32{}
+	}
+	length := uintptr(size / 4)
+	return unsafe.Slice((*int32)(unsafe.Add(reader.Pointer, offset)), length)
+}
+
+func (x *SerializableSparseArrayDataViewer) Idx2Key(reader *rockmem.Reader) (v []int32) {
+	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 24))
+	size := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 24+4))
+	if !reader.IsValidOffset(uint32(offset), size) {
+		return []int32{}
+	}
+	length := uintptr(size / 4)
+	return unsafe.Slice((*int32)(unsafe.Add(reader.Pointer, offset)), length)
+}
+
+func (x *SerializableSparseArrayDataViewer) MaxKey() (v int64) {
+	return *(*int64)(unsafe.Add(unsafe.Pointer(x), 40))
+}
+
+func (x *SerializableSparseArrayDataViewer) ShrinkThreshold() (v int32) {
+	return *(*int32)(unsafe.Add(unsafe.Pointer(x), 48))
+}
+
+func (x *SerializableSparseArrayDataViewer) InitSize() (v int32) {
+	return *(*int32)(unsafe.Add(unsafe.Pointer(x), 52))
+}
+
+func (x *SerializableSparseArrayDataViewer) IsKOrder() (v bool) {
+	return *(*bool)(unsafe.Add(unsafe.Pointer(x), 56))
+}
+
+type SerializableEntitySetDataViewer [117]byte
+
+func NewSerializableEntitySetDataViewer(reader *rockmem.Reader, offset uint32) (v *SerializableEntitySetDataViewer) {
+	if !reader.IsValidOffset(offset, 117) {
+		return (*SerializableEntitySetDataViewer)(unsafe.Pointer(&_Null_ecs[0]))
+	}
+	v = (*SerializableEntitySetDataViewer)(unsafe.Add(reader.Pointer, offset))
+	if !reader.IsValidOffset(offset, v.size()) {
+		return (*SerializableEntitySetDataViewer)(unsafe.Pointer(&_Null_ecs[0]))
+	}
+	return v
+}
+
+func (x *SerializableEntitySetDataViewer) size() uint32 {
+	return *(*uint32)(unsafe.Pointer(x))
+}
+
+func (x *SerializableEntitySetDataViewer) RockmemReader() *rockmem.Reader {
+	return rockmem.NewReader(x[:])
+}
+
+func (x *SerializableEntitySetDataViewer) EntityIds(reader *rockmem.Reader) (v []int64) {
+	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 4))
+	size := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 4+4))
+	if !reader.IsValidOffset(uint32(offset), size) {
+		return []int64{}
+	}
+	length := uintptr(size / 8)
+	return unsafe.Slice((*int64)(unsafe.Add(reader.Pointer, offset)), length)
+}
+
+func (x *SerializableEntitySetDataViewer) CompoundOffsets(reader *rockmem.Reader) (v []int32) {
+	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 20))
+	size := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 20+4))
+	if !reader.IsValidOffset(uint32(offset), size) {
+		return []int32{}
+	}
+	length := uintptr(size / 4)
+	return unsafe.Slice((*int32)(unsafe.Add(reader.Pointer, offset)), length)
+}
+
+func (x *SerializableEntitySetDataViewer) CompoundLengths(reader *rockmem.Reader) (v []int32) {
+	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 36))
+	size := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 36+4))
+	if !reader.IsValidOffset(uint32(offset), size) {
+		return []int32{}
+	}
+	length := uintptr(size / 4)
+	return unsafe.Slice((*int32)(unsafe.Add(reader.Pointer, offset)), length)
+}
+
+func (x *SerializableEntitySetDataViewer) CompoundData(reader *rockmem.Reader) (v []uint16) {
+	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 52))
+	size := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 52+4))
+	if !reader.IsValidOffset(uint32(offset), size) {
+		return []uint16{}
+	}
+	length := uintptr(size / 2)
+	return unsafe.Slice((*uint16)(unsafe.Add(reader.Pointer, offset)), length)
+}
+
+func (x *SerializableEntitySetDataViewer) Indices(reader *rockmem.Reader) (v []int32) {
+	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 68))
+	size := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 68+4))
+	if !reader.IsValidOffset(uint32(offset), size) {
+		return []int32{}
+	}
+	length := uintptr(size / 4)
+	return unsafe.Slice((*int32)(unsafe.Add(reader.Pointer, offset)), length)
+}
+
+func (x *SerializableEntitySetDataViewer) Idx2Key(reader *rockmem.Reader) (v []int32) {
+	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 84))
+	size := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 84+4))
+	if !reader.IsValidOffset(uint32(offset), size) {
+		return []int32{}
+	}
+	length := uintptr(size / 4)
+	return unsafe.Slice((*int32)(unsafe.Add(reader.Pointer, offset)), length)
+}
+
+func (x *SerializableEntitySetDataViewer) MaxKey() (v int64) {
+	return *(*int64)(unsafe.Add(unsafe.Pointer(x), 100))
+}
+
+func (x *SerializableEntitySetDataViewer) ShrinkThreshold() (v int32) {
+	return *(*int32)(unsafe.Add(unsafe.Pointer(x), 108))
+}
+
+func (x *SerializableEntitySetDataViewer) InitSize() (v int32) {
+	return *(*int32)(unsafe.Add(unsafe.Pointer(x), 112))
+}
+
+func (x *SerializableEntitySetDataViewer) IsKOrder() (v bool) {
+	return *(*bool)(unsafe.Add(unsafe.Pointer(x), 116))
 }
 
 type SerializableUSetDataModifier struct {
@@ -180,27 +747,195 @@ func newSerializableUSetDataModifierByViewer(viewer *SerializableUSetDataViewer)
 }
 
 func (x *SerializableUSetDataModifier) SetEleSize(v uint64) {
-	*(*uint64)(unsafe.Add(unsafe.Pointer(x.SerializableUSetDataViewer), 0)) = v
+	*(*uint64)(unsafe.Add(unsafe.Pointer(x.SerializableUSetDataViewer), 4)) = v
 }
 
 func (x *SerializableUSetDataModifier) SetLen(v int64) {
-	*(*int64)(unsafe.Add(unsafe.Pointer(x.SerializableUSetDataViewer), 8)) = v
+	*(*int64)(unsafe.Add(unsafe.Pointer(x.SerializableUSetDataViewer), 12)) = v
 }
 
 func (x *SerializableUSetDataModifier) SetInitSize(v int64) {
-	*(*int64)(unsafe.Add(unsafe.Pointer(x.SerializableUSetDataViewer), 16)) = v
+	*(*int64)(unsafe.Add(unsafe.Pointer(x.SerializableUSetDataViewer), 20)) = v
 }
 
 func (x *SerializableUSetDataModifier) SetData(v []byte) error {
-	cap := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableUSetDataViewer), 24+8))
+	cap := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableUSetDataViewer), 28+8))
 	newSize := 1 * uint32(len(v))
 	if newSize > cap {
 		return errors.New("invalid size, new size must less than capacity")
 	}
-	*(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableUSetDataViewer), 24+4)) = newSize
-	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableUSetDataViewer), 24+0))
+	*(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableUSetDataViewer), 28+4)) = newSize
+	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableUSetDataViewer), 28+0))
 	srcData := unsafe.Slice((*byte)(unsafe.Pointer(&v[0])), newSize)
 	dstData := unsafe.Slice((*byte)(unsafe.Add(unsafe.Pointer(x.SerializableUSetDataViewer), offset)), newSize)
 	copy(dstData, srcData)
 	return nil
+}
+
+type SerializableSparseArrayDataModifier struct {
+	*SerializableSparseArrayDataViewer
+}
+
+func NewSerializableSparseArrayDataModifier(reader *rockmem.Reader, offset uint32) (v SerializableSparseArrayDataModifier) {
+	return SerializableSparseArrayDataModifier{NewSerializableSparseArrayDataViewer(reader, offset)}
+}
+
+func newSerializableSparseArrayDataModifierByViewer(viewer *SerializableSparseArrayDataViewer) (v SerializableSparseArrayDataModifier) {
+	return SerializableSparseArrayDataModifier{viewer}
+}
+
+func (x *SerializableSparseArrayDataModifier) SetIndices(v []int32) error {
+	cap := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableSparseArrayDataViewer), 8+8))
+	newSize := 4 * uint32(len(v))
+	if newSize > cap {
+		return errors.New("invalid size, new size must less than capacity")
+	}
+	*(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableSparseArrayDataViewer), 8+4)) = newSize
+	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableSparseArrayDataViewer), 8+0))
+	srcData := unsafe.Slice((*byte)(unsafe.Pointer(&v[0])), newSize)
+	dstData := unsafe.Slice((*byte)(unsafe.Add(unsafe.Pointer(x.SerializableSparseArrayDataViewer), offset)), newSize)
+	copy(dstData, srcData)
+	return nil
+}
+
+func (x *SerializableSparseArrayDataModifier) SetIdx2Key(v []int32) error {
+	cap := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableSparseArrayDataViewer), 24+8))
+	newSize := 4 * uint32(len(v))
+	if newSize > cap {
+		return errors.New("invalid size, new size must less than capacity")
+	}
+	*(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableSparseArrayDataViewer), 24+4)) = newSize
+	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableSparseArrayDataViewer), 24+0))
+	srcData := unsafe.Slice((*byte)(unsafe.Pointer(&v[0])), newSize)
+	dstData := unsafe.Slice((*byte)(unsafe.Add(unsafe.Pointer(x.SerializableSparseArrayDataViewer), offset)), newSize)
+	copy(dstData, srcData)
+	return nil
+}
+
+func (x *SerializableSparseArrayDataModifier) SetMaxKey(v int64) {
+	*(*int64)(unsafe.Add(unsafe.Pointer(x.SerializableSparseArrayDataViewer), 40)) = v
+}
+
+func (x *SerializableSparseArrayDataModifier) SetShrinkThreshold(v int32) {
+	*(*int32)(unsafe.Add(unsafe.Pointer(x.SerializableSparseArrayDataViewer), 48)) = v
+}
+
+func (x *SerializableSparseArrayDataModifier) SetInitSize(v int32) {
+	*(*int32)(unsafe.Add(unsafe.Pointer(x.SerializableSparseArrayDataViewer), 52)) = v
+}
+
+func (x *SerializableSparseArrayDataModifier) SetIsKOrder(v bool) {
+	*(*bool)(unsafe.Add(unsafe.Pointer(x.SerializableSparseArrayDataViewer), 56)) = v
+}
+
+type SerializableEntitySetDataModifier struct {
+	*SerializableEntitySetDataViewer
+}
+
+func NewSerializableEntitySetDataModifier(reader *rockmem.Reader, offset uint32) (v SerializableEntitySetDataModifier) {
+	return SerializableEntitySetDataModifier{NewSerializableEntitySetDataViewer(reader, offset)}
+}
+
+func newSerializableEntitySetDataModifierByViewer(viewer *SerializableEntitySetDataViewer) (v SerializableEntitySetDataModifier) {
+	return SerializableEntitySetDataModifier{viewer}
+}
+
+func (x *SerializableEntitySetDataModifier) SetEntityIds(v []int64) error {
+	cap := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 4+8))
+	newSize := 8 * uint32(len(v))
+	if newSize > cap {
+		return errors.New("invalid size, new size must less than capacity")
+	}
+	*(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 4+4)) = newSize
+	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 4+0))
+	srcData := unsafe.Slice((*byte)(unsafe.Pointer(&v[0])), newSize)
+	dstData := unsafe.Slice((*byte)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), offset)), newSize)
+	copy(dstData, srcData)
+	return nil
+}
+
+func (x *SerializableEntitySetDataModifier) SetCompoundOffsets(v []int32) error {
+	cap := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 20+8))
+	newSize := 4 * uint32(len(v))
+	if newSize > cap {
+		return errors.New("invalid size, new size must less than capacity")
+	}
+	*(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 20+4)) = newSize
+	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 20+0))
+	srcData := unsafe.Slice((*byte)(unsafe.Pointer(&v[0])), newSize)
+	dstData := unsafe.Slice((*byte)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), offset)), newSize)
+	copy(dstData, srcData)
+	return nil
+}
+
+func (x *SerializableEntitySetDataModifier) SetCompoundLengths(v []int32) error {
+	cap := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 36+8))
+	newSize := 4 * uint32(len(v))
+	if newSize > cap {
+		return errors.New("invalid size, new size must less than capacity")
+	}
+	*(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 36+4)) = newSize
+	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 36+0))
+	srcData := unsafe.Slice((*byte)(unsafe.Pointer(&v[0])), newSize)
+	dstData := unsafe.Slice((*byte)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), offset)), newSize)
+	copy(dstData, srcData)
+	return nil
+}
+
+func (x *SerializableEntitySetDataModifier) SetCompoundData(v []uint16) error {
+	cap := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 52+8))
+	newSize := 2 * uint32(len(v))
+	if newSize > cap {
+		return errors.New("invalid size, new size must less than capacity")
+	}
+	*(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 52+4)) = newSize
+	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 52+0))
+	srcData := unsafe.Slice((*byte)(unsafe.Pointer(&v[0])), newSize)
+	dstData := unsafe.Slice((*byte)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), offset)), newSize)
+	copy(dstData, srcData)
+	return nil
+}
+
+func (x *SerializableEntitySetDataModifier) SetIndices(v []int32) error {
+	cap := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 68+8))
+	newSize := 4 * uint32(len(v))
+	if newSize > cap {
+		return errors.New("invalid size, new size must less than capacity")
+	}
+	*(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 68+4)) = newSize
+	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 68+0))
+	srcData := unsafe.Slice((*byte)(unsafe.Pointer(&v[0])), newSize)
+	dstData := unsafe.Slice((*byte)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), offset)), newSize)
+	copy(dstData, srcData)
+	return nil
+}
+
+func (x *SerializableEntitySetDataModifier) SetIdx2Key(v []int32) error {
+	cap := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 84+8))
+	newSize := 4 * uint32(len(v))
+	if newSize > cap {
+		return errors.New("invalid size, new size must less than capacity")
+	}
+	*(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 84+4)) = newSize
+	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 84+0))
+	srcData := unsafe.Slice((*byte)(unsafe.Pointer(&v[0])), newSize)
+	dstData := unsafe.Slice((*byte)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), offset)), newSize)
+	copy(dstData, srcData)
+	return nil
+}
+
+func (x *SerializableEntitySetDataModifier) SetMaxKey(v int64) {
+	*(*int64)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 100)) = v
+}
+
+func (x *SerializableEntitySetDataModifier) SetShrinkThreshold(v int32) {
+	*(*int32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 108)) = v
+}
+
+func (x *SerializableEntitySetDataModifier) SetInitSize(v int32) {
+	*(*int32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 112)) = v
+}
+
+func (x *SerializableEntitySetDataModifier) SetIsKOrder(v bool) {
+	*(*bool)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 116)) = v
 }
