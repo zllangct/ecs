@@ -4,13 +4,9 @@ import rockmem "github.com/zllangct/rockmem/golang"
 
 type ComponentIntType uint64
 
-type ComponentPointer[T ComponentObject] interface {
+type ComponentPointer[T any] interface {
 	Component
 	*T
-}
-
-type ComponentObject interface {
-	ComponentObjectIdentifier()
 }
 
 type Component interface {
@@ -24,7 +20,7 @@ func GetIntTypeByComp(com Component) ComponentIntType {
 	return ComponentIntType(com.PacketIdentifier())
 }
 
-func GetIntType[T ComponentObject, TP ComponentPointer[T]]() ComponentIntType {
+func GetIntType[T any, TP ComponentPointer[T]]() ComponentIntType {
 	return ComponentIntType(TP(nil).PacketIdentifier())
 }
 
@@ -47,5 +43,3 @@ func (d *dummyComponent) IsNomadic() bool {
 func (d *dummyComponent) IsDisposable() bool {
 	return false
 }
-
-func (d dummyComponent) ComponentObjectIdentifier() {}

@@ -12,63 +12,41 @@ type ComponentDependency interface {
 	intType() ComponentIntType
 }
 
-type Dependency uint64
+type ItDependency struct {
+	componentIntType ComponentIntType
+	isReadonly       Writable
+}
 
-const dependencyWritableFlag Dependency = 1 << 63
-
-func NewDependency(it ComponentIntType, writable ...Writable) Dependency {
-	w := ReadOnly
+func NewItDependency(it ComponentIntType, writable ...Writable) ItDependency {
 	if len(writable) > 0 {
-		w = writable[0]
+		return ItDependency{it, writable[0]}
 	}
-	if w {
-		return Dependency(it) | dependencyWritableFlag
-	} else {
-		return Dependency(it)
-	}
+
+	return ItDependency{it, ReadOnly}
 }
 
-func (r Dependency) readonly() bool {
-	return r&dependencyWritableFlag == 0
+func (r ItDependency) readonly() bool {
+	return r.isReadonly
 }
 
-func (r Dependency) intType() ComponentIntType {
-	return ComponentIntType(r &^ dependencyWritableFlag)
+func (r ItDependency) intType() ComponentIntType {
+	return r.componentIntType
 }
 
-type readonly[T ComponentObject, TP ComponentPointer[T]] struct{}
+type Dependency[T any, TP ComponentPointer[T]] bool
 
-func (r readonly[T, TP]) readonly() bool {
-	return true
+func (r Dependency[T, TP]) readonly() bool {
+	return bool(r)
 }
 
-func (r readonly[T, TP]) intType() ComponentIntType {
+func (r Dependency[T, TP]) intType() ComponentIntType {
 	return GetIntType[T, TP]()
 }
 
-type readwrite[T ComponentObject, TP ComponentPointer[T]] struct{}
-
-func (r readwrite[T, TP]) readonly() bool {
-	return false
-}
-
-func (r readwrite[T, TP]) intType() ComponentIntType {
-	return GetIntType[T, TP]()
-}
-
-func Dep2[T ComponentObject, TP ComponentPointer[T]](writable ...Writable) ComponentDependency {
+func Dep[T any, TP ComponentPointer[T]](writable ...Writable) ComponentDependency {
 	ro := ReadOnly
 	if len(writable) > 0 {
 		ro = writable[0]
 	}
-	if ro {
-		return &readwrite[T, TP]{}
-	} else {
-		return &readonly[T, TP]{}
-	}
-}
-
-func Dep[T ComponentObject, TP ComponentPointer[T]](writable ...Writable) Dependency {
-	it := GetIntType[T, TP]()
-	return NewDependency(it, writable...)
+	return (Dependency[T, TP])(!ro)
 }

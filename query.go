@@ -28,20 +28,20 @@ func WithBuddies(buddies QueryBuddies) QueryOption {
 	}
 }
 
-func WithComp[T ComponentObject, TP ComponentPointer[T]]() QueryOption {
+func WithComp[T any, TP ComponentPointer[T]]() QueryOption {
 	it := GetIntType[T, TP]()
 	return func(q *QueryConfig) {
 		q.queryBuddies.Add(it)
 	}
 }
 
-type QueryIterator struct {
+type Query struct {
 	ctx    *SystemContext
-	config QueryConfig
+	config *QueryConfig
 	minSet ComponentSet
 }
 
-func (q *QueryIterator) Iter() iter.Seq2[EntityIndex, *EntityInfo] {
+func (q *Query) Iter() iter.Seq2[EntityIndex, *EntityInfo] {
 	if !q.ctx.constraint.isValid() ||
 		len(q.config.queryBuddies) == 0 ||
 		q.minSet == nil ||

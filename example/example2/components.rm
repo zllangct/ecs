@@ -1,0 +1,35 @@
+rockmem components @package("components") @component();
+
+// GameState组件 - 游戏状态，用于验证序列化
+struct GameState inline {
+    tick int64;
+    score int32;
+    game_name [32]byte @string();
+}
+
+// Position组件 - 实体位置
+struct Position inline {
+    x float32;
+    y float32;
+    z float32;
+}
+
+// Velocity组件 - 实体速度
+struct Velocity inline {
+    x float32;
+    y float32;
+    z float32;
+}
+
+// Entity组件 - 实体基本信息
+struct EntityData inline {
+    name [16]byte @string();
+    type_id int32;
+    flags uint32;
+}
+
+// Inventory组件 - 背包（定长数组示例）
+struct Inventory inline {
+    items [8]int32;
+    count int32;
+}

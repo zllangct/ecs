@@ -6,8 +6,8 @@ import (
 
 var ECS string = "ecs"
 
-func Query(ctx *SystemContext, opt ...QueryOption) QueryIterator {
-	qi := QueryIterator{
+func NewQuery(ctx *SystemContext, opt ...QueryOption) Query {
+	qi := Query{
 		ctx: ctx,
 	}
 
@@ -15,10 +15,10 @@ func Query(ctx *SystemContext, opt ...QueryOption) QueryIterator {
 		return qi
 	}
 
-	c := QueryConfig{}
+	c := &QueryConfig{}
 	c.initDefault()
 	for _, option := range opt {
-		option(&c)
+		option(c)
 	}
 	qi.config = c
 
@@ -44,7 +44,7 @@ func Query(ctx *SystemContext, opt ...QueryOption) QueryIterator {
 	return qi
 }
 
-func GetComponents[T ComponentObject, TP ComponentPointer[T]](ctx *SystemContext) iter.Seq2[EntityIndex, *T] {
+func GetComponents[T any, TP ComponentPointer[T]](ctx *SystemContext) iter.Seq2[EntityIndex, *T] {
 	empty := func(yield func(EntityIndex, *T) bool) {
 	}
 	if !ctx.constraint.isValid() {
@@ -61,19 +61,19 @@ func GetComponents[T ComponentObject, TP ComponentPointer[T]](ctx *SystemContext
 	if !ok {
 		return empty
 	}
-	set, ok := s.(*CSet[T])
+	set, ok := s.(*CSet[T, TP])
 	if !ok {
 		return empty
 	}
 
 	if dep.readonly() {
 		return set.IterReadOnly()
-	} else {
-		return set.Iter()
 	}
+
+	return set.Iter()
 }
 
-func GetBuddy[T ComponentObject, TP ComponentPointer[T]](ctx *SystemContext, index EntityIndex) (*T, bool) {
+func GetBuddy[T any, TP ComponentPointer[T]](ctx *SystemContext, index EntityIndex) (*T, bool) {
 	if !ctx.constraint.isValid() {
 		return nil, false
 	}
@@ -93,7 +93,7 @@ func GetBuddy[T ComponentObject, TP ComponentPointer[T]](ctx *SystemContext, ind
 	}
 	if dep.readonly() {
 		return &*(*T)(b), true
-	} else {
-		return (*T)(b), true
 	}
+
+	return (*T)(b), true
 }

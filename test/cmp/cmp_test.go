@@ -63,7 +63,7 @@ func TestCmpMain(t *testing.T) {
 
 	// query
 	sys2 := func(ctx *ecs.SystemContext, event ecs.Event) error {
-		r := ecs.Query(ctx, ecs.WithComp[testdata.Point](), ecs.WithComp[testdata.Position]())
+		r := ecs.NewQuery(ctx, ecs.WithComp[testdata.Point](), ecs.WithComp[testdata.Position]())
 		for idx, _ := range r.Iter() {
 			p, _ := ecs.GetBuddy[testdata.Point](ctx, idx)
 			pos, _ := ecs.GetBuddy[testdata.Position](ctx, idx)

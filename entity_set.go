@@ -10,30 +10,30 @@ func NewEntitySet() *EntitySet {
 	}
 }
 
-func (c *EntitySet) Exist(entity Entity) bool {
+func (es *EntitySet) Exist(entity Entity) bool {
 	index := entity.Index()
-	return c.SparseArray.Exist(index)
+	return es.SparseArray.Exist(index)
 }
 
-func (c *EntitySet) Get(entity Entity) (*EntityInfo, bool) {
+func (es *EntitySet) Get(entity Entity) (*EntityInfo, bool) {
 	index := entity.Index()
-	info := c.SparseArray.Get(index)
+	info := es.SparseArray.Get(index)
 	if info == nil {
 		return nil, false
 	}
 	return info, true
 }
 
-func (c *EntitySet) Add(entityInfo EntityInfo) *EntityInfo {
+func (es *EntitySet) Add(entityInfo EntityInfo) *EntityInfo {
 	index := entityInfo.entity.Index()
-	return c.SparseArray.Add(index, &entityInfo)
+	return es.SparseArray.Add(index, &entityInfo)
 }
 
-func (c *EntitySet) Remove(entity Entity) *EntityInfo {
+func (es *EntitySet) Remove(entity Entity) *EntityInfo {
 	index := entity.Index()
-	return c.SparseArray.Remove(index)
+	return es.SparseArray.Remove(index)
 }
 
-func (c *EntitySet) getByIndex(index EntityIndex) *EntityInfo {
-	return c.SparseArray.Get(index)
+func (es *EntitySet) getByIndex(index EntityIndex) *EntityInfo {
+	return es.SparseArray.Get(index)
 }

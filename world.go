@@ -3,6 +3,8 @@ package ecs
 import (
 	"runtime"
 	"time"
+
+	rockmem "github.com/zllangct/rockmem/golang"
 )
 
 type WorldStatus int
@@ -33,6 +35,8 @@ type World interface {
 	RegisterLight(system LightSystem, Option ...SystemOption) error
 	RegisterStandard(system SystemStandard) error
 	Optimize(t time.Duration, force bool) error
+	MarshalTo(writer rockmem.Writer) (uint, error)
+	Marshal() *SerializableWorldData
 }
 
 type WorldOption func(config *WorldConfig)

@@ -1,6 +1,7 @@
 package ecs
 
 import (
+	"runtime"
 	"unsafe"
 
 	rockmem "github.com/zllangct/rockmem/golang"
@@ -136,29 +137,29 @@ func (s *SparseArray[K, V]) UnmarshalFrom(reader *rockmem.Reader) {
 
 // Marshal serializes CSet[T] to SerializableSparseArrayData
 // Since CSet embeds SparseArray, we just call the parent's Marshal method
-func (c *CSet[T]) Marshal() *SerializableSparseArrayData {
+func (c *CSet[T, TP]) Marshal() *SerializableSparseArrayData {
 	return c.SparseArray.Marshal()
 }
 
 // MarshalTo writes CSet[T] to a rockmem.Writer
-func (c *CSet[T]) MarshalTo(writer rockmem.Writer) (uint, error) {
+func (c *CSet[T, TP]) MarshalTo(writer rockmem.Writer) (uint, error) {
 	return c.SparseArray.MarshalTo(writer)
 }
 
 // Unmarshal deserializes SerializableSparseArrayData to CSet[T]
 // IMPORTANT: The caller must ensure type T matches the original serialized type
-func (c *CSet[T]) Unmarshal(data *SerializableSparseArrayData) {
+func (c *CSet[T, TP]) Unmarshal(data *SerializableSparseArrayData) {
 	c.SparseArray.Unmarshal(data)
 }
 
 // UnmarshalFrom reads CSet[T] from a rockmem.Reader
-func (c *CSet[T]) UnmarshalFrom(reader *rockmem.Reader) {
+func (c *CSet[T, TP]) UnmarshalFrom(reader *rockmem.Reader) {
 	c.SparseArray.UnmarshalFrom(reader)
 }
 
 // NewCSetFromData creates a new CSet[T] from SerializableSparseArrayData
-func NewCSetFromData[T ComponentObject](data *SerializableSparseArrayData) *CSet[T] {
-	c := &CSet[T]{}
+func NewCSetFromData[T any, TP ComponentPointer[T]](data *SerializableSparseArrayData) *CSet[T, TP] {
+	c := &CSet[T, TP]{}
 	c.Unmarshal(data)
 	return c
 }
@@ -551,7 +552,7 @@ func (w *world) UnmarshalFrom(reader *rockmem.Reader) {
 // NewWorldFromData creates a new world from SerializableWorldData
 // Note: This creates a minimal world without systems, optimizer, etc.
 // The caller should configure these runtime components after deserialization.
-func NewWorldFromData(data *SerializableWorldData, opts ...WorldOption) *world {
+func NewWorldFromData(data *SerializableWorldData, opts ...WorldOption) World {
 	c := &WorldConfig{}
 	c.initDefault()
 	for _, opt := range opts {
@@ -561,6 +562,15 @@ func NewWorldFromData(data *SerializableWorldData, opts ...WorldOption) *world {
 	w := &world{}
 	w.status = WorldStatusInitializing
 	w.config = c
+
+	// Initialize runtime components (these are not serialized)
+	flowExecOpt := WithFlowSyncMode()
+	if c.ExecuteMode == ExecuteModeParallel {
+		flowExecOpt = WithFlowASyncMode()
+	}
+	w.systems = newSystemFlow(w, flowExecOpt)
+	w.opLog = NewOpLog(w, runtime.NumCPU())
+	w.optimizer = newOptimizer(w)
 
 	// Unmarshal the serializable state
 	w.Unmarshal(data)

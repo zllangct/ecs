@@ -4,9 +4,8 @@ package ecs
 import (
 	"errors"
 	"fmt"
-	"unsafe"
-
 	rockmem "github.com/zllangct/rockmem/golang"
+	"unsafe"
 )
 
 var _ unsafe.Pointer
@@ -126,7 +125,14 @@ func (x *SerializableUSetData) Read(viewer *SerializableUSetDataViewer, reader *
 	x.EleSize = viewer.EleSize()
 	x.Len = viewer.Len()
 	x.InitSize = viewer.InitSize()
-	x.Data = viewer.Data(reader)
+	__DataSlice := viewer.Data(reader)
+	__DataLen := len(__DataSlice)
+	if __DataLen > cap(x.Data) {
+		x.Data = make([]byte, __DataLen)
+	} else {
+		x.Data = x.Data[:__DataLen]
+	}
+	copy(x.Data, __DataSlice)
 }
 
 // SerializableSparseArrayData SparseArray serializable data structure
@@ -264,8 +270,22 @@ func (x *SerializableSparseArrayData) Read(viewer *SerializableSparseArrayDataVi
 		return
 	}
 	x.USetData.Read(viewer.USetData(reader), reader)
-	x.Indices = viewer.Indices(reader)
-	x.Idx2Key = viewer.Idx2Key(reader)
+	__IndicesSlice := viewer.Indices(reader)
+	__IndicesLen := len(__IndicesSlice)
+	if __IndicesLen > cap(x.Indices) {
+		x.Indices = make([]int32, __IndicesLen)
+	} else {
+		x.Indices = x.Indices[:__IndicesLen]
+	}
+	copy(x.Indices, __IndicesSlice)
+	__Idx2KeySlice := viewer.Idx2Key(reader)
+	__Idx2KeyLen := len(__Idx2KeySlice)
+	if __Idx2KeyLen > cap(x.Idx2Key) {
+		x.Idx2Key = make([]int32, __Idx2KeyLen)
+	} else {
+		x.Idx2Key = x.Idx2Key[:__Idx2KeyLen]
+	}
+	copy(x.Idx2Key, __Idx2KeySlice)
 	x.MaxKey = viewer.MaxKey()
 	x.ShrinkThreshold = viewer.ShrinkThreshold()
 	x.InitSize = viewer.InitSize()
@@ -458,12 +478,54 @@ func (x *SerializableEntitySetData) Read(viewer *SerializableEntitySetDataViewer
 	if viewer == nil {
 		return
 	}
-	x.EntityIds = viewer.EntityIds(reader)
-	x.CompoundOffsets = viewer.CompoundOffsets(reader)
-	x.CompoundLengths = viewer.CompoundLengths(reader)
-	x.CompoundData = viewer.CompoundData(reader)
-	x.Indices = viewer.Indices(reader)
-	x.Idx2Key = viewer.Idx2Key(reader)
+	__EntityIdsSlice := viewer.EntityIds(reader)
+	__EntityIdsLen := len(__EntityIdsSlice)
+	if __EntityIdsLen > cap(x.EntityIds) {
+		x.EntityIds = make([]int64, __EntityIdsLen)
+	} else {
+		x.EntityIds = x.EntityIds[:__EntityIdsLen]
+	}
+	copy(x.EntityIds, __EntityIdsSlice)
+	__CompoundOffsetsSlice := viewer.CompoundOffsets(reader)
+	__CompoundOffsetsLen := len(__CompoundOffsetsSlice)
+	if __CompoundOffsetsLen > cap(x.CompoundOffsets) {
+		x.CompoundOffsets = make([]int32, __CompoundOffsetsLen)
+	} else {
+		x.CompoundOffsets = x.CompoundOffsets[:__CompoundOffsetsLen]
+	}
+	copy(x.CompoundOffsets, __CompoundOffsetsSlice)
+	__CompoundLengthsSlice := viewer.CompoundLengths(reader)
+	__CompoundLengthsLen := len(__CompoundLengthsSlice)
+	if __CompoundLengthsLen > cap(x.CompoundLengths) {
+		x.CompoundLengths = make([]int32, __CompoundLengthsLen)
+	} else {
+		x.CompoundLengths = x.CompoundLengths[:__CompoundLengthsLen]
+	}
+	copy(x.CompoundLengths, __CompoundLengthsSlice)
+	__CompoundDataSlice := viewer.CompoundData(reader)
+	__CompoundDataLen := len(__CompoundDataSlice)
+	if __CompoundDataLen > cap(x.CompoundData) {
+		x.CompoundData = make([]uint64, __CompoundDataLen)
+	} else {
+		x.CompoundData = x.CompoundData[:__CompoundDataLen]
+	}
+	copy(x.CompoundData, __CompoundDataSlice)
+	__IndicesSlice := viewer.Indices(reader)
+	__IndicesLen := len(__IndicesSlice)
+	if __IndicesLen > cap(x.Indices) {
+		x.Indices = make([]int32, __IndicesLen)
+	} else {
+		x.Indices = x.Indices[:__IndicesLen]
+	}
+	copy(x.Indices, __IndicesSlice)
+	__Idx2KeySlice := viewer.Idx2Key(reader)
+	__Idx2KeyLen := len(__Idx2KeySlice)
+	if __Idx2KeyLen > cap(x.Idx2Key) {
+		x.Idx2Key = make([]int32, __Idx2KeyLen)
+	} else {
+		x.Idx2Key = x.Idx2Key[:__Idx2KeyLen]
+	}
+	copy(x.Idx2Key, __Idx2KeySlice)
 	x.MaxKey = viewer.MaxKey()
 	x.ShrinkThreshold = viewer.ShrinkThreshold()
 	x.InitSize = viewer.InitSize()
@@ -588,11 +650,25 @@ func (x *SerializableEntityIDGeneratorData) Read(viewer *SerializableEntityIDGen
 	if viewer == nil {
 		return
 	}
-	x.Ids = viewer.Ids(reader)
+	__IdsSlice := viewer.Ids(reader)
+	__IdsLen := len(__IdsSlice)
+	if __IdsLen > cap(x.Ids) {
+		x.Ids = make([]int64, __IdsLen)
+	} else {
+		x.Ids = x.Ids[:__IdsLen]
+	}
+	copy(x.Ids, __IdsSlice)
 	x.Free = viewer.Free()
 	x.Pending = viewer.Pending()
 	x.Len = viewer.Len()
-	x.RemoveDelay = viewer.RemoveDelay(reader)
+	__RemoveDelaySlice := viewer.RemoveDelay(reader)
+	__RemoveDelayLen := len(__RemoveDelaySlice)
+	if __RemoveDelayLen > cap(x.RemoveDelay) {
+		x.RemoveDelay = make([]int64, __RemoveDelayLen)
+	} else {
+		x.RemoveDelay = x.RemoveDelay[:__RemoveDelayLen]
+	}
+	copy(x.RemoveDelay, __RemoveDelaySlice)
 	x.DelayFree = viewer.DelayFree()
 	x.DelayCap = viewer.DelayCap()
 }
@@ -864,16 +940,35 @@ func (x *SerializableWorldData) Read(viewer *SerializableWorldDataViewer, reader
 	}
 	x.Entities.Read(viewer.Entities(reader), reader)
 	x.IdGenerator.Read(viewer.IdGenerator(reader), reader)
-	__ComponentSetsViewerSlice := viewer.ComponentSets(reader)
-	if len(__ComponentSetsViewerSlice) > 0 {
-		x.ComponentSets = make([]SerializableComponentSetEntry, len(__ComponentSetsViewerSlice))
-		for i := range x.ComponentSets {
-			x.ComponentSets[i].Read(&__ComponentSetsViewerSlice[i], reader)
-		}
+	__ComponentSetsSlice := viewer.ComponentSets(reader)
+	__ComponentSetsLen := len(__ComponentSetsSlice)
+	if __ComponentSetsLen > cap(x.ComponentSets) {
+		x.ComponentSets = append(x.ComponentSets, make([]SerializableComponentSetEntry, __ComponentSetsLen-len(x.ComponentSets))...)
 	}
+	if __ComponentSetsLen > len(x.ComponentSets) {
+		x.ComponentSets = x.ComponentSets[:__ComponentSetsLen]
+	}
+	for i := 0; i < __ComponentSetsLen; i++ {
+		x.ComponentSets[i].Read(&__ComponentSetsSlice[i], reader)
+	}
+	x.ComponentSets = x.ComponentSets[:__ComponentSetsLen]
 	x.Frame = viewer.Frame()
-	x.DisposableTypes = viewer.DisposableTypes(reader)
-	x.NomadicTypes = viewer.NomadicTypes(reader)
+	__DisposableTypesSlice := viewer.DisposableTypes(reader)
+	__DisposableTypesLen := len(__DisposableTypesSlice)
+	if __DisposableTypesLen > cap(x.DisposableTypes) {
+		x.DisposableTypes = make([]uint64, __DisposableTypesLen)
+	} else {
+		x.DisposableTypes = x.DisposableTypes[:__DisposableTypesLen]
+	}
+	copy(x.DisposableTypes, __DisposableTypesSlice)
+	__NomadicTypesSlice := viewer.NomadicTypes(reader)
+	__NomadicTypesLen := len(__NomadicTypesSlice)
+	if __NomadicTypesLen > cap(x.NomadicTypes) {
+		x.NomadicTypes = make([]uint64, __NomadicTypesLen)
+	} else {
+		x.NomadicTypes = x.NomadicTypes[:__NomadicTypesLen]
+	}
+	copy(x.NomadicTypes, __NomadicTypesSlice)
 }
 
 type SerializableUSetDataViewer [44]byte

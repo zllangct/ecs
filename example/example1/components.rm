@@ -1,0 +1,36 @@
+rockmem components @package("components") @component();
+
+// Position组件 - 表示实体的位置
+struct Position inline {
+    x float32;
+    y float32;
+    z float32;
+}
+
+// Velocity组件 - 表示实体的速度
+struct Velocity inline {
+    x float32;
+    y float32;
+    z float32;
+}
+
+// Player组件 - 表示玩家信息
+struct Player inline {
+    name [32]byte @string();
+    level int32;
+    health float32;
+    max_health float32;
+}
+
+// Health组件 - 表示生命值
+struct Health inline {
+    current float32;
+    max float32;
+}
+
+// DamageEvent组件 - 一次性伤害事件
+struct DamageEvent inline @disposable() {
+    damage float32;
+    source_id int64;
+    target_id int64;
+}

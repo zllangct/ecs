@@ -5,7 +5,7 @@ import (
 	"unsafe"
 )
 
-var EnableShrink = false
+var EnableShrink = true
 
 const (
 	InitMaxSize = 64

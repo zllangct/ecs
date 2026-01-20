@@ -29,20 +29,20 @@ type SystemInfo interface {
 	getState() SystemState
 	setState(state SystemState)
 	getType() SystemType
-	getDeps() []Dependency
+	getDeps() []ComponentDependency
 	id() uint64
 	name() string
 	getOrder() Order
 	getRaw() any
 	impl(stage Stage) bool
 	getContext() *SystemContext
-	getDep(intType ComponentIntType) (Dependency, bool)
+	getDep(intType ComponentIntType) (ComponentDependency, bool)
 	getOptReporter() *optReporter
 }
 
 type SystemConfig struct {
 	name         string
-	dependencies []Dependency
+	dependencies []ComponentDependency
 	stage        Stage
 	order        Order
 }
@@ -55,15 +55,21 @@ func (s *SystemConfig) initDefault() {
 
 type SystemOption func(config *SystemConfig)
 
-func WithDeps(comp ...Dependency) SystemOption {
+func WithDeps(comp ...ComponentDependency) SystemOption {
 	return func(c *SystemConfig) {
 		c.dependencies = append(c.dependencies, comp...)
 	}
 }
 
-func WithDep[T ComponentObject, TP ComponentPointer[T]](writable ...Writable) SystemOption {
+func WithDep[T any, TP ComponentPointer[T]](writable ...Writable) SystemOption {
 	return func(c *SystemConfig) {
 		c.dependencies = append(c.dependencies, Dep[T, TP](writable...))
+	}
+}
+
+func WithDepReadOnly[T any, TP ComponentPointer[T]]() SystemOption {
+	return func(c *SystemConfig) {
+		c.dependencies = append(c.dependencies, Dep[T, TP](true))
 	}
 }
 
@@ -142,13 +148,13 @@ func (s *SystemInfoInstance) init(opts ...SystemOption) {
 	}
 }
 
-func (s *SystemInfoInstance) getDep(it ComponentIntType) (Dependency, bool) {
+func (s *SystemInfoInstance) getDep(it ComponentIntType) (ComponentDependency, bool) {
 	for _, d := range s.config.dependencies {
 		if d.intType() == it {
 			return d, true
 		}
 	}
-	return 0, false
+	return nil, false
 }
 
 func (s *SystemInfoInstance) getContext() *SystemContext {
@@ -181,7 +187,7 @@ func (s *SystemInfoInstance) getRaw() any {
 	return s.raw
 }
 
-func (s *SystemInfoInstance) getDeps() []Dependency {
+func (s *SystemInfoInstance) getDeps() []ComponentDependency {
 	return s.config.dependencies
 }
 

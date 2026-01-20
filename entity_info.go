@@ -21,6 +21,11 @@ type EntityInfo struct {
 	world    *world
 }
 
+// Entity returns the entity ID
+func (e *EntityInfo) Entity() Entity {
+	return e.entity
+}
+
 func (e *EntityInfo) Add(comps ...Component) *EntityInfo {
 	for _, comp := range comps {
 		if e.compound.Exist(GetIntTypeByComp(comp)) {

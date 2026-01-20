@@ -609,8 +609,6 @@ func (t *testWorldComponent) IsDisposable() bool {
 	return false
 }
 
-func (testWorldComponent) ComponentObjectIdentifier() {}
-
 // Test component 2 for world serialization tests
 type testWorldComponent2 struct {
 	X float32
@@ -632,8 +630,6 @@ func (t *testWorldComponent2) IsNomadic() bool {
 func (t *testWorldComponent2) IsDisposable() bool {
 	return false
 }
-
-func (testWorldComponent2) ComponentObjectIdentifier() {}
 
 func init() {
 	// Register test components for serialization
@@ -905,8 +901,8 @@ func TestWorldSerializationRoundTrip(t *testing.T) {
 	}
 
 	if origExists && restoredExists {
-		origCSet := origSet.(*CSet[testWorldComponent])
-		restoredCSet := restoredSet.(*CSet[testWorldComponent])
+		origCSet := origSet.(*CSet[testWorldComponent, *testWorldComponent])
+		restoredCSet := restoredSet.(*CSet[testWorldComponent, *testWorldComponent])
 
 		if origCSet.Len() != restoredCSet.Len() {
 			t.Errorf("Component set size not preserved: expected %d, got %d",
@@ -948,7 +944,7 @@ func TestNewWorldFromData(t *testing.T) {
 	data := original.Marshal()
 
 	// Create new world from data
-	restored := NewWorldFromData(data)
+	restored := NewWorldFromData(data).(*world)
 
 	// Verify
 	if restored.frame != original.frame {

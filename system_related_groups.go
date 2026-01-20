@@ -67,7 +67,7 @@ func NewSystemRelatedGroups() SystemTraverser {
 	}
 }
 
-func (s *SystemRelatedGroups) refCount(rqs []Dependency) int {
+func (s *SystemRelatedGroups) refCount(rqs []ComponentDependency) int {
 	ref := 0
 	for _, com := range rqs {
 		ref += s.ref[com.intType()] - 1

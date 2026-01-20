@@ -55,9 +55,9 @@ func genTestCase(sg SystemTraverser) {
 		},
 	}
 	for i, deps := range args {
-		var compDeps []Dependency
+		var compDeps []ComponentDependency
 		for _, dep := range deps {
-			compDeps = append(compDeps, NewDependency(dep.i, dep.b))
+			compDeps = append(compDeps, NewItDependency(dep.i, dep.b))
 		}
 		s := newSystem(nil, handler, SystemTypeLight)
 		s.init(WithDeps(compDeps...), WithName(strconv.Itoa(i)))

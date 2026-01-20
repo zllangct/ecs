@@ -72,7 +72,7 @@ func (c *ComponentGenerator) Init(fileTree *parser.FileTree, file *parser.File) 
 		golang.AddCustomImport(file.Filename, "github.com/zllangct/ecs", "ecs")
 		// 向 init 函数添加组件注册代码
 		for _, st := range c.components {
-			code := fmt.Sprintf("ecs.RegisterComponent[%s]((*%s)(nil))", st.Name, st.Name)
+			code := fmt.Sprintf("ecs.RegisterComponent[%s](\"%s\")", st.Name, file.Package.Name)
 			golang.AddCustomInitCode(file.Filename, code)
 		}
 	}
@@ -222,10 +222,6 @@ func (c *ComponentGenerator) generateComponentMethods(w *generator.CodeWriter, s
 	isDisposable, _ := helper.GetBoolValue("disposable")
 
 	w.Printf("// Component extension for %s", structName)
-	w.P()
-
-	// 生成 ComponentObjectIdentifier 方法
-	w.Printf("func (x %s) ComponentObjectIdentifier() {}", structName)
 	w.P()
 
 	// 生成 NewComponentSet 方法

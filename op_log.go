@@ -174,5 +174,4 @@ func (c *OpLog) opExecute(taskList *opTaskList, set ComponentSet) {
 			set.Reset()
 		}
 	}
-
 }
