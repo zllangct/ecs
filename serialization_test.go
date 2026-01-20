@@ -633,9 +633,9 @@ func (t *testWorldComponent2) IsDisposable() bool {
 
 func init() {
 	// Register test components for serialization
-	RegisterComponent[testWorldComponent]((*testWorldComponent)(nil))
-	RegisterComponent[testWorldComponent2]((*testWorldComponent2)(nil))
-	RegisterComponent[dummyComponent]((*dummyComponent)(nil))
+	RegisterComponent[testWorldComponent]("")
+	RegisterComponent[testWorldComponent2]("")
+	RegisterComponent[dummyComponent]("")
 }
 
 func TestEntityIDGeneratorSerialization(t *testing.T) {

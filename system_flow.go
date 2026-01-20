@@ -359,8 +359,9 @@ func (p *flow) executeParallel(event Event) error {
 					errs.AppendWithLock(err)
 					continue
 				}
-				ctx := info.getContext()
 				if task.isValid {
+					ctx := info.getContext()
+					wg.Add(1)
 					go func() {
 						defer wg.Done()
 						ctx.constraint.reset()
@@ -372,8 +373,8 @@ func (p *flow) executeParallel(event Event) error {
 					}()
 				}
 			}
+			wg.Wait()
 		}
-		wg.Wait()
 	}
 	if len(errs.SubErrs) > 0 {
 		errs.Err = errors.New("errors found in executeParallel")

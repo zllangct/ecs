@@ -1,0 +1,75 @@
+rockmem components @package("components") @component();
+
+// Transform组件 - 实体变换（位置、旋转、缩放）
+struct Transform inline {
+    posX float32;
+    posY float32;
+    posZ float32;
+    rotX float32;
+    rotY float32;
+    rotZ float32;
+    scaleX float32;
+    scaleY float32;
+    scaleZ float32;
+}
+
+// Velocity组件 - 线性速度和角速度
+struct Velocity inline {
+    linearX float32;
+    linearY float32;
+    linearZ float32;
+    angularX float32;
+    angularY float32;
+    angularZ float32;
+}
+
+// Physics组件 - 物理属性
+struct Physics inline {
+    mass float32;
+    drag float32;
+    angularDrag float32;
+    useGravity int8;
+    isKinematic int8;
+}
+
+// Render组件 - 渲染相关
+struct Render inline {
+    meshId int32;
+    materialId int32;
+    visible int8;
+    castShadow int8;
+    receiveShadow int8;
+}
+
+// Health组件 - 生命值
+struct Health inline {
+    current float32;
+    max float32;
+    regen float32;
+}
+
+// AI组件 - AI状态
+struct AI inline {
+    state int32;
+    targetId int64;
+    aggroRange float32;
+    attackRange float32;
+}
+
+// Movement组件 - 移动控制
+struct Movement inline {
+    speed float32;
+    maxSpeed float32;
+    acceleration float32;
+    deceleration float32;
+    turnSpeed float32;
+}
+
+// Combat组件 - 战斗属性
+struct Combat inline {
+    attack float32;
+    defense float32;
+    critRate float32;
+    critDamage float32;
+    attackSpeed float32;
+}
