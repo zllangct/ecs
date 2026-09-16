@@ -2,36 +2,20 @@ package ecs
 
 import (
 	"errors"
-	"math/rand"
 	"reflect"
 	"runtime/debug"
 	"sync/atomic"
 	"time"
 )
 
-var seq uint32
-var timestamp uint64
+var idSeq uint64
 
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
-
+// LocalUniqueID 进程内唯一 ID：高 42 位毫秒时间戳（约 139 年回绕），
+// 低 22 位原子序号（每毫秒 400 万容量），单调不减。
 func LocalUniqueID() uint64 {
-	tNow := uint64(time.Now().UnixNano()) << 32
-	tTemp := atomic.LoadUint64(&timestamp)
-	if tTemp != tNow {
-		atomic.StoreUint32(&seq, 0)
-		for {
-			if atomic.CompareAndSwapUint64(&timestamp, tTemp, tNow) {
-				break
-			} else {
-				tTemp = atomic.LoadUint64(&timestamp)
-				tNow = uint64(time.Now().UnixNano()) << 32
-			}
-		}
-	}
-	s := atomic.AddUint32(&seq, 1)
-	return tNow + uint64((s<<16)&0xFFFF0000+rand.Uint32()&0x0000FFFF)
+	ms := uint64(time.Now().UnixMilli())
+	seq := atomic.AddUint64(&idSeq, 1) - 1
+	return (ms << 22) | (seq & 0x3FFFFF)
 }
 
 func TypeOf[T any]() reflect.Type {

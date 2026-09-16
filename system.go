@@ -24,6 +24,13 @@ const (
 	SystemStateDestroyed
 )
 
+type System interface{}
+
+type SystemPointer[T any] interface {
+	UpdateReceiver
+	*T
+}
+
 type SystemInfo interface {
 	isValid() bool
 	getState() SystemState
@@ -45,6 +52,8 @@ type SystemConfig struct {
 	dependencies []ComponentDependency
 	stage        Stage
 	order        Order
+	// groups 本 system 声明的固定访问组（布局优化用，World.Register 时收集）
+	groups [][]ComponentIntType
 }
 
 func (s *SystemConfig) initDefault() {
@@ -69,7 +78,20 @@ func WithDep[T any, TP ComponentPointer[T]](writable ...Writable) SystemOption {
 
 func WithDepReadOnly[T any, TP ComponentPointer[T]]() SystemOption {
 	return func(c *SystemConfig) {
-		c.dependencies = append(c.dependencies, Dep[T, TP](true))
+		c.dependencies = append(c.dependencies, Dep[T, TP](ReadOnly))
+	}
+}
+
+// WithGroup 声明本 system 固定联合访问的组件组（布局优化，不取代 WithDeps 权限声明）。
+// 组内组件必须已 RegisterComponent 且非 disposable/nomadic（World.Register 期校验）；
+// 至少 2 个组件类型；多 system 声明的重叠组会合并为并集组。
+func WithGroup(deps ...ComponentDependency) SystemOption {
+	return func(c *SystemConfig) {
+		g := make([]ComponentIntType, 0, len(deps))
+		for _, d := range deps {
+			g = append(g, d.intType())
+		}
+		c.groups = append(c.groups, g)
 	}
 }
 
@@ -91,26 +113,57 @@ func WithName(name string) SystemOption {
 	}
 }
 
+// SystemConstraint 约束 SystemContext 只在 system 执行期间（含 Init）有效
 type SystemConstraint struct {
-	outdated bool
+	active bool
 }
 
 func (s *SystemConstraint) isValid() bool {
-	return s.outdated
+	return s.active
 }
 
-func (s *SystemConstraint) reset() {
-	s.outdated = true
+// activate 在 system 回调执行前激活约束
+func (s *SystemConstraint) activate() {
+	s.active = true
 }
 
-func (s *SystemConstraint) setOutdated() {
-	s.outdated = false
+// deactivate 在 system 回调返回后关闭约束
+func (s *SystemConstraint) deactivate() {
+	s.active = false
 }
 
 type SystemContext struct {
 	constraint SystemConstraint
-	world      *world
+	world      *World
 	info       SystemInfo
+	// queryCache 查询预解析缓存（shapeKey → queryCached），跨帧复用，
+	// world.compVersion 变化或组表未定型时失效重建
+	queryCache map[FixedCompound]*queryCached
+}
+
+// AddComponents 在 system 执行期间提交组件添加操作，写入本 system 的独立队列
+// （单写无锁），帧同步点统一生效。语义与 EntityInfo.Add 一致：已存在/游牧组件跳过。
+func (ctx *SystemContext) AddComponents(entity Entity, comps ...Component) {
+	if !ctx.constraint.isValid() {
+		return
+	}
+	info, ok := ctx.world.getEntityInfo(entity)
+	if !ok {
+		return
+	}
+	for _, comp := range comps {
+		if info.compound.Exist(GetIntTypeByComp(comp)) {
+			continue
+		}
+		if comp.IsNomadic() {
+			continue
+		}
+		ctx.world.opLog.operateForSystem(ctx.info.id(), Operate{
+			Entity: entity,
+			Op:     ComponentOperateAdd,
+			Comp:   comp,
+		})
+	}
 }
 
 type SystemInfoInstance struct {
@@ -121,12 +174,12 @@ type SystemInfoInstance struct {
 	state      SystemState
 	ctx        SystemContext
 	typ        SystemType
-	world      *world
+	world      *World
 	reporter   *optReporter
 	raw        any
 }
 
-func newSystem(world *world, system any, typ SystemType) *SystemInfoInstance {
+func newSystem(world *World, system any, typ SystemType) *SystemInfoInstance {
 	c := &SystemConfig{}
 	c.initDefault()
 	impls := implsCheck(system)

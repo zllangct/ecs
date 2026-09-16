@@ -1,9 +1,5 @@
 package ecs
 
-import (
-	"sync"
-)
-
 type opTask struct {
 	target Entity
 	com    Component
@@ -64,25 +60,17 @@ func (o *opTaskList) Reset() {
 var opTaskPool = newTaskPool()
 
 type taskPool struct {
-	pool sync.Pool
+	pool *Pool[opTask]
 }
 
 func newTaskPool() *taskPool {
 	return &taskPool{
-		pool: sync.Pool{
-			New: func() interface{} {
-				return new(opTask)
-			},
-		},
+		pool: NewPool(func() *opTask { return new(opTask) }),
 	}
 }
 
 func (p *taskPool) Get() *opTask {
-	v := p.pool.Get()
-	if v == nil {
-		return &opTask{}
-	}
-	return v.(*opTask)
+	return p.pool.Get()
 }
 
 func (p *taskPool) Put(t *opTask) {

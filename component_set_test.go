@@ -5,6 +5,15 @@ import (
 	"testing"
 )
 
+// D18: 删除不存在的组件不得 panic
+func TestCSetRemoveAndReturn_NotExist(t *testing.T) {
+	c := NewCSet[dummyComponent]()
+	got := c.RemoveAndReturn(Entity(1 << 32)) // index=1, reuse=0
+	if got != nil {
+		t.Errorf("want nil, got %v", got)
+	}
+}
+
 func TestComponentSet(t *testing.T) {
 	//prepare test data
 	caseCount := 50

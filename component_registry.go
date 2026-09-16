@@ -3,6 +3,7 @@ package ecs
 import (
 	"fmt"
 	"sync"
+	"unsafe"
 )
 
 // ComponentSetFactory is a function that creates a new ComponentSet
@@ -17,6 +18,10 @@ type ComponentDefineInfo struct {
 	Type        ComponentIntType
 	Factory     ComponentSetFactory
 	Unmarshaler ComponentSetUnmarshaler
+	// Size 组件定长字节数（unsafe.Sizeof(T)），组表列 stride 用
+	Size int
+	// Proto 组件原型构造器，注册期读取 IsDisposable/IsNomadic 等标记
+	Proto func() Component
 }
 
 // ComponentRegistry manages component type registrations for serialization/deserialization
@@ -35,8 +40,10 @@ func GetComponentRegistry() *ComponentRegistry {
 	return globalComponentRegistry
 }
 
-// Register registers a component type with its factory and unmarshaler
-func (r *ComponentRegistry) Register(group string, compType ComponentIntType, factory ComponentSetFactory, unmarshaler ComponentSetUnmarshaler) {
+// Register registers a component type with its factory and unmarshaler.
+// 设计约定：组件类型进程级全局唯一（rockgo 单 world 场景）；
+// 不同类型组注册同一 compType 属于配置错误，直接 panic。
+func (r *ComponentRegistry) Register(group string, compType ComponentIntType, factory ComponentSetFactory, unmarshaler ComponentSetUnmarshaler, size int, proto func() Component) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -53,6 +60,8 @@ func (r *ComponentRegistry) Register(group string, compType ComponentIntType, fa
 		Type:        compType,
 		Factory:     factory,
 		Unmarshaler: unmarshaler,
+		Size:        size,
+		Proto:       proto,
 	}
 }
 
@@ -69,7 +78,19 @@ func RegisterComponent[T any, TP ComponentPointer[T]](group string) {
 		func(data *SerializableSparseArrayData) ComponentSet {
 			return NewCSetFromData[T, TP](data)
 		},
+		int(unsafe.Sizeof(*new(T))),
+		func() Component {
+			return TP(new(T))
+		},
 	)
+}
+
+// GetInfo returns the full define info for a component type
+func (r *ComponentRegistry) GetInfo(compType ComponentIntType) (*ComponentDefineInfo, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	info, ok := r.infos[compType]
+	return info, ok
 }
 
 // GetFactory returns the factory for a component type

@@ -43,26 +43,26 @@ func (s *MovementSystem) Update(ctx *ecs.SystemContext, event ecs.Event) error {
 		deltaSeconds = 1.0 / 60.0
 	}
 
-	query := ecs.NewQuery(ctx,
+	query := ctx.NewQuery(
 		ecs.WithComp[components.Transform](),
 		ecs.WithComp[components.Velocity](),
 	)
 	for index := range query.Iter() {
-		transform, ok := ecs.GetBuddy[components.Transform](ctx, index)
+		transform, ok := ctx.GetBuddy[components.Transform](index)
 		if !ok {
 			continue
 		}
-		velocity, ok := ecs.GetBuddy[components.Velocity](ctx, index)
+		velocity, ok := ctx.GetBuddyReadOnly[components.VelocityReadOnly](index)
 		if !ok {
 			continue
 		}
 
-		transform.PosX += velocity.LinearX * deltaSeconds
-		transform.PosY += velocity.LinearY * deltaSeconds
-		transform.PosZ += velocity.LinearZ * deltaSeconds
-		transform.RotX += velocity.AngularX * deltaSeconds
-		transform.RotY += velocity.AngularY * deltaSeconds
-		transform.RotZ += velocity.AngularZ * deltaSeconds
+		transform.PosX += velocity.LinearX() * deltaSeconds
+		transform.PosY += velocity.LinearY() * deltaSeconds
+		transform.PosZ += velocity.LinearZ() * deltaSeconds
+		transform.RotX += velocity.AngularX() * deltaSeconds
+		transform.RotY += velocity.AngularY() * deltaSeconds
+		transform.RotZ += velocity.AngularZ() * deltaSeconds
 	}
 	return nil
 }
@@ -86,33 +86,33 @@ func (s *PhysicsSystem) Update(ctx *ecs.SystemContext, event ecs.Event) error {
 		deltaSeconds = 1.0 / 60.0
 	}
 
-	query := ecs.NewQuery(ctx,
+	query := ctx.NewQuery(
 		ecs.WithComp[components.Transform](),
 		ecs.WithComp[components.Velocity](),
 		ecs.WithComp[components.Physics](),
 	)
 	for index := range query.Iter() {
-		transform, ok := ecs.GetBuddy[components.Transform](ctx, index)
+		transform, ok := ctx.GetBuddy[components.Transform](index)
 		if !ok {
 			continue
 		}
-		velocity, ok := ecs.GetBuddy[components.Velocity](ctx, index)
+		velocity, ok := ctx.GetBuddy[components.Velocity](index)
 		if !ok {
 			continue
 		}
-		physics, ok := ecs.GetBuddy[components.Physics](ctx, index)
+		physics, ok := ctx.GetBuddyReadOnly[components.PhysicsReadOnly](index)
 		if !ok {
 			continue
 		}
 
 		// 重力
-		if physics.UseGravity == 1 {
+		if physics.UseGravity() == 1 {
 			velocity.LinearY -= 9.8 * deltaSeconds
 		}
 		// 阻力
-		velocity.LinearX *= (1 - physics.Drag*deltaSeconds)
-		velocity.LinearY *= (1 - physics.Drag*deltaSeconds)
-		velocity.LinearZ *= (1 - physics.Drag*deltaSeconds)
+		velocity.LinearX *= (1 - physics.Drag()*deltaSeconds)
+		velocity.LinearY *= (1 - physics.Drag()*deltaSeconds)
+		velocity.LinearZ *= (1 - physics.Drag()*deltaSeconds)
 		// 更新位置
 		transform.PosX += velocity.LinearX * deltaSeconds
 		transform.PosY += velocity.LinearY * deltaSeconds
@@ -138,7 +138,7 @@ func (s *HealthRegenSystem) Update(ctx *ecs.SystemContext, event ecs.Event) erro
 		deltaSeconds = 1.0 / 60.0
 	}
 
-	for _, health := range ecs.GetComponents[components.Health](ctx) {
+	for _, health := range ctx.GetComponents[components.Health]() {
 		if health.Current < health.Max {
 			health.Current += health.Regen * deltaSeconds
 			if health.Current > health.Max {
@@ -169,17 +169,17 @@ func (s *ComplexActorSystem) Update(ctx *ecs.SystemContext, event ecs.Event) err
 		deltaSeconds = 1.0 / 60.0
 	}
 
-	query := ecs.NewQuery(ctx,
+	query := ctx.NewQuery(
 		ecs.WithComp[components.Transform](),
 		ecs.WithComp[components.Velocity](),
 		ecs.WithComp[components.Physics](),
 		ecs.WithComp[components.Health](),
 	)
 	for index := range query.Iter() {
-		transform, _ := ecs.GetBuddy[components.Transform](ctx, index)
-		velocity, _ := ecs.GetBuddy[components.Velocity](ctx, index)
-		physics, _ := ecs.GetBuddy[components.Physics](ctx, index)
-		health, _ := ecs.GetBuddy[components.Health](ctx, index)
+		transform, _ := ctx.GetBuddy[components.Transform](index)
+		velocity, _ := ctx.GetBuddy[components.Velocity](index)
+		physics, _ := ctx.GetBuddyReadOnly[components.PhysicsReadOnly](index)
+		health, _ := ctx.GetBuddy[components.Health](index)
 
 		// 移动
 		transform.PosX += velocity.LinearX * deltaSeconds
@@ -187,7 +187,7 @@ func (s *ComplexActorSystem) Update(ctx *ecs.SystemContext, event ecs.Event) err
 		transform.PosZ += velocity.LinearZ * deltaSeconds
 
 		// 物理
-		if physics.UseGravity == 1 {
+		if physics.UseGravity() == 1 {
 			velocity.LinearY -= 9.8 * deltaSeconds
 		}
 
@@ -207,9 +207,9 @@ func (s *ComplexActorSystem) Update(ctx *ecs.SystemContext, event ecs.Event) err
 // ============================================================================
 
 // 创建ECS World 并注册系统
-func setupECSWorldSimple(entityCount int) ecs.World {
+func setupECSWorldSimple(entityCount int) *ecs.World {
 	world := ecs.NewWorld(ecs.WithWorldSyncMode())
-	world.RegisterStandard(&MovementSystem{})
+	world.Register[MovementSystem]()
 
 	// 创建实体
 	for i := 0; i < entityCount; i++ {
@@ -227,9 +227,9 @@ func setupECSWorldSimple(entityCount int) ecs.World {
 	return world
 }
 
-func setupECSWorldPhysics(entityCount int) ecs.World {
+func setupECSWorldPhysics(entityCount int) *ecs.World {
 	world := ecs.NewWorld(ecs.WithWorldSyncMode())
-	world.RegisterStandard(&PhysicsSystem{})
+	world.Register[PhysicsSystem]()
 
 	for i := 0; i < entityCount; i++ {
 		transform := &components.Transform{PosX: float32(i)}
@@ -240,9 +240,9 @@ func setupECSWorldPhysics(entityCount int) ecs.World {
 	return world
 }
 
-func setupECSWorldComplex(entityCount int) ecs.World {
+func setupECSWorldComplex(entityCount int) *ecs.World {
 	world := ecs.NewWorld(ecs.WithWorldSyncMode())
-	world.RegisterStandard(&ComplexActorSystem{})
+	world.Register[ComplexActorSystem]()
 
 	for i := 0; i < entityCount; i++ {
 		transform := &components.Transform{PosX: float32(i)}
@@ -254,10 +254,10 @@ func setupECSWorldComplex(entityCount int) ecs.World {
 	return world
 }
 
-func setupECSWorldFull(entityCount int) ecs.World {
+func setupECSWorldFull(entityCount int) *ecs.World {
 	world := ecs.NewWorld(ecs.WithWorldSyncMode())
-	world.RegisterStandard(&MovementSystem{})
-	world.RegisterStandard(&HealthRegenSystem{})
+	world.Register[MovementSystem]()
+	world.Register[HealthRegenSystem]()
 
 	for i := 0; i < entityCount; i++ {
 		transform := &components.Transform{PosX: float32(i)}
@@ -542,13 +542,13 @@ func BenchmarkPureIteration_ECS_10000(b *testing.B) {
 	// 使用轻量系统进行纯遍历
 	world.RegisterLight(func(ctx *ecs.SystemContext, event ecs.Event) error {
 		var sum float32
-		query := ecs.NewQuery(ctx,
+		query := ctx.NewQuery(
 			ecs.WithComp[components.Transform](),
 		)
 		for index := range query.Iter() {
-			transform, ok := ecs.GetBuddy[components.Transform](ctx, index)
+			transform, ok := ctx.GetBuddyReadOnly[components.TransformReadOnly](index)
 			if ok {
-				sum += transform.PosX
+				sum += transform.PosX()
 			}
 		}
 		sinkFloat32 = sum
@@ -651,7 +651,7 @@ func BenchmarkFullEntity_OOP_10000(b *testing.B) {
 
 func BenchmarkSparseQuery_ECS_10000(b *testing.B) {
 	world := ecs.NewWorld(ecs.WithWorldSyncMode())
-	world.RegisterStandard(&HealthRegenSystem{})
+	world.Register[HealthRegenSystem]()
 
 	// 只有10%的实体有Health组件
 	for i := 0; i < 10000; i++ {
@@ -808,22 +808,22 @@ func (s *ParallelMovementSystem1) Update(ctx *ecs.SystemContext, event ecs.Event
 		deltaSeconds = 1.0 / 60.0
 	}
 
-	query := ecs.NewQuery(ctx,
+	query := ctx.NewQuery(
 		ecs.WithComp[components.Transform](),
 		ecs.WithComp[components.Velocity](),
 	)
 	for index := range query.Iter() {
-		transform, ok := ecs.GetBuddy[components.Transform](ctx, index)
+		transform, ok := ctx.GetBuddy[components.Transform](index)
 		if !ok {
 			continue
 		}
-		velocity, ok := ecs.GetBuddy[components.Velocity](ctx, index)
+		velocity, ok := ctx.GetBuddyReadOnly[components.VelocityReadOnly](index)
 		if !ok {
 			continue
 		}
-		transform.PosX += velocity.LinearX * deltaSeconds
-		transform.PosY += velocity.LinearY * deltaSeconds
-		transform.PosZ += velocity.LinearZ * deltaSeconds
+		transform.PosX += velocity.LinearX() * deltaSeconds
+		transform.PosY += velocity.LinearY() * deltaSeconds
+		transform.PosZ += velocity.LinearZ() * deltaSeconds
 	}
 	return nil
 }
@@ -845,7 +845,7 @@ func (s *ParallelHealthSystem) Update(ctx *ecs.SystemContext, event ecs.Event) e
 		deltaSeconds = 1.0 / 60.0
 	}
 
-	for _, health := range ecs.GetComponents[components.Health](ctx) {
+	for _, health := range ctx.GetComponents[components.Health]() {
 		if health.Current < health.Max {
 			health.Current += health.Regen * deltaSeconds
 			if health.Current > health.Max {
@@ -873,18 +873,18 @@ func (s *ParallelCombatSystem) Update(ctx *ecs.SystemContext, event ecs.Event) e
 		deltaSeconds = 1.0 / 60.0
 	}
 
-	for _, combat := range ecs.GetComponents[components.Combat](ctx) {
+	for _, combat := range ctx.GetComponents[components.Combat]() {
 		// 模拟攻击速度影响的计算
 		combat.Attack *= (1 + combat.AttackSpeed*deltaSeconds*0.001)
 	}
 	return nil
 }
 
-func setupECSWorldSyncMultiSystem(entityCount int) ecs.World {
+func setupECSWorldSyncMultiSystem(entityCount int) *ecs.World {
 	world := ecs.NewWorld(ecs.WithWorldSyncMode())
-	world.RegisterStandard(&ParallelMovementSystem1{})
-	world.RegisterStandard(&ParallelHealthSystem{})
-	world.RegisterStandard(&ParallelCombatSystem{})
+	world.Register[ParallelMovementSystem1]()
+	world.Register[ParallelHealthSystem]()
+	world.Register[ParallelCombatSystem]()
 
 	for i := 0; i < entityCount; i++ {
 		transform := &components.Transform{PosX: float32(i)}
@@ -896,11 +896,11 @@ func setupECSWorldSyncMultiSystem(entityCount int) ecs.World {
 	return world
 }
 
-func setupECSWorldAsyncMultiSystem(entityCount int) ecs.World {
+func setupECSWorldAsyncMultiSystem(entityCount int) *ecs.World {
 	world := ecs.NewWorld(ecs.WithWorldASyncMode())
-	world.RegisterStandard(&ParallelMovementSystem1{})
-	world.RegisterStandard(&ParallelHealthSystem{})
-	world.RegisterStandard(&ParallelCombatSystem{})
+	world.Register[ParallelMovementSystem1]()
+	world.Register[ParallelHealthSystem]()
+	world.Register[ParallelCombatSystem]()
 
 	for i := 0; i < entityCount; i++ {
 		transform := &components.Transform{PosX: float32(i)}

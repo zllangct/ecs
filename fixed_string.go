@@ -31,8 +31,13 @@ func (f *FixedString[T]) String() string {
 }
 
 func (f *FixedString[T]) Set(s string) {
-	f.len = len(s)
-	if f.len != 0 {
-		copy((*(*[__FixedMax]byte)(unsafe.Pointer(&(f.data))))[:unsafe.Sizeof(f.data)], s)
+	max := int(unsafe.Sizeof(f.data))
+	n := len(s)
+	if n > max {
+		n = max // 超长截断，防止 String() 越界
+	}
+	f.len = n
+	if n != 0 {
+		copy((*(*[__FixedMax]byte)(unsafe.Pointer(&(f.data))))[:max], s[:n])
 	}
 }

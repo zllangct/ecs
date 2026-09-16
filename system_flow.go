@@ -97,13 +97,13 @@ type SystemTaskContext struct {
 // system execute flow
 type flow struct {
 	config           *FlowConfig
-	world            *world
+	world            *World
 	traverserFactory func() SystemTraverser
 	stages           map[Stage]SystemTraverserList
 	systems          map[uint64]SystemInfo
 }
 
-func newSystemFlow(world *world, opt ...FlowOption) *flow {
+func newSystemFlow(world *World, opt ...FlowOption) *flow {
 	config := &FlowConfig{}
 	config.initDefault()
 
@@ -127,7 +127,7 @@ func (p *flow) reset() {
 	} else {
 		p.traverserFactory = NewSystemRelatedGroups
 	}
-	for stage := range StageMaxIndex {
+	for stage := range StageMaxIndex + 1 {
 		p.stages[stage] = SystemTraverserList{}
 		stlFront := p.traverserFactory()
 		stlFront.setOrder(OrderFront)
@@ -138,10 +138,21 @@ func (p *flow) reset() {
 }
 
 func (p *flow) flushTempTask() error {
-	wg := &sync.WaitGroup{}
-	tasks, clean := p.world.flushPendingOperate()
+	tasks, syncTasks, clean := p.world.flushPendingOperate()
 	defer clean()
 
+	if err := p.runOpTasks(tasks); err != nil {
+		return err
+	}
+	// 第二相：组表成员资格 sync，依赖第一相完成后的 CSet/compound 终态
+	return p.runOpTasks(syncTasks)
+}
+
+func (p *flow) runOpTasks(tasks []func()) error {
+	if len(tasks) == 0 {
+		return nil
+	}
+	wg := &sync.WaitGroup{}
 	switch p.config.ExecuteMode {
 	case ExecuteModeLinear:
 		for _, task := range tasks {
@@ -165,6 +176,8 @@ func (p *flow) flushTempTask() error {
 
 func (p *flow) Execute(event Event) error {
 	var err error
+	// 帧同步点：先处理实体销毁，再合并组件操作
+	p.world.flushPendingDestroy()
 	err = p.flushTempTask()
 	if err != nil {
 		return err
@@ -181,6 +194,11 @@ func (p *flow) Execute(event Event) error {
 		return err
 	}
 	err = p.world.clearDisposable()
+	if err != nil {
+		return err
+	}
+	// 游牧组件每帧末清空
+	err = p.world.clearNomadic()
 	if err != nil {
 		return err
 	}
@@ -216,20 +234,23 @@ func (p *flow) getSystemTask(info SystemInfo, stage Stage) (ctx SystemTaskContex
 		}
 		switch stage {
 		case StageSyncBeforeStart:
-			system, ok := sys.(SyncBeforeStartReceiver)
-			fn = system.SyncBeforeStart
-			imp = ok
-			runSync = true
+			if system, ok := sys.(SyncBeforeStartReceiver); ok {
+				fn = system.SyncBeforeStart
+				imp = true
+				runSync = true
+			}
 		case StageStart:
-			system, ok := sys.(StartReceiver)
-			fn = system.Start
-			imp = ok
-			runSync = false
+			if system, ok := sys.(StartReceiver); ok {
+				fn = system.Start
+				imp = true
+				runSync = false
+			}
 		case StageSyncAfterStart:
-			system, ok := sys.(SyncAfterStartReceiver)
-			fn = system.SyncAfterStart
-			imp = ok
-			runSync = true
+			if system, ok := sys.(SyncAfterStartReceiver); ok {
+				fn = system.SyncAfterStart
+				imp = true
+				runSync = true
+			}
 		}
 	} else if state == SystemStateUpdate {
 		if stage < StageSyncBeforePreUpdate || stage > StageSyncAfterPostUpdate {
@@ -237,52 +258,61 @@ func (p *flow) getSystemTask(info SystemInfo, stage Stage) (ctx SystemTaskContex
 		}
 		switch stage {
 		case StageSyncBeforePreUpdate:
-			system, ok := sys.(SyncBeforePreUpdateReceiver)
-			fn = system.SyncBeforePreUpdate
-			imp = ok
-			runSync = true
+			if system, ok := sys.(SyncBeforePreUpdateReceiver); ok {
+				fn = system.SyncBeforePreUpdate
+				imp = true
+				runSync = true
+			}
 		case StagePreUpdate:
-			system, ok := sys.(PreUpdateReceiver)
-			fn = system.PreUpdate
-			imp = ok
-			runSync = true
+			if system, ok := sys.(PreUpdateReceiver); ok {
+				fn = system.PreUpdate
+				imp = true
+				runSync = true
+			}
 		case StageSyncAfterPreUpdate:
-			system, ok := sys.(SyncAfterPreUpdateReceiver)
-			fn = system.SyncAfterPreUpdate
-			imp = ok
-			runSync = true
+			if system, ok := sys.(SyncAfterPreUpdateReceiver); ok {
+				fn = system.SyncAfterPreUpdate
+				imp = true
+				runSync = true
+			}
 
 		case StageSyncBeforeUpdate:
-			system, ok := sys.(SyncBeforeUpdateReceiver)
-			fn = system.SyncBeforeUpdate
-			imp = ok
-			runSync = true
+			if system, ok := sys.(SyncBeforeUpdateReceiver); ok {
+				fn = system.SyncBeforeUpdate
+				imp = true
+				runSync = true
+			}
 		case StageUpdate:
-			system, ok := sys.(UpdateReceiver)
-			fn = system.Update
-			imp = ok
-			runSync = false
+			if system, ok := sys.(UpdateReceiver); ok {
+				fn = system.Update
+				imp = true
+				runSync = false
+			}
 		case StageSyncAfterUpdate:
-			system, ok := sys.(SyncAfterUpdateReceiver)
-			fn = system.SyncAfterUpdate
-			imp = ok
-			runSync = true
+			if system, ok := sys.(SyncAfterUpdateReceiver); ok {
+				fn = system.SyncAfterUpdate
+				imp = true
+				runSync = true
+			}
 
 		case StageSyncBeforePostUpdate:
-			system, ok := sys.(SyncBeforePostUpdateReceiver)
-			fn = system.SyncBeforePostUpdate
-			imp = ok
-			runSync = true
+			if system, ok := sys.(SyncBeforePostUpdateReceiver); ok {
+				fn = system.SyncBeforePostUpdate
+				imp = true
+				runSync = true
+			}
 		case StagePostUpdate:
-			system, ok := sys.(PostUpdateReceiver)
-			fn = system.PostUpdate
-			imp = ok
-			runSync = false
+			if system, ok := sys.(PostUpdateReceiver); ok {
+				fn = system.PostUpdate
+				imp = true
+				runSync = false
+			}
 		case StageSyncAfterPostUpdate:
-			system, ok := sys.(SyncAfterPostUpdateReceiver)
-			fn = system.SyncAfterPostUpdate
-			imp = ok
-			runSync = true
+			if system, ok := sys.(SyncAfterPostUpdateReceiver); ok {
+				fn = system.SyncAfterPostUpdate
+				imp = true
+				runSync = true
+			}
 		}
 	} else if state == SystemStateDestroy {
 		if stage < StageSyncBeforeDestroy {
@@ -290,22 +320,25 @@ func (p *flow) getSystemTask(info SystemInfo, stage Stage) (ctx SystemTaskContex
 		}
 		switch stage {
 		case StageSyncBeforeDestroy:
-			system, ok := sys.(SyncBeforeDestroyReceiver)
-			fn = system.SyncBeforeDestroy
-			imp = ok
-			runSync = true
+			if system, ok := sys.(SyncBeforeDestroyReceiver); ok {
+				fn = system.SyncBeforeDestroy
+				imp = true
+				runSync = true
+			}
 		case StageDestroy:
-			system, ok := sys.(DestroyReceiver)
-			fn = system.Destroy
-			imp = ok
-			runSync = false
+			if system, ok := sys.(DestroyReceiver); ok {
+				fn = system.Destroy
+				imp = true
+				runSync = false
+			}
 		case StageSyncAfterDestroy:
-			system, ok := sys.(SyncAfterPostDestroyReceiver)
-			fn = system.SyncAfterDestroy
-			imp = ok
-			runSync = true
+			if system, ok := sys.(SyncAfterPostDestroyReceiver); ok {
+				fn = system.SyncAfterDestroy
+				imp = true
+				runSync = true
 
-			info.setState(SystemStateDestroyed)
+				info.setState(SystemStateDestroyed)
+			}
 		}
 	}
 
@@ -331,9 +364,9 @@ func (p *flow) executeLinear(event Event) error {
 			}
 			if task.isValid {
 				ctx := info.getContext()
-				ctx.constraint.reset()
+				ctx.constraint.activate()
 				err := task.fn(ctx, event)
-				ctx.constraint.setOutdated()
+				ctx.constraint.deactivate()
 				if err != nil {
 					errs.Append(err)
 					continue
@@ -364,9 +397,9 @@ func (p *flow) executeParallel(event Event) error {
 					wg.Add(1)
 					go func() {
 						defer wg.Done()
-						ctx.constraint.reset()
+						ctx.constraint.activate()
 						err := task.fn(ctx, event)
-						ctx.constraint.setOutdated()
+						ctx.constraint.deactivate()
 						if err != nil {
 							errs.AppendWithLock(err)
 						}
@@ -385,7 +418,7 @@ func (p *flow) executeParallel(event Event) error {
 
 func (p *flow) traverserIter() iter.Seq2[Stage, SystemTraverser] {
 	return func(yield func(Stage, SystemTraverser) bool) {
-		for stage := range StageMaxIndex {
+		for stage := range StageMaxIndex + 1 {
 			sq := p.stages[stage]
 			for _, sl := range sq {
 				if sl.count() == 0 {
@@ -408,7 +441,7 @@ func (p *flow) register(system SystemInfo) {
 		order = OrderAppend
 	}
 
-	for stage := range StageMaxIndex {
+	for stage := range StageMaxIndex + 1 {
 
 		if !system.impl(stage) {
 			continue
@@ -428,8 +461,12 @@ func (p *flow) register(system SystemInfo) {
 					sg := p.traverserFactory()
 					sg.setOrder(order)
 					sg.add(system)
-					temp := append(SystemTraverserList{}, sl[i-1:]...)
-					p.stages[stage] = append(append(sl[:i-1], sg), temp...)
+					// 在 i 前插入新分组，显式构造新切片避免污染原底层数组
+					ns := make(SystemTraverserList, 0, len(sl)+1)
+					ns = append(ns, sl[:i]...)
+					ns = append(ns, sg)
+					ns = append(ns, sl[i:]...)
+					p.stages[stage] = ns
 					break
 				}
 			}
@@ -437,6 +474,7 @@ func (p *flow) register(system SystemInfo) {
 	}
 
 	p.systems[system.id()] = system
+	p.world.opLog.registerSystem(system.id())
 
 	system.setState(SystemStateStart)
 }
@@ -511,7 +549,7 @@ func (p *flow) DebugInfo() {
 
 	var output []string
 	var sq SystemTraverserList
-	for stage := range StageMaxIndex {
+	for stage := range StageMaxIndex + 1 {
 		var slContent []string
 		sq = p.stages[stage]
 		for i, sl := range sq {

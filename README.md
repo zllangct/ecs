@@ -100,75 +100,77 @@ component Position {
 go run ./command/karmem/main.go build -golang -o ./testdata/ testdata/components.km
 ```
 #### ECS示例
+
 ```go
 package main
 
 import (
-    "fmt"
-    "github.com/zllangct/ecs"
+	"fmt"
+	"github.com/zllangct/ecs"
 )
 
 // standard system
-type _testStandardSystem struct {}
+type _testStandardSystem struct{}
 
 func (t *_testStandardSystem) Update(ctx *ecs.SystemContext, event ecs.Event) error {
-    for i, p := range ecs.GetComponents[testdata.Point](ctx) {
-        fmt.Printf("StandardExample, EnityIndex: %d, P:%v\n", i, p)
-    }
-    return nil
+	for i, p := range ecs.GetComponents[testdata.Point](ctx) {
+		fmt.Printf("StandardExample, EnityIndex: %d, P:%v\n", i, p)
+	}
+	return nil
 }
 
 func (t *_testStandardSystem) Init(ctx *ecs.SystemInitContext) error {
-    ctx.SetOption(
-        ecs.WithName("StandardExample"),
-        ecs.WithDep[testdata.Point](),
-        ecs.WithDep[testdata.Position](),
-    )
-    return nil
+	ctx.SetOption(
+		ecs.WithName("StandardExample"),
+		ecs.WithDep[testdata.Point](),
+		ecs.WithDep[testdata.Position](),
+	)
+	return nil
 }
 
 func main() {
-    // new world
-    world := ecs.NewWorld()
-	
-    // new entity
-    e := world.NewEntity()
-	
-    // new component with default data
-    point1 := testdata.Point{X: 1, Y: 2, Z: 3}
-    pos1 := testdata.Position{X: 7}
-	
-    // add component to entity
-    e.Add(&point1)
-    e.Add(&pos1)
-	
-    // define light system 
-    sys := func(ctx *ecs.SystemContext, event ecs.Event) error {
-        // get single components by ecs.GetComponents
-        for i, p := range ecs.GetComponents[testdata.Point](ctx) {
-            pos, _ := ecs.GetBuddy[testdata.Position](ctx, i)
-            fmt.Printf("LightExample 1, EnityIndex: %d, P:%v, Pos:%v\n", i, p, pos)
-        }
-        
-        //get components by ecs.Query
-        r := ecs.Query(ctx, ecs.WithComp[testdata.Point](), ecs.WithComp[testdata.Position]())
-        for idx, _ := range r.Iter() {
-            p, _ := ecs.GetBuddy[testdata.Point](ctx, idx)
-            pos, _ := ecs.GetBuddy[testdata.Position](ctx, idx)
-            name, _ := ecs.GetBuddy[testdata.Name](ctx, idx)
-            fmt.Printf("LightExample 2, EnityIndex: %d, P:%v, Pos:%v, Name:%s\n", idx, p, pos, name.Value.String())
-        }
+	// new world
+	world := ecs.NewWorld()
 
-        return nil
-    }
-	
-    // register light system
-    world.RegisterLight(sys, ecs.WithName("LightExample2"), ecs.WithDep[testdata.Point](), ecs.WithDep[testdata.Position](ecs.ReadWrite))
-    // register standard system
-    world.RegisterStandard(&_testStandardSystem{})
-	
-    // update your world
-    world.Update()
+	// new entity（返回 Entity 值；EntityInfo 按需通过 GetEntityInfo 查询，勿长期持有其指针）
+	e := world.NewEntity()
+
+	// new component with default data
+	point1 := testdata.Point{X: 1, Y: 2, Z: 3}
+	pos1 := testdata.Position{X: 7}
+
+	// add component to entity
+	info, _ := world.GetEntityInfo(e)
+	info.Add(&point1)
+	info.Add(&pos1)
+
+	// define light system 
+	sys := func(ctx *ecs.SystemContext, event ecs.Event) error {
+		// get single components by ecs.GetComponents
+		for i, p := range ecs.GetComponents[testdata.Point](ctx) {
+			pos, _ := ecs.GetBuddy[testdata.Position](ctx, i)
+			fmt.Printf("LightExample 1, EnityIndex: %d, P:%v, Pos:%v\n", i, p, pos)
+		}
+
+		//get components by ecs.Query
+		r := ecs.Query(ctx, ecs.WithComp[testdata.Point](), ecs.WithComp[testdata.Position]())
+		for idx, _ := range r.Iter() {
+			p, _ := ecs.GetBuddy[testdata.Point](ctx, idx)
+			pos, _ := ecs.GetBuddy[testdata.Position](ctx, idx)
+			name, _ := ecs.GetBuddy[testdata.Name](ctx, idx)
+			fmt.Printf("LightExample 2, EnityIndex: %d, P:%v, Pos:%v, Name:%s\n", idx, p, pos, name.Value.String())
+		}
+
+		return nil
+	}
+
+	// register light system
+	world.RegisterLight(sys, ecs.WithName("LightExample2"), ecs.WithDep[testdata.Point](), ecs.WithDep[testdata.Position](ecs.ReadWrite))
+	// register standard system
+	world.Register[_testStandardSystem]()
+
+	// update your world
+	world.Update()
 }
 ```
 示例中的 ```__world_Test_S_1``` ```__world_Test_C_1```为系统和组件，后面会详细介绍，完整的代码请移步 [ world_test.go ](./world_test.go)。
@@ -250,6 +252,43 @@ Shape是ECS中的辅助单元，用来描述一组同属同一Entity的Component
 FixedString是一个固定长度的字符串，适用于Component中的字符串，语言内置string是引用类型，如果内存的方式转移组件，那么内置string会带来一些问题。
 #### “下一帧生效"
 这是一个非常重要的概念，我们的ECS框架中，对Entity的Component创建、删除操作都会在下一帧生效。
+#### 只读依赖与只读视图
+System 的组件依赖默认是可写（ReadWrite），也可以显式声明为只读：
+
+```go
+ctx.SetOption(
+    ecs.WithDep[components.Position](ecs.ReadWrite),   // 可写，等价于 ecs.WithDep[components.Position]()
+    ecs.WithDepReadOnly[components.Velocity](),        // 只读，等价于 ecs.WithDep[components.Velocity](ecs.ReadOnly)
+)
+```
+
+只读依赖是并行调度的依据：两个 System 对同一组件均为只读时不构成冲突，可以并行执行。
+
+只读依赖的组件必须通过**只读视图**访问。代码生成器会为每个组件生成零拷贝只读视图类型 `TReadOnly`（8 字节指针包装，仅 getter，编译期防止误写）。视图自描述组件类型信息，API 仅需一个类型参数：
+
+```go
+// 遍历只读依赖组件
+for idx, vel := range ctx.GetComponentsReadOnly[components.VelocityReadOnly]() {
+    _ = vel.X() // 字段访问语法为 p.X()，而非 p.X
+}
+
+// 按实体索引读取只读视图
+vel, ok := ctx.GetBuddyReadOnly[components.VelocityReadOnly](index)
+```
+
+手写组件使用上述泛型形式时，其视图类型需实现 `ecs.ReadOnlyView` 约束（`ComponentPacketIdentifier()` 返回与源组件一致的 PacketIdentifier，`FromPtr(unsafe.Pointer)` 构造视图）。
+
+视图 getter 规则：基础类型/枚举字段生成 `Field() T`；嵌套 struct 字段生成嵌套视图 `Field() TReadOnly`；定长数组生成 `FieldLen()` 与 `FieldAt(i)`；`[n]byte @string()` 字段生成 `FieldString() string`。
+
+行为约定（静默失败，与框架整体约定一致）：
+
+| 依赖声明 | GetComponents / GetBuddy | GetComponentsReadOnly / GetBuddyReadOnly |
+|----------|--------------------------|-------------------------------------------|
+| 未声明   | 空 / nil                  | 空 / false                                 |
+| ReadWrite| 返回 *T                   | 空 / false                                 |
+| ReadOnly | 空 / nil                  | 返回 TReadOnly 视图                        |
+
+注意：只读保护依赖代码生成。手写组件若未实现 `ReadOnly()` 方法，则无法使用只读视图 API；其只读依赖走可写 API 会静默返回空。组件的嵌套 struct 字段不支持跨包类型（生成器会显式报错）。
 ### 设计目标
 * 组件使用连续内存结构，减少cpu cache-miss
 * 快速索引，无遍历获取兄弟组件
@@ -692,6 +731,37 @@ func (s *TestSystem1) Update(event Event) {
 （努力完善中）
 ### Compound
 （努力完善中）
+### 固定访问组（WithGroup / 组表存储）
+* 用途：System 注册时声明"固定联合访问的组件组合"，框架为该组建立列式组表（Archetype Group），拥有组全集的实体在表内占一行，多组件联合遍历按行同步顺序访问，消除跨组件池的随机稀疏查找。
+* 用法：
+  ```go
+  world.Register[MoveSystem](
+      ecs.WithDep[Position](ecs.ReadWrite),
+      ecs.WithDep[Velocity](ecs.ReadOnly),
+      ecs.WithGroup(ecs.Dep[Position](), ecs.Dep[Velocity]()),
+  )
+  ```
+* 约束：至少 2 个组件类型；组件必须已 RegisterComponent；disposable/nomadic 组件禁止入组（注册期报错）；多个 System 声明的重叠组自动合并为并集组；组声明在首个 Update 时定型（Finalize），此后不可再声明。
+* 语义不变量：组件实例只存一处（组表列 或 CSet 残段）；实体集齐组组件 ⟺ 在表中占一行；增删组件在帧同步点自动收拢入行/拆行散回；`WithoutGroups()` 可全局关闭（纯布局优化层，关闭后语义完全等价）。
+* 序列化兼容：导出时组表自动散回 CSet 形态，旧存档可互通；恢复后首个 Update 自动重新收拢。
+* 高性能访问 API（推荐）：
+  ```go
+  // View2RO：组表双列 lockstep，行内零查找（A 可写 + B 只读视图）
+  for t, v := range ecs.View2RO[components.Transform, components.VelocityReadOnly](ctx) {
+      t.PosX += v.LinearX() * dt
+  }
+  // View2：双可写版本；QueryGet：Query 预解析槽位直取（免每实体重复解析）
+  q := ctx.NewQuery(ecs.WithComp[Transform](), ecs.WithComp[Velocity]())
+  for index := range q.Iter() {
+      t, _ := ecs.QueryGet[components.Transform](&q, index)
+  }
+  ```
+  View2/View2RO 在非组表场景自动回退通用路径（结果恒正确，仅性能差异）。
+  3 元及以上使用 View3-View8 / View3RO-View8RO：因 Go range-over-func 最多支持 2 个迭代变量，
+  产出为 TupleN 结构体（`for t := range View3[...](ctx) { t.V1.PosX += t.V2.LinearX() }`）。
+  ViewNRO 形态为"首组件可写 + 其余只读视图"，更复杂的读写混合场景请用 Query + QueryGet/GetBuddyReadOnly。
+* 查询自动优化（零声明）：各组件池按 EntityIndex 有序时（顺序创建实体天然满足，或 optimizer Sort 后），多池查询自动走归并连接（merge-join），失序自动回退。
+* 设计文档：`docs/plans/2026-09-16-archetype-group-storage-design.md`；基准结论：`AgentDocs/GroupStorage_Bench.md`。
 ### 一次Update的执行流程
 （努力完善中）
 ### 从添加Component到生效

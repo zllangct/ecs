@@ -820,3 +820,132 @@ func (x *DamageEvent) IsNomadic() bool {
 func (x *DamageEvent) IsDisposable() bool {
 	return true
 }
+
+// PositionReadOnly 是 Position 的只读视图（零拷贝指针包装，仅 getter，编译期防写）
+type PositionReadOnly struct{ p *Position }
+
+func (v PositionReadOnly) X() float32 {
+	return v.p.X
+}
+
+func (v PositionReadOnly) Y() float32 {
+	return v.p.Y
+}
+
+func (v PositionReadOnly) Z() float32 {
+	return v.p.Z
+}
+
+// ComponentPacketIdentifier 与源组件 Position.PacketIdentifier() 返回一致，用于只读 API 的依赖与组件集查找
+func (v PositionReadOnly) ComponentPacketIdentifier() rockmem.PacketIdentifier {
+	return PacketIdentifierPosition
+}
+
+// FromPtr 从组件内存指针构造 Position 的只读视图（零拷贝）
+func (v PositionReadOnly) FromPtr(p unsafe.Pointer) PositionReadOnly {
+	return PositionReadOnly{p: (*Position)(p)}
+}
+
+// VelocityReadOnly 是 Velocity 的只读视图（零拷贝指针包装，仅 getter，编译期防写）
+type VelocityReadOnly struct{ p *Velocity }
+
+func (v VelocityReadOnly) X() float32 {
+	return v.p.X
+}
+
+func (v VelocityReadOnly) Y() float32 {
+	return v.p.Y
+}
+
+func (v VelocityReadOnly) Z() float32 {
+	return v.p.Z
+}
+
+// ComponentPacketIdentifier 与源组件 Velocity.PacketIdentifier() 返回一致，用于只读 API 的依赖与组件集查找
+func (v VelocityReadOnly) ComponentPacketIdentifier() rockmem.PacketIdentifier {
+	return PacketIdentifierVelocity
+}
+
+// FromPtr 从组件内存指针构造 Velocity 的只读视图（零拷贝）
+func (v VelocityReadOnly) FromPtr(p unsafe.Pointer) VelocityReadOnly {
+	return VelocityReadOnly{p: (*Velocity)(p)}
+}
+
+// PlayerReadOnly 是 Player 的只读视图（零拷贝指针包装，仅 getter，编译期防写）
+type PlayerReadOnly struct{ p *Player }
+
+func (v PlayerReadOnly) NameString() string {
+	n := len(v.p.Name)
+	for n > 0 && v.p.Name[n-1] == 0 {
+		n--
+	}
+	return string(v.p.Name[:n])
+}
+
+func (v PlayerReadOnly) Level() int32 {
+	return v.p.Level
+}
+
+func (v PlayerReadOnly) Health() float32 {
+	return v.p.Health
+}
+
+func (v PlayerReadOnly) MaxHealth() float32 {
+	return v.p.MaxHealth
+}
+
+// ComponentPacketIdentifier 与源组件 Player.PacketIdentifier() 返回一致，用于只读 API 的依赖与组件集查找
+func (v PlayerReadOnly) ComponentPacketIdentifier() rockmem.PacketIdentifier {
+	return PacketIdentifierPlayer
+}
+
+// FromPtr 从组件内存指针构造 Player 的只读视图（零拷贝）
+func (v PlayerReadOnly) FromPtr(p unsafe.Pointer) PlayerReadOnly {
+	return PlayerReadOnly{p: (*Player)(p)}
+}
+
+// HealthReadOnly 是 Health 的只读视图（零拷贝指针包装，仅 getter，编译期防写）
+type HealthReadOnly struct{ p *Health }
+
+func (v HealthReadOnly) Current() float32 {
+	return v.p.Current
+}
+
+func (v HealthReadOnly) Max() float32 {
+	return v.p.Max
+}
+
+// ComponentPacketIdentifier 与源组件 Health.PacketIdentifier() 返回一致，用于只读 API 的依赖与组件集查找
+func (v HealthReadOnly) ComponentPacketIdentifier() rockmem.PacketIdentifier {
+	return PacketIdentifierHealth
+}
+
+// FromPtr 从组件内存指针构造 Health 的只读视图（零拷贝）
+func (v HealthReadOnly) FromPtr(p unsafe.Pointer) HealthReadOnly {
+	return HealthReadOnly{p: (*Health)(p)}
+}
+
+// DamageEventReadOnly 是 DamageEvent 的只读视图（零拷贝指针包装，仅 getter，编译期防写）
+type DamageEventReadOnly struct{ p *DamageEvent }
+
+func (v DamageEventReadOnly) Damage() float32 {
+	return v.p.Damage
+}
+
+func (v DamageEventReadOnly) SourceId() int64 {
+	return v.p.SourceId
+}
+
+func (v DamageEventReadOnly) TargetId() int64 {
+	return v.p.TargetId
+}
+
+// ComponentPacketIdentifier 与源组件 DamageEvent.PacketIdentifier() 返回一致，用于只读 API 的依赖与组件集查找
+func (v DamageEventReadOnly) ComponentPacketIdentifier() rockmem.PacketIdentifier {
+	return PacketIdentifierDamageEvent
+}
+
+// FromPtr 从组件内存指针构造 DamageEvent 的只读视图（零拷贝）
+func (v DamageEventReadOnly) FromPtr(p unsafe.Pointer) DamageEventReadOnly {
+	return DamageEventReadOnly{p: (*DamageEvent)(p)}
+}

@@ -10,12 +10,17 @@ import (
 )
 
 // ComponentGenerator ECS组件代码生成器
-// 用于为带有 @component() 标签的结构体生成 Component 接口所需的方法
+// 用于为带有 @component() 标签的结构体生成 Component 接口所需的方法，
+// 以及只读依赖（ReadOnly）所需的零拷贝只读视图 TReadOnly（仅 getter，编译期防写）。
 type ComponentGenerator struct {
 	file     *parser.File
 	fileTree *parser.FileTree
 	// components 存储需要生成组件代码的结构体
 	components []*parser.Struct
+	// viewStructs 存储需要生成只读视图的结构体：组件及其字段可达的所有 struct（去重，按发现顺序）
+	viewStructs []*parser.Struct
+	// isComponent 标记 viewStructs 中哪些是组件（组件额外生成 ReadOnly() 连接方法）
+	isComponent map[string]bool
 	// errors 存储验证错误
 	errors []string
 }
@@ -29,6 +34,8 @@ func (c *ComponentGenerator) Init(fileTree *parser.FileTree, file *parser.File) 
 	c.file = file
 	c.fileTree = fileTree
 	c.components = nil
+	c.viewStructs = nil
+	c.isComponent = nil
 	c.errors = nil
 
 	// 检查文件级标签是否有 @component()
@@ -64,7 +71,7 @@ func (c *ComponentGenerator) Init(fileTree *parser.FileTree, file *parser.File) 
 		for _, e := range c.errors {
 			errMsg += "  - " + e + "\n"
 		}
-		return fmt.Errorf(errMsg)
+		return fmt.Errorf("%s", errMsg)
 	}
 
 	// 如果有组件需要生成，添加 ecs 导入和 init 代码
@@ -75,8 +82,52 @@ func (c *ComponentGenerator) Init(fileTree *parser.FileTree, file *parser.File) 
 			code := fmt.Sprintf("ecs.RegisterComponent[%s](\"%s\")", st.Name, file.Package.Name)
 			golang.AddCustomInitCode(file.Filename, code)
 		}
+		// 收集只读视图结构体：组件及其字段可达的所有 struct（BFS）
+		if err := c.collectViewStructs(fileTree); err != nil {
+			return err
+		}
 	}
 
+	return nil
+}
+
+// collectViewStructs 以组件为起点 BFS 收集字段可达的所有 struct。
+// 跨包 struct 字段无法在本文件生成对应视图，属于不支持场景，显式报错。
+func (c *ComponentGenerator) collectViewStructs(fileTree *parser.FileTree) error {
+	c.isComponent = make(map[string]bool, len(c.components))
+	seen := map[string]bool{}
+	queue := make([]*parser.Struct, 0, len(c.components))
+	for _, st := range c.components {
+		c.isComponent[st.Name] = true
+		queue = append(queue, st)
+	}
+
+	for len(queue) > 0 {
+		st := queue[0]
+		queue = queue[1:]
+		if seen[st.Name] {
+			continue
+		}
+		seen[st.Name] = true
+		c.viewStructs = append(c.viewStructs, st)
+
+		for _, field := range st.Fields {
+			if field.Type == nil || !field.Type.IsStruct() {
+				continue
+			}
+			if field.Type.Package != nil && !field.Type.Package.IsLocal() {
+				return fmt.Errorf("component '%s' field '%s': cross-package struct type '%s' "+
+					"is not supported in components (cannot generate read-only view across packages)",
+					st.Name, field.Name, field.Type.QualifiedName())
+			}
+			nested := fileTree.FindStructByName(field.Type.PlainSchema)
+			if nested == nil {
+				return fmt.Errorf("component '%s' field '%s': struct type '%s' not found",
+					st.Name, field.Name, field.Type.PlainSchema)
+			}
+			queue = append(queue, nested)
+		}
+	}
 	return nil
 }
 
@@ -142,7 +193,110 @@ func (c *ComponentGenerator) Generate(fileTree *parser.FileTree, file *parser.Fi
 		c.generateStringHelperMethods(w, st)
 	}
 
+	// 生成只读视图（组件及其字段可达的所有 struct）
+	c.generateReadOnlyViews(w)
+
 	return w.Bytes(), nil
+}
+
+// generateReadOnlyViews 为所有视图结构体生成 TReadOnly 类型；
+// 组件额外生成 (*T).ReadOnly() 连接方法（供 ecs.ReadOnlyPointer 约束推断）。
+func (c *ComponentGenerator) generateReadOnlyViews(w *generator.CodeWriter) {
+	for _, st := range c.viewStructs {
+		c.generateReadOnlyView(w, st)
+		w.P()
+
+		if c.isComponent[st.Name] {
+			c.generateReadOnlySelfDescribeMethods(w, st)
+			w.P()
+		}
+	}
+}
+
+// generateReadOnlySelfDescribeMethods 为组件视图生成自描述方法，
+// 使只读 API 仅需视图类型一个类型参数（ecs.ReadOnlyView 约束）：
+//   - ComponentPacketIdentifier 与源组件 PacketIdentifier 一致（依赖/组件集查找）
+//   - FromPtr 从组件内存指针构造视图（零拷贝）
+func (c *ComponentGenerator) generateReadOnlySelfDescribeMethods(w *generator.CodeWriter, st *parser.Struct) {
+	viewName := st.Name + "ReadOnly"
+
+	w.Printf("// ComponentPacketIdentifier 与源组件 %s.PacketIdentifier() 返回一致，用于只读 API 的依赖与组件集查找", st.Name)
+	w.Printf("func (v %s) ComponentPacketIdentifier() rockmem.PacketIdentifier {", viewName)
+	w.Printf("	return PacketIdentifier%s", st.Name)
+	w.Printf("}")
+	w.P()
+
+	w.Printf("// FromPtr 从组件内存指针构造 %s 的只读视图（零拷贝）", st.Name)
+	w.Printf("func (v %s) FromPtr(p unsafe.Pointer) %s {", viewName, viewName)
+	w.Printf("	return %s{p: (*%s)(p)}", viewName, st.Name)
+	w.Printf("}")
+}
+
+// generateReadOnlyView 生成单个结构体的只读视图类型与全部字段 getter
+func (c *ComponentGenerator) generateReadOnlyView(w *generator.CodeWriter, st *parser.Struct) {
+	w.Printf("// %sReadOnly 是 %s 的只读视图（零拷贝指针包装，仅 getter，编译期防写）", st.Name, st.Name)
+	w.Printf("type %sReadOnly struct{ p *%s }", st.Name, st.Name)
+	w.P()
+
+	for _, field := range st.Fields {
+		if field.Name == "_" || field.Type == nil {
+			continue
+		}
+		c.generateViewFieldGetter(w, st, field)
+		w.P()
+	}
+}
+
+// generateViewFieldGetter 生成单个字段的只读 getter：
+//   - 标量（基础类型/枚举）: Field() T
+//   - struct 字段: Field() TReadOnly（嵌套视图，深层防护）
+//   - 定长数组: FieldLen() int + FieldAt(i) T / TReadOnly
+//   - [n]byte @string(): FieldString() string
+func (c *ComponentGenerator) generateViewFieldGetter(w *generator.CodeWriter, st *parser.Struct, field *parser.StructField) {
+	viewName := st.Name + "ReadOnly"
+	fieldName := common.ToPascalCase(field.Name)
+	typ := field.Type
+
+	switch {
+	case typ.IsArray():
+		// [n]byte @string() → 字符串 getter
+		if c.isByteArray(field) {
+			fieldHelper := parser.NewTagHelper(field.Tags)
+			if hasStringTag, _ := fieldHelper.GetBoolValue("string"); hasStringTag {
+				w.Printf("func (v %s) %sString() string {", viewName, fieldName)
+				w.Printf("	n := len(v.p.%s)", fieldName)
+				w.Printf("	for n > 0 && v.p.%s[n-1] == 0 {", fieldName)
+				w.Printf("		n--")
+				w.Printf("	}")
+				w.Printf("	return string(v.p.%s[:n])", fieldName)
+				w.Printf("}")
+				return
+			}
+		}
+		w.Printf("func (v %s) %sLen() int {", viewName, fieldName)
+		w.Printf("	return %d", typ.Length)
+		w.Printf("}")
+		w.P()
+		if typ.IsStruct() {
+			elemView := typ.PlainSchema + "ReadOnly"
+			w.Printf("func (v %s) %sAt(i int) %s {", viewName, fieldName, elemView)
+			w.Printf("	return %s{p: &v.p.%s[i]}", elemView, fieldName)
+			w.Printf("}")
+		} else {
+			w.Printf("func (v %s) %sAt(i int) %s {", viewName, fieldName, typ.QualifiedName())
+			w.Printf("	return v.p.%s[i]", fieldName)
+			w.Printf("}")
+		}
+	case typ.IsStruct():
+		w.Printf("func (v %s) %s() %sReadOnly {", viewName, fieldName, typ.PlainSchema)
+		w.Printf("	return %sReadOnly{p: &v.p.%s}", typ.PlainSchema, fieldName)
+		w.Printf("}")
+	default:
+		// 基础类型/枚举标量
+		w.Printf("func (v %s) %s() %s {", viewName, fieldName, typ.QualifiedName())
+		w.Printf("	return v.p.%s", fieldName)
+		w.Printf("}")
+	}
 }
 
 // generateStringHelperMethods 为带有 @string() 标签的 [n]byte 字段生成字符串辅助方法

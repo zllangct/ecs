@@ -13,8 +13,8 @@ type MovementSystem struct{}
 func (s *MovementSystem) Init(ctx *ecs.SystemInitContext) error {
 	ctx.SetOption(
 		ecs.WithName("MovementSystem"),
-		ecs.WithDep[components.Position](ecs.ReadWrite),
-		ecs.WithDep[components.Velocity](ecs.ReadOnly),
+		ecs.WithDep[components.Position](),
+		ecs.WithDepReadOnly[components.Velocity](),
 	)
 	return nil
 }
@@ -26,24 +26,25 @@ func (s *MovementSystem) Update(ctx *ecs.SystemContext, event ecs.Event) error {
 	}
 
 	// 遍历所有有 Position 和 Velocity 组件的实体
-	query := ecs.NewQuery(ctx,
+	query := ctx.NewQuery(
 		ecs.WithComp[components.Position](),
 		ecs.WithComp[components.Velocity](),
 	)
 	for index, _ := range query.Iter() {
-		pos, ok := ecs.GetBuddy[components.Position](ctx, index)
+		pos, ok := ctx.GetBuddy[components.Position](index)
 		if !ok {
 			continue
 		}
-		vel, ok := ecs.GetBuddy[components.Velocity](ctx, index)
+		// Velocity 是只读依赖，通过零拷贝只读视图访问（编译期防误写）
+		vel, ok := ctx.GetBuddyReadOnly[components.VelocityReadOnly](index)
 		if !ok {
 			continue
 		}
 
 		// 根据速度和时间更新位置（直接访问公开字段）
-		pos.X = pos.X + vel.X*float32(deltaSeconds)
-		pos.Y = pos.Y + vel.Y*float32(deltaSeconds)
-		pos.Z = pos.Z + vel.Z*float32(deltaSeconds)
+		pos.X = pos.X + vel.X()*float32(deltaSeconds)
+		pos.Y = pos.Y + vel.Y()*float32(deltaSeconds)
+		pos.Z = pos.Z + vel.Z()*float32(deltaSeconds)
 	}
 
 	return nil
@@ -62,25 +63,25 @@ func (s *HealthSystem) Init(ctx *ecs.SystemInitContext) error {
 }
 
 func (s *HealthSystem) Update(ctx *ecs.SystemContext, event ecs.Event) error {
-	// 遍历所有伤害事件
-	for _, damage := range ecs.GetComponents[components.DamageEvent](ctx) {
-		targetIndex := ecs.EntityIndex(damage.TargetId)
+	// 遍历所有伤害事件（DamageEvent 是只读依赖，使用零拷贝只读视图）
+	for _, damage := range ctx.GetComponentsReadOnly[components.DamageEventReadOnly]() {
+		targetIndex := ecs.EntityIndex(damage.TargetId())
 
 		// 获取目标的Health组件
-		health, ok := ecs.GetBuddy[components.Health](ctx, targetIndex)
+		health, ok := ctx.GetBuddy[components.Health](targetIndex)
 		if !ok {
 			continue
 		}
 
 		// 应用伤害（直接访问公开字段）
-		newHealth := health.Current - damage.Damage
+		newHealth := health.Current - damage.Damage()
 		if newHealth < 0 {
 			newHealth = 0
 		}
 		health.Current = newHealth
 
 		fmt.Printf("Frame %d: Entity received %.1f damage, health: %.1f/%.1f\n",
-			event.Frame, damage.Damage, health.Current, health.Max)
+			event.Frame, damage.Damage(), health.Current, health.Max)
 	}
 
 	return nil
@@ -111,33 +112,25 @@ func (s *RenderSystem) Update(ctx *ecs.SystemContext, event ecs.Event) error {
 	fmt.Printf("\n=== Frame %d (Delta: %v) ===\n", event.Frame, event.Delta)
 
 	// 遍历所有有 Position 和 Player 组件的实体
-	query := ecs.NewQuery(ctx,
+	query := ctx.NewQuery(
 		ecs.WithComp[components.Position](),
 		ecs.WithComp[components.Player](),
 	)
-	for index, _ := range query.Iter() {
-		pos, ok := ecs.GetBuddy[components.Position](ctx, index)
+	for index := range query.Iter() {
+		// Position/Player 均为只读依赖，通过零拷贝只读视图访问
+		pos, ok := ctx.GetBuddyReadOnly[components.PositionReadOnly](index)
 		if !ok {
 			continue
 		}
-		player, ok := ecs.GetBuddy[components.Player](ctx, index)
+		player, ok := ctx.GetBuddyReadOnly[components.PlayerReadOnly](index)
 		if !ok {
 			continue
-		}
-
-		// 从字节数组获取名字字符串
-		name := string(player.Name[:])
-		for i, b := range player.Name {
-			if b == 0 {
-				name = string(player.Name[:i])
-				break
-			}
 		}
 
 		fmt.Printf("  Player '%s' (Lv.%d): Position(%.2f, %.2f, %.2f) Health: %.1f/%.1f\n",
-			name, player.Level,
-			pos.X, pos.Y, pos.Z,
-			player.Health, player.MaxHealth)
+			player.NameString(), player.Level(),
+			pos.X(), pos.Y(), pos.Z(),
+			player.Health(), player.MaxHealth())
 	}
 
 	return nil

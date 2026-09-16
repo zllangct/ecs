@@ -26,7 +26,8 @@ func (c *OrderedIntSet[T]) FindIndexToInsert(it T, offset int) int {
 		l = l + 1
 	} else if (*c)[l] > it {
 	} else {
-		l = l - 1
+		// 重复元素：返回 -1，调用方不得插入
+		return -1
 	}
 	return l
 }
@@ -106,8 +107,12 @@ func (c *OrderedIntSet[T]) Merge(otherSet OrderedIntSet[T]) {
 	}
 	index := 0
 	for i := 0; i < len(otherSet); i++ {
-		index = c.FindIndexToInsert(otherSet[i], index)
-		c.insert(otherSet[i], index)
+		idx := c.FindIndexToInsert(otherSet[i], index)
+		if idx < 0 {
+			continue // 已存在，跳过
+		}
+		c.insert(otherSet[i], idx)
+		index = idx
 	}
 }
 

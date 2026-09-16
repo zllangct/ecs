@@ -44,9 +44,10 @@ func TestCmpMain(t *testing.T) {
 	name1 := testdata.Name{}
 	name1.SetValueString("hello")
 
-	e.Add(&point1)
-	e.Add(&pos1)
-	e.Add(&name1)
+	info, _ := world.GetEntityInfo(e)
+	info.Add(&point1)
+	info.Add(&pos1)
+	info.Add(&name1)
 
 	// get and walk components by GetComponents
 	sys := func(ctx *ecs.SystemContext, event ecs.Event) error {
@@ -93,7 +94,7 @@ func TestCmpMain(t *testing.T) {
 		t.Error(err)
 	}
 
-	err = world.RegisterStandard(&_testStandardSystem{})
+	err = world.Register[_testStandardSystem]()
 	if err != nil {
 		t.Error(err)
 	}
@@ -116,4 +117,45 @@ func TestName(t *testing.T) {
 	copy(a[:], b[:])
 
 	fmt.Printf("%v, %v\n", a, b)
+}
+
+// 只读视图（codegen 生成）：只读依赖可读取，可写/未声明返回空
+func TestGeneratedReadOnlyView(t *testing.T) {
+	world := ecs.NewWorld()
+	e := world.NewEntity()
+	info, _ := world.GetEntityInfo(e)
+	info.Add(&testdata.Point{X: 1, Y: 2, Z: 3})
+
+	called := false
+	roSys := func(ctx *ecs.SystemContext, event ecs.Event) error {
+		called = true
+		count := 0
+		for idx, p := range ctx.GetComponentsReadOnly[testdata.PointReadOnly]() {
+			count++
+			if p.X() != 1 || p.Y() != 2 || p.Z() != 3 {
+				t.Errorf("view values wrong: %v %v %v", p.X(), p.Y(), p.Z())
+			}
+			pv, ok := ctx.GetBuddyReadOnly[testdata.PointReadOnly](idx)
+			if !ok || pv.X() != p.X() {
+				t.Errorf("GetBuddyReadOnly mismatch at %d", idx)
+			}
+		}
+		if count != 1 {
+			t.Errorf("want 1 point, got %d", count)
+		}
+		// 可写 API 对只读依赖静默返回空
+		for range ecs.GetComponents[testdata.Point](ctx) {
+			t.Error("GetComponents on readonly dep should be empty")
+		}
+		return nil
+	}
+	if err := world.RegisterLight(roSys, ecs.WithDepReadOnly[testdata.Point]()); err != nil {
+		t.Fatal(err)
+	}
+	if err := world.Update(); err != nil {
+		t.Fatal(err)
+	}
+	if !called {
+		t.Error("system not called")
+	}
 }

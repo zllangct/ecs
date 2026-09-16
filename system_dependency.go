@@ -19,10 +19,10 @@ type ItDependency struct {
 
 func NewItDependency(it ComponentIntType, writable ...Writable) ItDependency {
 	if len(writable) > 0 {
-		return ItDependency{it, writable[0]}
+		return ItDependency{it, !writable[0]}
 	}
 
-	return ItDependency{it, ReadOnly}
+	return ItDependency{it, false}
 }
 
 func (r ItDependency) readonly() bool {
@@ -43,10 +43,11 @@ func (r Dependency[T, TP]) intType() ComponentIntType {
 	return GetIntType[T, TP]()
 }
 
+// Dep 声明组件依赖，默认可写（ReadWrite）；Dependency 底层 bool 存的是 isReadonly。
 func Dep[T any, TP ComponentPointer[T]](writable ...Writable) ComponentDependency {
-	ro := ReadOnly
+	w := ReadWrite
 	if len(writable) > 0 {
-		ro = writable[0]
+		w = writable[0]
 	}
-	return (Dependency[T, TP])(!ro)
+	return (Dependency[T, TP])(!w)
 }

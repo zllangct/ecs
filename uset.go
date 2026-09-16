@@ -32,10 +32,10 @@ func NewUSet[T any](initSize ...int) *USet[T] {
 	c := &USet[T]{}
 	c.a = allocator[T]{}
 	c.data = c.a.alloc(0, int(size))
+	c.eleSize = uint64(typ.Size())
 
 	if len(initSize) > 0 {
 		c.initSize = size
-		c.eleSize = uint64(typ.Size())
 	}
 	return c
 }
@@ -62,7 +62,7 @@ func (u *USet[T]) Add(element *T) (*T, int64) {
 }
 
 func (u *USet[T]) Remove(idx int64) (*T, int64, int64) {
-	if idx < 0 {
+	if idx < 0 || idx >= u.len {
 		return nil, 0, 0
 	}
 	lastIdx := u.len - 1
@@ -132,7 +132,9 @@ func (u *USet[T]) getIndexByElePointer(element *T) int64 {
 func (u *USet[T]) Iter() iter.Seq2[int, *T] {
 	return func(yield func(int, *T) bool) {
 		for i := 0; i < int(u.len); i++ {
-			yield(i, &u.data[i])
+			if !yield(i, &u.data[i]) {
+				return
+			}
 		}
 	}
 }

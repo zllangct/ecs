@@ -725,14 +725,15 @@ func TestEntityIDGeneratorSerializationWithRockmem(t *testing.T) {
 
 func TestWorldSerialization(t *testing.T) {
 	// Create a world with entities and components
-	original := NewWorld().(*world)
+	original := NewWorld()
 
 	// Add some entities with components
 	for i := 0; i < 5; i++ {
 		entity := original.NewEntity()
-		entity.Add(&testWorldComponent{Value: int32(i * 100), Name: "test"})
+		info, _ := original.GetEntityInfo(entity)
+		info.Add(&testWorldComponent{Value: int32(i * 100), Name: "test"})
 		if i%2 == 0 {
-			entity.Add(&testWorldComponent2{X: float32(i), Y: float32(i * 2)})
+			info.Add(&testWorldComponent2{X: float32(i), Y: float32(i * 2)})
 		}
 	}
 
@@ -751,7 +752,7 @@ func TestWorldSerialization(t *testing.T) {
 	}
 
 	// Deserialize
-	restored := &world{}
+	restored := &World{}
 	restored.Unmarshal(data)
 
 	// Validate restored data
@@ -785,13 +786,14 @@ func TestWorldSerialization(t *testing.T) {
 
 func TestWorldSerializationWithRockmem(t *testing.T) {
 	// Create a world with entities and components
-	original := NewWorld().(*world)
+	original := NewWorld()
 
 	// Add some entities with components
 	for i := 0; i < 10; i++ {
 		entity := original.NewEntity()
-		entity.Add(&testWorldComponent{Value: int32(i * 100), Name: "entity"})
-		entity.Add(&testWorldComponent2{X: float32(i), Y: float32(i * 2)})
+		info, _ := original.GetEntityInfo(entity)
+		info.Add(&testWorldComponent{Value: int32(i * 100), Name: "entity"})
+		info.Add(&testWorldComponent2{X: float32(i), Y: float32(i * 2)})
 	}
 
 	original.frame = 100
@@ -810,7 +812,7 @@ func TestWorldSerializationWithRockmem(t *testing.T) {
 	reader := rockmem.NewReader(bytes)
 
 	// Deserialize from rockmem reader
-	restored := &world{}
+	restored := &World{}
 	restored.UnmarshalFrom(reader)
 
 	// Validate restored data
@@ -831,15 +833,16 @@ func TestWorldSerializationRoundTrip(t *testing.T) {
 	// 4. Verify all state is preserved
 
 	// Create original world
-	original := NewWorld().(*world)
+	original := NewWorld()
 
 	// Add entities with various components
-	entities := make([]*EntityInfo, 20)
+	entities := make([]Entity, 20)
 	for i := 0; i < 20; i++ {
 		entities[i] = original.NewEntity()
-		entities[i].Add(&testWorldComponent{Value: int32(i), Name: "test"})
+		info, _ := original.GetEntityInfo(entities[i])
+		info.Add(&testWorldComponent{Value: int32(i), Name: "test"})
 		if i%3 == 0 {
-			entities[i].Add(&testWorldComponent2{X: float32(i), Y: float32(i * 10)})
+			info.Add(&testWorldComponent2{X: float32(i), Y: float32(i * 10)})
 		}
 	}
 
@@ -860,7 +863,7 @@ func TestWorldSerializationRoundTrip(t *testing.T) {
 
 	// "Transfer" over network and deserialize at destination
 	reader := rockmem.NewReader(networkBytes)
-	restored := &world{}
+	restored := &World{}
 	restored.UnmarshalFrom(reader)
 
 	// Verify all state
@@ -912,13 +915,13 @@ func TestWorldSerializationRoundTrip(t *testing.T) {
 }
 
 func TestEmptyWorldSerialization(t *testing.T) {
-	original := NewWorld().(*world)
+	original := NewWorld()
 
 	// Serialize empty world
 	data := original.Marshal()
 
 	// Deserialize
-	restored := &world{}
+	restored := &World{}
 	restored.Unmarshal(data)
 
 	// Verify
@@ -933,10 +936,11 @@ func TestEmptyWorldSerialization(t *testing.T) {
 
 func TestNewWorldFromData(t *testing.T) {
 	// Create and populate original world
-	original := NewWorld().(*world)
+	original := NewWorld()
 	for i := 0; i < 5; i++ {
 		entity := original.NewEntity()
-		entity.Add(&testWorldComponent{Value: int32(i)})
+		info, _ := original.GetEntityInfo(entity)
+		info.Add(&testWorldComponent{Value: int32(i)})
 	}
 	original.frame = 123
 
@@ -944,7 +948,7 @@ func TestNewWorldFromData(t *testing.T) {
 	data := original.Marshal()
 
 	// Create new world from data
-	restored := NewWorldFromData(data).(*world)
+	restored := NewWorldFromData(data)
 
 	// Verify
 	if restored.frame != original.frame {
@@ -961,12 +965,13 @@ func TestNewWorldFromData(t *testing.T) {
 
 func BenchmarkWorldSerialization(b *testing.B) {
 	// Create a world with entities and components
-	w := NewWorld().(*world)
+	w := NewWorld()
 	for i := 0; i < 1000; i++ {
 		entity := w.NewEntity()
-		entity.Add(&testWorldComponent{Value: int32(i), Name: "benchmark"})
+		info, _ := w.GetEntityInfo(entity)
+		info.Add(&testWorldComponent{Value: int32(i), Name: "benchmark"})
 		if i%2 == 0 {
-			entity.Add(&testWorldComponent2{X: float32(i), Y: float32(i * 2)})
+			info.Add(&testWorldComponent2{X: float32(i), Y: float32(i * 2)})
 		}
 	}
 	w.frame = 1000
@@ -981,7 +986,7 @@ func BenchmarkWorldSerialization(b *testing.B) {
 
 	b.Run("Unmarshal", func(b *testing.B) {
 		for n := 0; n < b.N; n++ {
-			restored := &world{}
+			restored := &World{}
 			restored.Unmarshal(data)
 		}
 	})
@@ -1001,7 +1006,7 @@ func BenchmarkWorldSerialization(b *testing.B) {
 	b.Run("UnmarshalFrom", func(b *testing.B) {
 		for n := 0; n < b.N; n++ {
 			reader := rockmem.NewReader(bytes)
-			restored := &world{}
+			restored := &World{}
 			restored.UnmarshalFrom(reader)
 		}
 	})

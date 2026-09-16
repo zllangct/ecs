@@ -23,13 +23,13 @@ func main() {
 
 	// 2. 注册Systems
 	// 标准System（实现Init和Update接口）
-	if err := world.RegisterStandard(&MovementSystem{}); err != nil {
+	if err := world.Register[MovementSystem](); err != nil {
 		panic(err)
 	}
-	if err := world.RegisterStandard(&HealthSystem{}); err != nil {
+	if err := world.Register[HealthSystem](); err != nil {
 		panic(err)
 	}
-	if err := world.RegisterStandard(&RenderSystem{}); err != nil {
+	if err := world.Register[RenderSystem](); err != nil {
 		panic(err)
 	}
 
@@ -111,7 +111,7 @@ func main() {
 	world.NewEntity(ecs.WithComponents(npcPos, npcVel))
 
 	fmt.Printf("Created entities: Player1(Entity: %d), Player2(Entity: %d)\n",
-		player1.Entity().ToInt64(), player2.Entity().ToInt64())
+		player1.ToInt64(), player2.ToInt64())
 	fmt.Println()
 
 	// 5. 运行World主循环
@@ -123,8 +123,8 @@ func main() {
 		if i == 50 {
 			damageEvent := &components.DamageEvent{}
 			damageEvent.Damage = 25
-			damageEvent.SourceId = player2.Entity().ToInt64()
-			damageEvent.TargetId = int64(player1.Entity().Index())
+			damageEvent.SourceId = player2.ToInt64()
+			damageEvent.TargetId = int64(player1.Index())
 
 			world.NewEntity(ecs.WithComponents(damageEvent))
 			fmt.Println("\n>>> Added damage event at frame 50")

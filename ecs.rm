@@ -3,10 +3,10 @@ rockmem ecs @package("ecs");
 // USet serializable data structure
 // Used for serializing USet[T] container, stores raw bytes of elements
 struct SerializableUSetData {
-    EleSize  uint64;  // Size of each element
+    EleSize  uint64;  // Size of each element; 0 means Data uses IDL layout (offsets header + per-element blobs)
     Len      int64;   // Number of elements
     InitSize int64;   // Initial capacity
-    Data     []byte;  // Raw bytes of all elements
+    Data     []byte;  // Raw bytes of all elements (legacy), or IDL layout: [(Len+1) int64 offsets][concatenated per-element blobs]
 }
 
 // SparseArray serializable data structure

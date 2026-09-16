@@ -21,6 +21,10 @@ func (es *EntitySet) Get(entity Entity) (*EntityInfo, bool) {
 	if info == nil {
 		return nil, false
 	}
+	// 校验 reuse 代数，拒绝 index 复用前的旧句柄
+	if info.entity != entity {
+		return nil, false
+	}
 	return info, true
 }
 

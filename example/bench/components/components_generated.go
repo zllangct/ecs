@@ -1452,3 +1452,275 @@ func (x *Combat) IsNomadic() bool {
 func (x *Combat) IsDisposable() bool {
 	return false
 }
+
+// TransformReadOnly 是 Transform 的只读视图（零拷贝指针包装，仅 getter，编译期防写）
+type TransformReadOnly struct{ p *Transform }
+
+func (v TransformReadOnly) PosX() float32 {
+	return v.p.PosX
+}
+
+func (v TransformReadOnly) PosY() float32 {
+	return v.p.PosY
+}
+
+func (v TransformReadOnly) PosZ() float32 {
+	return v.p.PosZ
+}
+
+func (v TransformReadOnly) RotX() float32 {
+	return v.p.RotX
+}
+
+func (v TransformReadOnly) RotY() float32 {
+	return v.p.RotY
+}
+
+func (v TransformReadOnly) RotZ() float32 {
+	return v.p.RotZ
+}
+
+func (v TransformReadOnly) ScaleX() float32 {
+	return v.p.ScaleX
+}
+
+func (v TransformReadOnly) ScaleY() float32 {
+	return v.p.ScaleY
+}
+
+func (v TransformReadOnly) ScaleZ() float32 {
+	return v.p.ScaleZ
+}
+
+// ComponentPacketIdentifier 与源组件 Transform.PacketIdentifier() 返回一致，用于只读 API 的依赖与组件集查找
+func (v TransformReadOnly) ComponentPacketIdentifier() rockmem.PacketIdentifier {
+	return PacketIdentifierTransform
+}
+
+// FromPtr 从组件内存指针构造 Transform 的只读视图（零拷贝）
+func (v TransformReadOnly) FromPtr(p unsafe.Pointer) TransformReadOnly {
+	return TransformReadOnly{p: (*Transform)(p)}
+}
+
+// VelocityReadOnly 是 Velocity 的只读视图（零拷贝指针包装，仅 getter，编译期防写）
+type VelocityReadOnly struct{ p *Velocity }
+
+func (v VelocityReadOnly) LinearX() float32 {
+	return v.p.LinearX
+}
+
+func (v VelocityReadOnly) LinearY() float32 {
+	return v.p.LinearY
+}
+
+func (v VelocityReadOnly) LinearZ() float32 {
+	return v.p.LinearZ
+}
+
+func (v VelocityReadOnly) AngularX() float32 {
+	return v.p.AngularX
+}
+
+func (v VelocityReadOnly) AngularY() float32 {
+	return v.p.AngularY
+}
+
+func (v VelocityReadOnly) AngularZ() float32 {
+	return v.p.AngularZ
+}
+
+// ComponentPacketIdentifier 与源组件 Velocity.PacketIdentifier() 返回一致，用于只读 API 的依赖与组件集查找
+func (v VelocityReadOnly) ComponentPacketIdentifier() rockmem.PacketIdentifier {
+	return PacketIdentifierVelocity
+}
+
+// FromPtr 从组件内存指针构造 Velocity 的只读视图（零拷贝）
+func (v VelocityReadOnly) FromPtr(p unsafe.Pointer) VelocityReadOnly {
+	return VelocityReadOnly{p: (*Velocity)(p)}
+}
+
+// PhysicsReadOnly 是 Physics 的只读视图（零拷贝指针包装，仅 getter，编译期防写）
+type PhysicsReadOnly struct{ p *Physics }
+
+func (v PhysicsReadOnly) Mass() float32 {
+	return v.p.Mass
+}
+
+func (v PhysicsReadOnly) Drag() float32 {
+	return v.p.Drag
+}
+
+func (v PhysicsReadOnly) AngularDrag() float32 {
+	return v.p.AngularDrag
+}
+
+func (v PhysicsReadOnly) UseGravity() int8 {
+	return v.p.UseGravity
+}
+
+func (v PhysicsReadOnly) IsKinematic() int8 {
+	return v.p.IsKinematic
+}
+
+// ComponentPacketIdentifier 与源组件 Physics.PacketIdentifier() 返回一致，用于只读 API 的依赖与组件集查找
+func (v PhysicsReadOnly) ComponentPacketIdentifier() rockmem.PacketIdentifier {
+	return PacketIdentifierPhysics
+}
+
+// FromPtr 从组件内存指针构造 Physics 的只读视图（零拷贝）
+func (v PhysicsReadOnly) FromPtr(p unsafe.Pointer) PhysicsReadOnly {
+	return PhysicsReadOnly{p: (*Physics)(p)}
+}
+
+// RenderReadOnly 是 Render 的只读视图（零拷贝指针包装，仅 getter，编译期防写）
+type RenderReadOnly struct{ p *Render }
+
+func (v RenderReadOnly) MeshId() int32 {
+	return v.p.MeshId
+}
+
+func (v RenderReadOnly) MaterialId() int32 {
+	return v.p.MaterialId
+}
+
+func (v RenderReadOnly) Visible() int8 {
+	return v.p.Visible
+}
+
+func (v RenderReadOnly) CastShadow() int8 {
+	return v.p.CastShadow
+}
+
+func (v RenderReadOnly) ReceiveShadow() int8 {
+	return v.p.ReceiveShadow
+}
+
+// ComponentPacketIdentifier 与源组件 Render.PacketIdentifier() 返回一致，用于只读 API 的依赖与组件集查找
+func (v RenderReadOnly) ComponentPacketIdentifier() rockmem.PacketIdentifier {
+	return PacketIdentifierRender
+}
+
+// FromPtr 从组件内存指针构造 Render 的只读视图（零拷贝）
+func (v RenderReadOnly) FromPtr(p unsafe.Pointer) RenderReadOnly {
+	return RenderReadOnly{p: (*Render)(p)}
+}
+
+// HealthReadOnly 是 Health 的只读视图（零拷贝指针包装，仅 getter，编译期防写）
+type HealthReadOnly struct{ p *Health }
+
+func (v HealthReadOnly) Current() float32 {
+	return v.p.Current
+}
+
+func (v HealthReadOnly) Max() float32 {
+	return v.p.Max
+}
+
+func (v HealthReadOnly) Regen() float32 {
+	return v.p.Regen
+}
+
+// ComponentPacketIdentifier 与源组件 Health.PacketIdentifier() 返回一致，用于只读 API 的依赖与组件集查找
+func (v HealthReadOnly) ComponentPacketIdentifier() rockmem.PacketIdentifier {
+	return PacketIdentifierHealth
+}
+
+// FromPtr 从组件内存指针构造 Health 的只读视图（零拷贝）
+func (v HealthReadOnly) FromPtr(p unsafe.Pointer) HealthReadOnly {
+	return HealthReadOnly{p: (*Health)(p)}
+}
+
+// AIReadOnly 是 AI 的只读视图（零拷贝指针包装，仅 getter，编译期防写）
+type AIReadOnly struct{ p *AI }
+
+func (v AIReadOnly) State() int32 {
+	return v.p.State
+}
+
+func (v AIReadOnly) TargetId() int64 {
+	return v.p.TargetId
+}
+
+func (v AIReadOnly) AggroRange() float32 {
+	return v.p.AggroRange
+}
+
+func (v AIReadOnly) AttackRange() float32 {
+	return v.p.AttackRange
+}
+
+// ComponentPacketIdentifier 与源组件 AI.PacketIdentifier() 返回一致，用于只读 API 的依赖与组件集查找
+func (v AIReadOnly) ComponentPacketIdentifier() rockmem.PacketIdentifier {
+	return PacketIdentifierAI
+}
+
+// FromPtr 从组件内存指针构造 AI 的只读视图（零拷贝）
+func (v AIReadOnly) FromPtr(p unsafe.Pointer) AIReadOnly {
+	return AIReadOnly{p: (*AI)(p)}
+}
+
+// MovementReadOnly 是 Movement 的只读视图（零拷贝指针包装，仅 getter，编译期防写）
+type MovementReadOnly struct{ p *Movement }
+
+func (v MovementReadOnly) Speed() float32 {
+	return v.p.Speed
+}
+
+func (v MovementReadOnly) MaxSpeed() float32 {
+	return v.p.MaxSpeed
+}
+
+func (v MovementReadOnly) Acceleration() float32 {
+	return v.p.Acceleration
+}
+
+func (v MovementReadOnly) Deceleration() float32 {
+	return v.p.Deceleration
+}
+
+func (v MovementReadOnly) TurnSpeed() float32 {
+	return v.p.TurnSpeed
+}
+
+// ComponentPacketIdentifier 与源组件 Movement.PacketIdentifier() 返回一致，用于只读 API 的依赖与组件集查找
+func (v MovementReadOnly) ComponentPacketIdentifier() rockmem.PacketIdentifier {
+	return PacketIdentifierMovement
+}
+
+// FromPtr 从组件内存指针构造 Movement 的只读视图（零拷贝）
+func (v MovementReadOnly) FromPtr(p unsafe.Pointer) MovementReadOnly {
+	return MovementReadOnly{p: (*Movement)(p)}
+}
+
+// CombatReadOnly 是 Combat 的只读视图（零拷贝指针包装，仅 getter，编译期防写）
+type CombatReadOnly struct{ p *Combat }
+
+func (v CombatReadOnly) Attack() float32 {
+	return v.p.Attack
+}
+
+func (v CombatReadOnly) Defense() float32 {
+	return v.p.Defense
+}
+
+func (v CombatReadOnly) CritRate() float32 {
+	return v.p.CritRate
+}
+
+func (v CombatReadOnly) CritDamage() float32 {
+	return v.p.CritDamage
+}
+
+func (v CombatReadOnly) AttackSpeed() float32 {
+	return v.p.AttackSpeed
+}
+
+// ComponentPacketIdentifier 与源组件 Combat.PacketIdentifier() 返回一致，用于只读 API 的依赖与组件集查找
+func (v CombatReadOnly) ComponentPacketIdentifier() rockmem.PacketIdentifier {
+	return PacketIdentifierCombat
+}
+
+// FromPtr 从组件内存指针构造 Combat 的只读视图（零拷贝）
+func (v CombatReadOnly) FromPtr(p unsafe.Pointer) CombatReadOnly {
+	return CombatReadOnly{p: (*Combat)(p)}
+}

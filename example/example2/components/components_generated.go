@@ -864,3 +864,136 @@ func (x *Inventory) IsNomadic() bool {
 func (x *Inventory) IsDisposable() bool {
 	return false
 }
+
+// GameStateReadOnly 是 GameState 的只读视图（零拷贝指针包装，仅 getter，编译期防写）
+type GameStateReadOnly struct{ p *GameState }
+
+func (v GameStateReadOnly) Tick() int64 {
+	return v.p.Tick
+}
+
+func (v GameStateReadOnly) Score() int32 {
+	return v.p.Score
+}
+
+func (v GameStateReadOnly) GameNameString() string {
+	n := len(v.p.GameName)
+	for n > 0 && v.p.GameName[n-1] == 0 {
+		n--
+	}
+	return string(v.p.GameName[:n])
+}
+
+// ComponentPacketIdentifier 与源组件 GameState.PacketIdentifier() 返回一致，用于只读 API 的依赖与组件集查找
+func (v GameStateReadOnly) ComponentPacketIdentifier() rockmem.PacketIdentifier {
+	return PacketIdentifierGameState
+}
+
+// FromPtr 从组件内存指针构造 GameState 的只读视图（零拷贝）
+func (v GameStateReadOnly) FromPtr(p unsafe.Pointer) GameStateReadOnly {
+	return GameStateReadOnly{p: (*GameState)(p)}
+}
+
+// PositionReadOnly 是 Position 的只读视图（零拷贝指针包装，仅 getter，编译期防写）
+type PositionReadOnly struct{ p *Position }
+
+func (v PositionReadOnly) X() float32 {
+	return v.p.X
+}
+
+func (v PositionReadOnly) Y() float32 {
+	return v.p.Y
+}
+
+func (v PositionReadOnly) Z() float32 {
+	return v.p.Z
+}
+
+// ComponentPacketIdentifier 与源组件 Position.PacketIdentifier() 返回一致，用于只读 API 的依赖与组件集查找
+func (v PositionReadOnly) ComponentPacketIdentifier() rockmem.PacketIdentifier {
+	return PacketIdentifierPosition
+}
+
+// FromPtr 从组件内存指针构造 Position 的只读视图（零拷贝）
+func (v PositionReadOnly) FromPtr(p unsafe.Pointer) PositionReadOnly {
+	return PositionReadOnly{p: (*Position)(p)}
+}
+
+// VelocityReadOnly 是 Velocity 的只读视图（零拷贝指针包装，仅 getter，编译期防写）
+type VelocityReadOnly struct{ p *Velocity }
+
+func (v VelocityReadOnly) X() float32 {
+	return v.p.X
+}
+
+func (v VelocityReadOnly) Y() float32 {
+	return v.p.Y
+}
+
+func (v VelocityReadOnly) Z() float32 {
+	return v.p.Z
+}
+
+// ComponentPacketIdentifier 与源组件 Velocity.PacketIdentifier() 返回一致，用于只读 API 的依赖与组件集查找
+func (v VelocityReadOnly) ComponentPacketIdentifier() rockmem.PacketIdentifier {
+	return PacketIdentifierVelocity
+}
+
+// FromPtr 从组件内存指针构造 Velocity 的只读视图（零拷贝）
+func (v VelocityReadOnly) FromPtr(p unsafe.Pointer) VelocityReadOnly {
+	return VelocityReadOnly{p: (*Velocity)(p)}
+}
+
+// EntityDataReadOnly 是 EntityData 的只读视图（零拷贝指针包装，仅 getter，编译期防写）
+type EntityDataReadOnly struct{ p *EntityData }
+
+func (v EntityDataReadOnly) NameString() string {
+	n := len(v.p.Name)
+	for n > 0 && v.p.Name[n-1] == 0 {
+		n--
+	}
+	return string(v.p.Name[:n])
+}
+
+func (v EntityDataReadOnly) TypeId() int32 {
+	return v.p.TypeId
+}
+
+func (v EntityDataReadOnly) Flags() uint32 {
+	return v.p.Flags
+}
+
+// ComponentPacketIdentifier 与源组件 EntityData.PacketIdentifier() 返回一致，用于只读 API 的依赖与组件集查找
+func (v EntityDataReadOnly) ComponentPacketIdentifier() rockmem.PacketIdentifier {
+	return PacketIdentifierEntityData
+}
+
+// FromPtr 从组件内存指针构造 EntityData 的只读视图（零拷贝）
+func (v EntityDataReadOnly) FromPtr(p unsafe.Pointer) EntityDataReadOnly {
+	return EntityDataReadOnly{p: (*EntityData)(p)}
+}
+
+// InventoryReadOnly 是 Inventory 的只读视图（零拷贝指针包装，仅 getter，编译期防写）
+type InventoryReadOnly struct{ p *Inventory }
+
+func (v InventoryReadOnly) ItemsLen() int {
+	return 8
+}
+
+func (v InventoryReadOnly) ItemsAt(i int) int32 {
+	return v.p.Items[i]
+}
+
+func (v InventoryReadOnly) Count() int32 {
+	return v.p.Count
+}
+
+// ComponentPacketIdentifier 与源组件 Inventory.PacketIdentifier() 返回一致，用于只读 API 的依赖与组件集查找
+func (v InventoryReadOnly) ComponentPacketIdentifier() rockmem.PacketIdentifier {
+	return PacketIdentifierInventory
+}
+
+// FromPtr 从组件内存指针构造 Inventory 的只读视图（零拷贝）
+func (v InventoryReadOnly) FromPtr(p unsafe.Pointer) InventoryReadOnly {
+	return InventoryReadOnly{p: (*Inventory)(p)}
+}

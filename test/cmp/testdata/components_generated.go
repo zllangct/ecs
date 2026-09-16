@@ -543,3 +543,90 @@ func (x *Name) SetValueString(v string) {
 	}
 	copy(x.Value[:], v[:n])
 }
+
+// PointReadOnly 是 Point 的只读视图（零拷贝指针包装，仅 getter，编译期防写）
+type PointReadOnly struct{ p *Point }
+
+func (v PointReadOnly) X() float32 {
+	return v.p.X
+}
+
+func (v PointReadOnly) Y() float32 {
+	return v.p.Y
+}
+
+func (v PointReadOnly) Z() float32 {
+	return v.p.Z
+}
+
+// ComponentPacketIdentifier 与源组件 Point.PacketIdentifier() 返回一致，用于只读 API 的依赖与组件集查找
+func (v PointReadOnly) ComponentPacketIdentifier() rockmem.PacketIdentifier {
+	return PacketIdentifierPoint
+}
+
+// FromPtr 从组件内存指针构造 Point 的只读视图（零拷贝）
+func (v PointReadOnly) FromPtr(p unsafe.Pointer) PointReadOnly {
+	return PointReadOnly{p: (*Point)(p)}
+}
+
+// PositionReadOnly 是 Position 的只读视图（零拷贝指针包装，仅 getter，编译期防写）
+type PositionReadOnly struct{ p *Position }
+
+func (v PositionReadOnly) X() float32 {
+	return v.p.X
+}
+
+func (v PositionReadOnly) Y() float32 {
+	return v.p.Y
+}
+
+func (v PositionReadOnly) Z() float32 {
+	return v.p.Z
+}
+
+// ComponentPacketIdentifier 与源组件 Position.PacketIdentifier() 返回一致，用于只读 API 的依赖与组件集查找
+func (v PositionReadOnly) ComponentPacketIdentifier() rockmem.PacketIdentifier {
+	return PacketIdentifierPosition
+}
+
+// FromPtr 从组件内存指针构造 Position 的只读视图（零拷贝）
+func (v PositionReadOnly) FromPtr(p unsafe.Pointer) PositionReadOnly {
+	return PositionReadOnly{p: (*Position)(p)}
+}
+
+// NameReadOnly 是 Name 的只读视图（零拷贝指针包装，仅 getter，编译期防写）
+type NameReadOnly struct{ p *Name }
+
+func (v NameReadOnly) ValueString() string {
+	n := len(v.p.Value)
+	for n > 0 && v.p.Value[n-1] == 0 {
+		n--
+	}
+	return string(v.p.Value[:n])
+}
+
+func (v NameReadOnly) PointsLen() int {
+	return 2
+}
+
+func (v NameReadOnly) PointsAt(i int) PointReadOnly {
+	return PointReadOnly{p: &v.p.Points[i]}
+}
+
+func (v NameReadOnly) ArrLen() int {
+	return 2
+}
+
+func (v NameReadOnly) ArrAt(i int) int32 {
+	return v.p.Arr[i]
+}
+
+// ComponentPacketIdentifier 与源组件 Name.PacketIdentifier() 返回一致，用于只读 API 的依赖与组件集查找
+func (v NameReadOnly) ComponentPacketIdentifier() rockmem.PacketIdentifier {
+	return PacketIdentifierName
+}
+
+// FromPtr 从组件内存指针构造 Name 的只读视图（零拷贝）
+func (v NameReadOnly) FromPtr(p unsafe.Pointer) NameReadOnly {
+	return NameReadOnly{p: (*Name)(p)}
+}

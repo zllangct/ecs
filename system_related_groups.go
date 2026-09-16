@@ -12,6 +12,8 @@ type systemTreeNode struct {
 	val      SystemInfo
 }
 
+// isFriend 判断两个 system 是否因共享组件依赖而"相关"（任一方可写即冲突）。
+// 命名取"好友"形象义：好友必须排进同一条串行链（不同 batch），不能并行。
 func (p *systemTreeNode) isFriend(node *systemTreeNode) bool {
 	for _, r := range p.val.getDeps() {
 		for _, rTarget := range node.val.getDeps() {

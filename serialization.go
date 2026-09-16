@@ -1,6 +1,7 @@
 package ecs
 
 import (
+	"encoding/binary"
 	"runtime"
 	"unsafe"
 
@@ -135,10 +136,47 @@ func (s *SparseArray[K, V]) UnmarshalFrom(reader *rockmem.Reader) {
 
 // CSet serialization methods (inherits from SparseArray)
 
-// Marshal serializes CSet[T] to SerializableSparseArrayData
-// Since CSet embeds SparseArray, we just call the parent's Marshal method
+// rockmemMessage 是 rockmem 生成组件的序列化接口
+type rockmemMessage interface {
+	WriteAsRoot(rockmem.Writer) (uint, error)
+	ReadAsRoot(*rockmem.Reader)
+}
+
+// Marshal serializes CSet[T] to SerializableSparseArrayData.
+// 组件实现 rockmem.Message 时走逐元素 IDL 序列化（Data 布局：
+// [(Len+1) int64 偏移表][逐元素 blob 拼接]，EleSize=0 作标记），
+// 支持 string/slice/嵌套等非 POD 字段；否则回退 legacy raw 布局。
 func (c *CSet[T, TP]) Marshal() *SerializableSparseArrayData {
-	return c.SparseArray.Marshal()
+	data := c.SparseArray.Marshal()
+
+	var probe TP
+	if _, ok := any(probe).(rockmemMessage); !ok || c.Len() == 0 {
+		return data
+	}
+
+	n := c.Len()
+	offsets := make([]int64, n+1)
+	var blob []byte
+	w := rockmem.NewWriter()
+	for i := 0; i < n; i++ {
+		w.Reset()
+		m := any(TP(&c.data[i])).(rockmemMessage)
+		if _, err := m.WriteAsRoot(w); err != nil {
+			// 序列化失败放弃 IDL 路径，回退 legacy（保持可用性）
+			return c.SparseArray.Marshal()
+		}
+		offsets[i] = int64(len(blob))
+		blob = append(blob, w.Bytes()...)
+	}
+	offsets[n] = int64(len(blob))
+
+	hdr := make([]byte, (n+1)*8)
+	for i, o := range offsets {
+		binary.LittleEndian.PutUint64(hdr[i*8:], uint64(o))
+	}
+	data.USetData.Data = append(hdr, blob...)
+	data.USetData.EleSize = 0 // IDL 路径标记
+	return data
 }
 
 // MarshalTo writes CSet[T] to a rockmem.Writer
@@ -149,7 +187,50 @@ func (c *CSet[T, TP]) MarshalTo(writer rockmem.Writer) (uint, error) {
 // Unmarshal deserializes SerializableSparseArrayData to CSet[T]
 // IMPORTANT: The caller must ensure type T matches the original serialized type
 func (c *CSet[T, TP]) Unmarshal(data *SerializableSparseArrayData) {
+	if data.USetData.EleSize == 0 && data.USetData.Len > 0 {
+		c.unmarshalIDL(data)
+		return
+	}
 	c.SparseArray.Unmarshal(data)
+}
+
+// unmarshalIDL 按 IDL 布局（偏移表 + 逐元素 blob）恢复组件
+func (c *CSet[T, TP]) unmarshalIDL(data *SerializableSparseArrayData) {
+	raw := data.USetData.Data
+	n := int(data.USetData.Len)
+	hdrLen := int64((n + 1) * 8)
+	offsets := make([]int64, n+1)
+	for i := 0; i <= n; i++ {
+		offsets[i] = int64(binary.LittleEndian.Uint64(raw[i*8:]))
+	}
+
+	c.USet.eleSize = uint64(TypeOf[T]().Size())
+	c.USet.len = int64(n)
+	c.USet.initSize = data.USetData.InitSize
+	c.USet.data = c.USet.a.alloc(n, n)
+	for i := 0; i < n; i++ {
+		blob := raw[hdrLen+offsets[i] : hdrLen+offsets[i+1]]
+		m := any(TP(&c.USet.data[i])).(rockmemMessage)
+		m.ReadAsRoot(rockmem.NewReader(blob))
+	}
+
+	// SparseArray 元数据（与 SparseArray.Unmarshal 相同部分）
+	c.maxKey = EntityIndex(data.MaxKey)
+	c.shrinkThreshold = data.ShrinkThreshold
+	c.initSize = int(data.InitSize)
+	c.isKOrder = data.IsKOrder
+	if len(data.Indices) > 0 {
+		c.indices = make([]int32, len(data.Indices))
+		copy(c.indices, data.Indices)
+	} else {
+		c.indices = make([]int32, 0, c.initSize)
+	}
+	if len(data.Idx2Key) > 0 {
+		c.idx2Key = make([]int32, len(data.Idx2Key))
+		copy(c.idx2Key, data.Idx2Key)
+	} else {
+		c.idx2Key = []int32{}
+	}
 }
 
 // UnmarshalFrom reads CSet[T] from a rockmem.Reader
@@ -304,7 +385,7 @@ func (es *EntitySet) UnmarshalFrom(reader *rockmem.Reader) {
 }
 
 // SetWorldForAll sets the world pointer for all EntityInfos after deserialization
-func (es *EntitySet) SetWorldForAll(w *world) {
+func (es *EntitySet) SetWorldForAll(w *World) {
 	for i := 0; i < es.Len(); i++ {
 		es.data[i].SetWorld(w)
 	}
@@ -320,7 +401,7 @@ func NewEntitySetFromData(data *SerializableEntitySetData) *EntitySet {
 // EntityInfo helper methods for setting world after deserialization
 
 // SetWorld sets the world pointer after deserialization
-func (e *EntityInfo) SetWorld(w *world) {
+func (e *EntityInfo) SetWorld(w *World) {
 	e.world = w
 }
 
@@ -376,7 +457,16 @@ func (e *EntityIDGenerator) Unmarshal(data *SerializableEntityIDGeneratorData) {
 			e.ids[i] = Entity(id).toReuseID()
 		}
 	} else {
-		e.ids = make([]ReuseID, 0)
+		// 空数据等价于全新生成器：维持不变量 pending==len(ids)、index 0 保留不用、
+		// ids[i].index=i+1 构成初始 freelist 链
+		e.ids = make([]ReuseID, 1)
+		e.ids[0].index = 1
+		e.free = 1
+		e.pending = 1
+	}
+
+	if e.delayCap <= 0 {
+		e.delayCap = 10 // 与 NewEntityIDGenerator 默认值对齐
 	}
 
 	// Convert int64 slice to removeDelay slice
@@ -384,6 +474,9 @@ func (e *EntityIDGenerator) Unmarshal(data *SerializableEntityIDGeneratorData) {
 		e.removeDelay = make([]ReuseID, len(data.RemoveDelay))
 		for i, id := range data.RemoveDelay {
 			e.removeDelay[i] = Entity(id).toReuseID()
+		}
+		if int32(len(e.removeDelay)) < e.delayCap {
+			e.removeDelay = append(e.removeDelay, make([]ReuseID, int(e.delayCap)-len(e.removeDelay))...)
 		}
 	} else {
 		e.removeDelay = make([]ReuseID, e.delayCap)
@@ -465,12 +558,18 @@ func (w *serializableWorld) MarshalTo(writer rockmem.Writer) (uint, error) {
 }
 
 // MarshalTo writes world to a rockmem.Writer (convenience method)
-func (w *world) MarshalTo(writer rockmem.Writer) (uint, error) {
+// 组表数据先散回 CSet 导出（格式兼容），完成后重新收拢恢复布局。
+func (w *World) MarshalTo(writer rockmem.Writer) (uint, error) {
+	w.scatterAll()
+	defer w.absorbAll()
 	return w.serializableWorld.MarshalTo(writer)
 }
 
 // Marshal serializes world to SerializableWorldData (convenience method)
-func (w *world) Marshal() *SerializableWorldData {
+// 组表数据先散回 CSet 导出（格式兼容），完成后重新收拢恢复布局。
+func (w *World) Marshal() *SerializableWorldData {
+	w.scatterAll()
+	defer w.absorbAll()
 	return w.serializableWorld.Marshal()
 }
 
@@ -536,14 +635,14 @@ func (w *serializableWorld) UnmarshalFrom(reader *rockmem.Reader) {
 }
 
 // Unmarshal deserializes SerializableWorldData to world (convenience method)
-func (w *world) Unmarshal(data *SerializableWorldData) {
+func (w *World) Unmarshal(data *SerializableWorldData) {
 	w.serializableWorld.Unmarshal(data)
 	// Set world pointer for all entities after deserialization
 	w.entities.SetWorldForAll(w)
 }
 
 // UnmarshalFrom reads world from a rockmem.Reader (convenience method)
-func (w *world) UnmarshalFrom(reader *rockmem.Reader) {
+func (w *World) UnmarshalFrom(reader *rockmem.Reader) {
 	data := &SerializableWorldData{}
 	data.ReadAsRoot(reader)
 	w.Unmarshal(data)
@@ -552,14 +651,14 @@ func (w *world) UnmarshalFrom(reader *rockmem.Reader) {
 // NewWorldFromData creates a new world from SerializableWorldData
 // Note: This creates a minimal world without systems, optimizer, etc.
 // The caller should configure these runtime components after deserialization.
-func NewWorldFromData(data *SerializableWorldData, opts ...WorldOption) World {
+func NewWorldFromData(data *SerializableWorldData, opts ...WorldOption) *World {
 	c := &WorldConfig{}
 	c.initDefault()
 	for _, opt := range opts {
 		opt(c)
 	}
 
-	w := &world{}
+	w := &World{}
 	w.status = WorldStatusInitializing
 	w.config = c
 
@@ -571,6 +670,7 @@ func NewWorldFromData(data *SerializableWorldData, opts ...WorldOption) World {
 	w.systems = newSystemFlow(w, flowExecOpt)
 	w.opLog = NewOpLog(w, runtime.NumCPU())
 	w.optimizer = newOptimizer(w)
+	w.archetypes = NewArchetypeRegistry()
 
 	// Unmarshal the serializable state
 	w.Unmarshal(data)

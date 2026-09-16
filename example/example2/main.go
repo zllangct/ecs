@@ -84,9 +84,9 @@ func main() {
 	}
 
 	fmt.Println("原始World状态:")
-	fmt.Printf("  Entity1 (ID: %d): Player1\n", entity1.Entity().ToInt64())
-	fmt.Printf("  Entity2 (ID: %d): Enemy1\n", entity2.Entity().ToInt64())
-	fmt.Printf("  Entity3 (ID: %d): Item\n", entity3.Entity().ToInt64())
+	fmt.Printf("  Entity1 (ID: %d): Player1\n", entity1.ToInt64())
+	fmt.Printf("  Entity2 (ID: %d): Enemy1\n", entity2.ToInt64())
+	fmt.Printf("  Entity3 (ID: %d): Item\n", entity3.ToInt64())
 
 	// ========================================
 	// 第二部分：序列化World
@@ -174,54 +174,43 @@ func main() {
 	fmt.Println("=== 示例完成 ===")
 }
 
-// getBytesAsString 从字节数组获取字符串（去掉末尾空字节）
-func getBytesAsString(b []byte) string {
-	for i, c := range b {
-		if c == 0 {
-			return string(b[:i])
-		}
-	}
-	return string(b)
-}
-
 // verifyDataConsistency 验证数据一致性
-func verifyDataConsistency(world ecs.World) {
+func verifyDataConsistency(world *ecs.World) {
 	// 创建一个验证System来检查数据
 	verifySystem := func(ctx *ecs.SystemContext, event ecs.Event) error {
 		fmt.Println("验证组件数据:")
 
-		// 验证Position组件
+		// 验证Position组件（只读依赖，零拷贝只读视图）
 		posCount := 0
-		for _, pos := range ecs.GetComponents[components.Position](ctx) {
+		for _, pos := range ctx.GetComponentsReadOnly[components.PositionReadOnly]() {
 			posCount++
-			fmt.Printf("  Position: (%.2f, %.2f, %.2f)\n", pos.X, pos.Y, pos.Z)
+			fmt.Printf("  Position: (%.2f, %.2f, %.2f)\n", pos.X(), pos.Y(), pos.Z())
 		}
 		fmt.Printf("  Position组件数量: %d (预期: 3)\n", posCount)
 
 		// 验证Velocity组件
 		velCount := 0
-		for _, vel := range ecs.GetComponents[components.Velocity](ctx) {
+		for _, vel := range ctx.GetComponentsReadOnly[components.VelocityReadOnly]() {
 			velCount++
-			fmt.Printf("  Velocity: (%.2f, %.2f, %.2f)\n", vel.X, vel.Y, vel.Z)
+			fmt.Printf("  Velocity: (%.2f, %.2f, %.2f)\n", vel.X(), vel.Y(), vel.Z())
 		}
 		fmt.Printf("  Velocity组件数量: %d (预期: 2)\n", velCount)
 
 		// 验证EntityData组件
 		dataCount := 0
-		for _, data := range ecs.GetComponents[components.EntityData](ctx) {
+		for _, data := range ctx.GetComponentsReadOnly[components.EntityDataReadOnly]() {
 			dataCount++
-			name := getBytesAsString(data.Name[:])
 			fmt.Printf("  EntityData: name='%s', typeId=%d, flags=0x%X\n",
-				name, data.TypeId, data.Flags)
+				data.NameString(), data.TypeId(), data.Flags())
 		}
 		fmt.Printf("  EntityData组件数量: %d (预期: 2)\n", dataCount)
 
 		// 验证Inventory组件
 		invCount := 0
-		for _, inv := range ecs.GetComponents[components.Inventory](ctx) {
+		for _, inv := range ctx.GetComponentsReadOnly[components.InventoryReadOnly]() {
 			invCount++
 			fmt.Printf("  Inventory: count=%d, items=[%d, %d, %d, ...]\n",
-				inv.Count, inv.Items[0], inv.Items[1], inv.Items[2])
+				inv.Count(), inv.ItemsAt(0), inv.ItemsAt(1), inv.ItemsAt(2))
 		}
 		fmt.Printf("  Inventory组件数量: %d (预期: 1)\n", invCount)
 

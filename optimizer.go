@@ -20,7 +20,10 @@ func newOptReporter() *optReporter {
 }
 
 func (o *optReporter) shapeUsageAdd(compound Compound) {
-	key := NewFixedCompound(compound)
+	o.shapeUsageAddKey(NewFixedCompound(compound))
+}
+
+func (o *optReporter) shapeUsageAddKey(key FixedCompound) {
 	if _, ok := o.shapeUsage[key]; ok {
 		o.shapeUsage[key]++
 	} else {
@@ -29,7 +32,7 @@ func (o *optReporter) shapeUsageAdd(compound Compound) {
 }
 
 type optimizer struct {
-	world                  *world
+	world                  *World
 	startTime              time.Time
 	expireTime             time.Time
 	lastSample             time.Time
@@ -37,7 +40,7 @@ type optimizer struct {
 	lastCollectConsumption time.Duration
 }
 
-func newOptimizer(world *world) *optimizer {
+func newOptimizer(world *World) *optimizer {
 	return &optimizer{world: world}
 }
 
@@ -57,7 +60,7 @@ func (o *optimizer) collect() {
 		}
 	}
 	//sort
-	o.shapeInfos = make([]ShapeInfo, len(shapeRef))
+	o.shapeInfos = make([]ShapeInfo, 0, len(shapeRef))
 	for compound, count := range shapeRef {
 		o.shapeInfos = append(o.shapeInfos, ShapeInfo{
 			execCount: count,

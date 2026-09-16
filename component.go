@@ -1,12 +1,26 @@
 package ecs
 
-import rockmem "github.com/zllangct/rockmem/golang"
+import (
+	"unsafe"
+
+	rockmem "github.com/zllangct/rockmem/golang"
+)
 
 type ComponentIntType uint64
 
 type ComponentPointer[T any] interface {
 	Component
 	*T
+}
+
+// ReadOnlyView 约束 codegen 生成的组件只读视图（TReadOnly）。
+// 视图自描述全部类型信息：ComponentPacketIdentifier 与源组件的
+// PacketIdentifier 一致（用于依赖/组件集查找），FromPtr 从组件内存指针
+// 构造视图；因此只读 API 仅需显式书写视图类型一个类型参数。
+// 手写组件的只读视图需自行实现这两个方法方可使用 View API。
+type ReadOnlyView[TR any] interface {
+	ComponentPacketIdentifier() rockmem.PacketIdentifier
+	FromPtr(p unsafe.Pointer) TR
 }
 
 type Component interface {

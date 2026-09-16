@@ -56,6 +56,27 @@ func TestOrderedIntSet_InsertIndex(t *testing.T) {
 	}
 }
 
+// 回归：重复元素位于二分循环结束后的 l==r 位置时（如向 {1,2} 再 Add 2），
+// FindIndexToInsert 必须返回 -1，不得返回插入位导致乱序重复。
+func TestOrderedIntSet_AddDuplicateTail(t *testing.T) {
+	c := OrderedIntSet[uint16]{1, 2}
+	if got := c.FindIndexToInsert(2, 0); got != -1 {
+		t.Errorf("FindIndexToInsert(dup tail) = %v, want -1", got)
+	}
+	c2 := OrderedIntSet[uint16]{1, 2}
+	if c2.Add(2) {
+		t.Errorf("Add(dup tail) should return false, got %v", c2)
+	}
+	if len(c2) != 2 || c2[0] != 1 || c2[1] != 2 {
+		t.Errorf("set corrupted: %v", c2)
+	}
+	// 头部/中部重复也不得插入
+	c3 := OrderedIntSet[uint16]{1, 2, 3}
+	if c3.Add(1) || c3.Add(2) || c3.Add(3) {
+		t.Errorf("dup adds should all fail, got %v", c3)
+	}
+}
+
 func TestOrderedIntSet_Find(t *testing.T) {
 	c := OrderedIntSet[uint16]{}
 	insert := []uint16{7, 3, 6, 2, 9, 4}
