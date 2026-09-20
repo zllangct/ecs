@@ -130,7 +130,11 @@ func main() {
 	worldData.ReadAsRoot(reader)
 
 	// 创建新World并恢复状态
-	world2 := ecs.NewWorldFromData(worldData, ecs.WithWorldSyncMode())
+	world2, err := ecs.NewWorldFromData(worldData, ecs.WithWorldSyncMode())
+	if err != nil {
+		fmt.Println("恢复World失败:", err)
+		return
+	}
 
 	// 注册System（System不会被序列化，需要重新注册）
 	world2.RegisterLight(func(ctx *ecs.SystemContext, event ecs.Event) error {

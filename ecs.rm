@@ -73,4 +73,8 @@ struct SerializableWorldData {
     Frame          uint64;    // Current frame number
     DisposableTypes []uint64; // Disposable component types
     NomadicTypes    []uint64; // Nomadic component types
+
+    // 快照格式版本（R19）：不兼容演进递增，恢复时校验拒绝；
+    // Table 尾部追加，旧代码读新数据时按 content_size 判缺失（值为 0）同样被拒绝
+    Version        uint64;
 }

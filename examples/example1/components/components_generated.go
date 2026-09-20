@@ -25,11 +25,11 @@ func init() {
 }
 
 const (
-	PacketIdentifierPosition    = 14274740599321850262
-	PacketIdentifierVelocity    = 11902035645857708318
-	PacketIdentifierPlayer      = 8232229719869227258
-	PacketIdentifierHealth      = 2586536861959540839
-	PacketIdentifierDamageEvent = 17512361240650144843
+	PacketIdentifierPosition    = 13359150070914157970
+	PacketIdentifierVelocity    = 17432993991507742452
+	PacketIdentifierPlayer      = 16040825735880746150
+	PacketIdentifierHealth      = 8262915017193458645
+	PacketIdentifierDamageEvent = 899388977233049293
 )
 
 // Position Position组件 - 表示实体的位置
@@ -458,6 +458,18 @@ func (x *PositionViewer) size() uint32 {
 	return 16
 }
 
+// Validate 深校验数据边界（不可信输入接入端使用；offset 合法性由 NewPositionViewer 保证）
+func (x *PositionViewer) Validate(reader *rockmem.Reader) bool {
+	return x.validate(reader, 0)
+}
+
+func (x *PositionViewer) validate(reader *rockmem.Reader, depth int) bool {
+	if depth > 32 {
+		return false // 循环引用/超限深度
+	}
+	return true
+}
+
 func (x *PositionViewer) RockmemReader() *rockmem.Reader {
 	return rockmem.NewReader(x[:])
 }
@@ -486,6 +498,18 @@ func NewVelocityViewer(reader *rockmem.Reader, offset uint32) (v *VelocityViewer
 
 func (x *VelocityViewer) size() uint32 {
 	return 16
+}
+
+// Validate 深校验数据边界（不可信输入接入端使用；offset 合法性由 NewVelocityViewer 保证）
+func (x *VelocityViewer) Validate(reader *rockmem.Reader) bool {
+	return x.validate(reader, 0)
+}
+
+func (x *VelocityViewer) validate(reader *rockmem.Reader, depth int) bool {
+	if depth > 32 {
+		return false // 循环引用/超限深度
+	}
+	return true
 }
 
 func (x *VelocityViewer) RockmemReader() *rockmem.Reader {
@@ -518,6 +542,18 @@ func (x *PlayerViewer) size() uint32 {
 	return 48
 }
 
+// Validate 深校验数据边界（不可信输入接入端使用；offset 合法性由 NewPlayerViewer 保证）
+func (x *PlayerViewer) Validate(reader *rockmem.Reader) bool {
+	return x.validate(reader, 0)
+}
+
+func (x *PlayerViewer) validate(reader *rockmem.Reader, depth int) bool {
+	if depth > 32 {
+		return false // 循环引用/超限深度
+	}
+	return true
+}
+
 func (x *PlayerViewer) RockmemReader() *rockmem.Reader {
 	return rockmem.NewReader(x[:])
 }
@@ -530,6 +566,9 @@ func (x *PlayerViewer) Name() (v []byte) {
 }
 
 func (x *PlayerViewer) sliceName() (v []byte) {
+	if 0+32 > x.size() {
+		return nil
+	}
 	return unsafe.Slice((*byte)(unsafe.Add(unsafe.Pointer(x), 0)), 32)
 }
 
@@ -559,6 +598,18 @@ func (x *HealthViewer) size() uint32 {
 	return 8
 }
 
+// Validate 深校验数据边界（不可信输入接入端使用；offset 合法性由 NewHealthViewer 保证）
+func (x *HealthViewer) Validate(reader *rockmem.Reader) bool {
+	return x.validate(reader, 0)
+}
+
+func (x *HealthViewer) validate(reader *rockmem.Reader, depth int) bool {
+	if depth > 32 {
+		return false // 循环引用/超限深度
+	}
+	return true
+}
+
 func (x *HealthViewer) RockmemReader() *rockmem.Reader {
 	return rockmem.NewReader(x[:])
 }
@@ -585,6 +636,18 @@ func (x *DamageEventViewer) size() uint32 {
 	return 24
 }
 
+// Validate 深校验数据边界（不可信输入接入端使用；offset 合法性由 NewDamageEventViewer 保证）
+func (x *DamageEventViewer) Validate(reader *rockmem.Reader) bool {
+	return x.validate(reader, 0)
+}
+
+func (x *DamageEventViewer) validate(reader *rockmem.Reader, depth int) bool {
+	if depth > 32 {
+		return false // 循环引用/超限深度
+	}
+	return true
+}
+
 func (x *DamageEventViewer) RockmemReader() *rockmem.Reader {
 	return rockmem.NewReader(x[:])
 }
@@ -603,14 +666,15 @@ func (x *DamageEventViewer) TargetId() (v int64) {
 
 type PositionModifier struct {
 	*PositionViewer
+	reader *rockmem.Reader
 }
 
 func NewPositionModifier(reader *rockmem.Reader, offset uint32) (v PositionModifier) {
-	return PositionModifier{NewPositionViewer(reader, offset)}
+	return PositionModifier{NewPositionViewer(reader, offset), reader}
 }
 
-func newPositionModifierByViewer(viewer *PositionViewer) (v PositionModifier) {
-	return PositionModifier{viewer}
+func newPositionModifierByViewer(viewer *PositionViewer, reader *rockmem.Reader) (v PositionModifier) {
+	return PositionModifier{viewer, reader}
 }
 
 func (x *PositionModifier) SetX(v float32) {
@@ -627,14 +691,15 @@ func (x *PositionModifier) SetZ(v float32) {
 
 type VelocityModifier struct {
 	*VelocityViewer
+	reader *rockmem.Reader
 }
 
 func NewVelocityModifier(reader *rockmem.Reader, offset uint32) (v VelocityModifier) {
-	return VelocityModifier{NewVelocityViewer(reader, offset)}
+	return VelocityModifier{NewVelocityViewer(reader, offset), reader}
 }
 
-func newVelocityModifierByViewer(viewer *VelocityViewer) (v VelocityModifier) {
-	return VelocityModifier{viewer}
+func newVelocityModifierByViewer(viewer *VelocityViewer, reader *rockmem.Reader) (v VelocityModifier) {
+	return VelocityModifier{viewer, reader}
 }
 
 func (x *VelocityModifier) SetX(v float32) {
@@ -651,14 +716,15 @@ func (x *VelocityModifier) SetZ(v float32) {
 
 type PlayerModifier struct {
 	*PlayerViewer
+	reader *rockmem.Reader
 }
 
 func NewPlayerModifier(reader *rockmem.Reader, offset uint32) (v PlayerModifier) {
-	return PlayerModifier{NewPlayerViewer(reader, offset)}
+	return PlayerModifier{NewPlayerViewer(reader, offset), reader}
 }
 
-func newPlayerModifierByViewer(viewer *PlayerViewer) (v PlayerModifier) {
-	return PlayerModifier{viewer}
+func newPlayerModifierByViewer(viewer *PlayerViewer, reader *rockmem.Reader) (v PlayerModifier) {
+	return PlayerModifier{viewer, reader}
 }
 
 func (x *PlayerModifier) SetName(v *[32]byte) {
@@ -685,14 +751,15 @@ func (x *PlayerModifier) SetMaxHealth(v float32) {
 
 type HealthModifier struct {
 	*HealthViewer
+	reader *rockmem.Reader
 }
 
 func NewHealthModifier(reader *rockmem.Reader, offset uint32) (v HealthModifier) {
-	return HealthModifier{NewHealthViewer(reader, offset)}
+	return HealthModifier{NewHealthViewer(reader, offset), reader}
 }
 
-func newHealthModifierByViewer(viewer *HealthViewer) (v HealthModifier) {
-	return HealthModifier{viewer}
+func newHealthModifierByViewer(viewer *HealthViewer, reader *rockmem.Reader) (v HealthModifier) {
+	return HealthModifier{viewer, reader}
 }
 
 func (x *HealthModifier) SetCurrent(v float32) {
@@ -705,14 +772,15 @@ func (x *HealthModifier) SetMax(v float32) {
 
 type DamageEventModifier struct {
 	*DamageEventViewer
+	reader *rockmem.Reader
 }
 
 func NewDamageEventModifier(reader *rockmem.Reader, offset uint32) (v DamageEventModifier) {
-	return DamageEventModifier{NewDamageEventViewer(reader, offset)}
+	return DamageEventModifier{NewDamageEventViewer(reader, offset), reader}
 }
 
-func newDamageEventModifierByViewer(viewer *DamageEventViewer) (v DamageEventModifier) {
-	return DamageEventModifier{viewer}
+func newDamageEventModifierByViewer(viewer *DamageEventViewer, reader *rockmem.Reader) (v DamageEventModifier) {
+	return DamageEventModifier{viewer, reader}
 }
 
 func (x *DamageEventModifier) SetDamage(v float32) {

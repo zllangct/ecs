@@ -32,7 +32,7 @@ func TestUSetSerialization(t *testing.T) {
 
 	// Deserialize to a new USet
 	restored := NewUSet[dummyComponent]()
-	restored.Unmarshal(data)
+	if err := restored.Unmarshal(data); err != nil { t.Fatal(err) }
 
 	// Validate restored data
 	if restored.Len() != original.Len() {
@@ -70,7 +70,7 @@ func TestUSetSerializationWithRockmem(t *testing.T) {
 
 	// Deserialize from rockmem reader
 	restored := NewUSet[dummyComponent]()
-	restored.UnmarshalFrom(reader)
+	if err := restored.UnmarshalFrom(reader); err != nil { t.Fatal(err) }
 
 	// Validate restored data
 	if restored.Len() != original.Len() {
@@ -113,7 +113,7 @@ func TestSparseArraySerialization(t *testing.T) {
 
 	// Deserialize to a new SparseArray
 	restored := NewSparseArray[EntityIndex, dummyComponent]()
-	restored.Unmarshal(data)
+	if err := restored.Unmarshal(data); err != nil { t.Fatal(err) }
 
 	// Validate restored data
 	if restored.Len() != original.Len() {
@@ -161,7 +161,7 @@ func TestSparseArraySerializationWithRockmem(t *testing.T) {
 
 	// Deserialize from rockmem reader
 	restored := NewSparseArray[EntityIndex, dummyComponent]()
-	restored.UnmarshalFrom(reader)
+	if err := restored.UnmarshalFrom(reader); err != nil { t.Fatal(err) }
 
 	// Validate restored data
 	if restored.Len() != original.Len() {
@@ -195,10 +195,16 @@ func TestCSetSerialization(t *testing.T) {
 	}
 
 	// Serialize
-	data := original.Marshal()
+	data, err := original.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Deserialize to a new CSet
-	restored := NewCSetFromData[dummyComponent](data)
+	restored, err := NewCSetFromData[dummyComponent](data)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Validate restored data
 	if restored.Len() != original.Len() {
@@ -246,7 +252,7 @@ func TestCSetSerializationWithRockmem(t *testing.T) {
 
 	// Deserialize from rockmem reader
 	restored := NewCSet[dummyComponent]()
-	restored.UnmarshalFrom(reader)
+	if err := restored.UnmarshalFrom(reader); err != nil { t.Fatal(err) }
 
 	// Validate restored data
 	if restored.Len() != original.Len() {
@@ -278,7 +284,7 @@ func TestEmptyContainerSerialization(t *testing.T) {
 		data := original.Marshal()
 
 		restored := NewUSet[dummyComponent]()
-		restored.Unmarshal(data)
+		if err := restored.Unmarshal(data); err != nil { t.Fatal(err) }
 
 		if restored.Len() != 0 {
 			t.Errorf("Empty USet serialization failed: expected 0 length, got %d", restored.Len())
@@ -291,7 +297,7 @@ func TestEmptyContainerSerialization(t *testing.T) {
 		data := original.Marshal()
 
 		restored := NewSparseArray[EntityIndex, dummyComponent]()
-		restored.Unmarshal(data)
+		if err := restored.Unmarshal(data); err != nil { t.Fatal(err) }
 
 		if restored.Len() != 0 {
 			t.Errorf("Empty SparseArray serialization failed: expected 0 length, got %d", restored.Len())
@@ -301,9 +307,15 @@ func TestEmptyContainerSerialization(t *testing.T) {
 	// Test empty CSet
 	t.Run("EmptyCSet", func(t *testing.T) {
 		original := NewCSet[dummyComponent]()
-		data := original.Marshal()
+		data, err := original.Marshal()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-		restored := NewCSetFromData[dummyComponent](data)
+		restored, err := NewCSetFromData[dummyComponent](data)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		if restored.Len() != 0 {
 			t.Errorf("Empty CSet serialization failed: expected 0 length, got %d", restored.Len())
@@ -335,7 +347,7 @@ func TestSerializationDataIntegrity(t *testing.T) {
 	// Deserialize and verify all data
 	reader := rockmem.NewReader(bytes)
 	restored := NewCSet[dummyComponent]()
-	restored.UnmarshalFrom(reader)
+	if err := restored.UnmarshalFrom(reader); err != nil { t.Fatal(err) }
 
 	if restored.Len() != original.Len() {
 		t.Fatalf("Length mismatch: expected %d, got %d", original.Len(), restored.Len())
@@ -373,16 +385,19 @@ func BenchmarkCSetSerialization(b *testing.B) {
 
 	b.Run("Marshal", func(b *testing.B) {
 		for n := 0; n < b.N; n++ {
-			_ = c.Marshal()
+			_, _ = c.Marshal()
 		}
 	})
 
-	data := c.Marshal()
+	data, err := c.Marshal()
+	if err != nil {
+		b.Fatal(err)
+	}
 
 	b.Run("Unmarshal", func(b *testing.B) {
 		for n := 0; n < b.N; n++ {
 			restored := NewCSet[dummyComponent]()
-			restored.Unmarshal(data)
+			if err := restored.Unmarshal(data); err != nil { b.Fatal(err) }
 		}
 	})
 
@@ -402,7 +417,7 @@ func BenchmarkCSetSerialization(b *testing.B) {
 		for n := 0; n < b.N; n++ {
 			reader := rockmem.NewReader(bytes)
 			restored := NewCSet[dummyComponent]()
-			restored.UnmarshalFrom(reader)
+			if err := restored.UnmarshalFrom(reader); err != nil { b.Fatal(err) }
 		}
 	})
 }
@@ -433,7 +448,7 @@ func TestEntitySetSerialization(t *testing.T) {
 
 	// Deserialize
 	restored := NewEntitySet()
-	restored.Unmarshal(data)
+	if err := restored.Unmarshal(data); err != nil { t.Fatal(err) }
 
 	// Validate restored data
 	if restored.Len() != original.Len() {
@@ -499,7 +514,7 @@ func TestEntitySetSerializationWithRockmem(t *testing.T) {
 
 	// Deserialize from rockmem reader
 	restored := NewEntitySet()
-	restored.UnmarshalFrom(reader)
+	if err := restored.UnmarshalFrom(reader); err != nil { t.Fatal(err) }
 
 	// Validate restored data
 	if restored.Len() != original.Len() {
@@ -526,7 +541,10 @@ func TestEmptyEntitySetSerialization(t *testing.T) {
 	original := NewEntitySet()
 	data := original.Marshal()
 
-	restored := NewEntitySetFromData(data)
+	restored, err := NewEntitySetFromData(data)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if restored.Len() != 0 {
 		t.Errorf("Empty EntitySet serialization failed: expected 0 length, got %d", restored.Len())
@@ -557,7 +575,7 @@ func BenchmarkEntitySetSerialization(b *testing.B) {
 	b.Run("Unmarshal", func(b *testing.B) {
 		for n := 0; n < b.N; n++ {
 			restored := NewEntitySet()
-			restored.Unmarshal(data)
+			if err := restored.Unmarshal(data); err != nil { b.Fatal(err) }
 		}
 	})
 
@@ -577,7 +595,7 @@ func BenchmarkEntitySetSerialization(b *testing.B) {
 		for n := 0; n < b.N; n++ {
 			reader := rockmem.NewReader(bytes)
 			restored := NewEntitySet()
-			restored.UnmarshalFrom(reader)
+			if err := restored.UnmarshalFrom(reader); err != nil { b.Fatal(err) }
 		}
 	})
 }
@@ -673,7 +691,7 @@ func TestEntityIDGeneratorSerialization(t *testing.T) {
 
 	// Deserialize
 	restored := &EntityIDGenerator{}
-	restored.Unmarshal(data)
+	if err := restored.Unmarshal(data); err != nil { t.Fatal(err) }
 
 	// Validate restored data
 	if restored.len != original.len {
@@ -715,7 +733,7 @@ func TestEntityIDGeneratorSerializationWithRockmem(t *testing.T) {
 
 	// Deserialize from rockmem reader
 	restored := &EntityIDGenerator{}
-	restored.UnmarshalFrom(reader)
+	if err := restored.UnmarshalFrom(reader); err != nil { t.Fatal(err) }
 
 	// Validate
 	if restored.len != original.len {
@@ -741,7 +759,10 @@ func TestWorldSerialization(t *testing.T) {
 	original.frame = 42
 
 	// Serialize
-	data := original.Marshal()
+	data, err := original.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Validate serialized data
 	if data.Frame != 42 {
@@ -753,7 +774,7 @@ func TestWorldSerialization(t *testing.T) {
 
 	// Deserialize
 	restored := &World{}
-	restored.Unmarshal(data)
+	if err := restored.Unmarshal(data); err != nil { t.Fatal(err) }
 
 	// Validate restored data
 	if restored.frame != original.frame {
@@ -813,7 +834,7 @@ func TestWorldSerializationWithRockmem(t *testing.T) {
 
 	// Deserialize from rockmem reader
 	restored := &World{}
-	restored.UnmarshalFrom(reader)
+	if err := restored.UnmarshalFrom(reader); err != nil { t.Fatal(err) }
 
 	// Validate restored data
 	if restored.frame != original.frame {
@@ -864,7 +885,7 @@ func TestWorldSerializationRoundTrip(t *testing.T) {
 	// "Transfer" over network and deserialize at destination
 	reader := rockmem.NewReader(networkBytes)
 	restored := &World{}
-	restored.UnmarshalFrom(reader)
+	if err := restored.UnmarshalFrom(reader); err != nil { t.Fatal(err) }
 
 	// Verify all state
 	if restored.frame != original.frame {
@@ -918,11 +939,14 @@ func TestEmptyWorldSerialization(t *testing.T) {
 	original := NewWorld()
 
 	// Serialize empty world
-	data := original.Marshal()
+	data, err := original.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Deserialize
 	restored := &World{}
-	restored.Unmarshal(data)
+	if err := restored.Unmarshal(data); err != nil { t.Fatal(err) }
 
 	// Verify
 	if restored.entities.Len() != 0 {
@@ -945,10 +969,16 @@ func TestNewWorldFromData(t *testing.T) {
 	original.frame = 123
 
 	// Serialize
-	data := original.Marshal()
+	data, err := original.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Create new world from data
-	restored := NewWorldFromData(data)
+	restored, err := NewWorldFromData(data)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Verify
 	if restored.frame != original.frame {
@@ -978,16 +1008,19 @@ func BenchmarkWorldSerialization(b *testing.B) {
 
 	b.Run("Marshal", func(b *testing.B) {
 		for n := 0; n < b.N; n++ {
-			_ = w.Marshal()
+			_, _ = w.Marshal()
 		}
 	})
 
-	data := w.Marshal()
+	data, err := w.Marshal()
+	if err != nil {
+		b.Fatal(err)
+	}
 
 	b.Run("Unmarshal", func(b *testing.B) {
 		for n := 0; n < b.N; n++ {
 			restored := &World{}
-			restored.Unmarshal(data)
+			if err := restored.Unmarshal(data); err != nil { b.Fatal(err) }
 		}
 	})
 
@@ -1007,7 +1040,7 @@ func BenchmarkWorldSerialization(b *testing.B) {
 		for n := 0; n < b.N; n++ {
 			reader := rockmem.NewReader(bytes)
 			restored := &World{}
-			restored.UnmarshalFrom(reader)
+			if err := restored.UnmarshalFrom(reader); err != nil { b.Fatal(err) }
 		}
 	})
 

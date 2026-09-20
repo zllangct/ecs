@@ -53,8 +53,14 @@ func TestCSetSerialization_IDLPathNoSharedPointer(t *testing.T) {
 	orig := &stringyComp{Name: "hello-world", Seq: 42}
 	c.Add(e1, orig)
 
-	data := c.Marshal()
-	restored := NewCSetFromData[stringyComp](data)
+	data, err := c.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	restored, err := NewCSetFromData[stringyComp](data)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	rc := restored.Get(e1)
 	if rc == nil {
@@ -78,8 +84,14 @@ func TestWorldSnapshotRestore_NonPOD(t *testing.T) {
 	e := w.NewEntity(WithComponents(&stringyComp{Name: "snapshot", Seq: 7}))
 	w.Update()
 
-	data := w.Marshal()
-	w2 := NewWorldFromData(data)
+	data, err := w.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	w2, err := NewWorldFromData(data)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ww2 := w2
 	info, ok := ww2.getEntityInfo(e)
@@ -111,7 +123,9 @@ func TestCSetSerialization_IDLPathWithRockmem(t *testing.T) {
 		t.Fatal(err)
 	}
 	restored := NewCSet[stringyComp]()
-	restored.UnmarshalFrom(rockmem.NewReader(writer.Bytes()))
+	if err := restored.UnmarshalFrom(rockmem.NewReader(writer.Bytes())); err != nil {
+		t.Fatal(err)
+	}
 	if restored.Len() != 3 {
 		t.Fatalf("want 3, got %d", restored.Len())
 	}

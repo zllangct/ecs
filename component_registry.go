@@ -10,8 +10,9 @@ import (
 // and optionally unmarshals data into it
 type ComponentSetFactory func() ComponentSet
 
-// ComponentSetUnmarshaler is a function that unmarshals data into a ComponentSet
-type ComponentSetUnmarshaler func(data *SerializableSparseArrayData) ComponentSet
+// ComponentSetUnmarshaler is a function that unmarshals data into a ComponentSet.
+// 返回 error 表示快照数据非法/不兼容（R19：恢复失败必须可传播，不得 panic 或静默跳过）
+type ComponentSetUnmarshaler func(data *SerializableSparseArrayData) (ComponentSet, error)
 
 type ComponentDefineInfo struct {
 	Group       string
@@ -75,7 +76,7 @@ func RegisterComponent[T any, TP ComponentPointer[T]](group string) {
 		func() ComponentSet {
 			return NewCSet[T, TP]()
 		},
-		func(data *SerializableSparseArrayData) ComponentSet {
+		func(data *SerializableSparseArrayData) (ComponentSet, error) {
 			return NewCSetFromData[T, TP](data)
 		},
 		int(unsafe.Sizeof(*new(T))),
@@ -98,7 +99,10 @@ func (r *ComponentRegistry) GetFactory(compType ComponentIntType) (ComponentSetF
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	info, ok := r.infos[compType]
-	return info.Factory, ok
+	if !ok {
+		return nil, false
+	}
+	return info.Factory, true
 }
 
 // GetUnmarshaler returns the unmarshaler for a component type
@@ -106,7 +110,10 @@ func (r *ComponentRegistry) GetUnmarshaler(compType ComponentIntType) (Component
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	info, ok := r.infos[compType]
-	return info.Unmarshaler, ok
+	if !ok {
+		return nil, false
+	}
+	return info.Unmarshaler, true
 }
 
 // CreateComponentSet creates a new ComponentSet for the given type
@@ -118,13 +125,14 @@ func (r *ComponentRegistry) CreateComponentSet(compType ComponentIntType) (Compo
 	return f(), true
 }
 
-// UnmarshalComponentSet creates and unmarshals a ComponentSet from serialized data
-func (r *ComponentRegistry) UnmarshalComponentSet(compType ComponentIntType, data *SerializableSparseArrayData) (ComponentSet, bool) {
+// UnmarshalComponentSet creates and unmarshals a ComponentSet from serialized data.
+// 未注册类型返回 error（快照兼容性失败必须显式传播，不得静默丢弃业务状态）
+func (r *ComponentRegistry) UnmarshalComponentSet(compType ComponentIntType, data *SerializableSparseArrayData) (ComponentSet, error) {
 	u, ok := r.GetUnmarshaler(compType)
 	if !ok {
-		return nil, false
+		return nil, fmt.Errorf("ecs: component type %d not registered", compType)
 	}
-	return u(data), true
+	return u(data)
 }
 
 // IsRegistered checks if a component type is registered

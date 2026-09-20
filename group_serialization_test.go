@@ -17,14 +17,20 @@ func TestGroupSerialization_RoundTrip(t *testing.T) {
 		t.Fatal("e1 should be in table before marshal")
 	}
 
-	data := w.Marshal()
+	data, err := w.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Marshal 后源世界组表应已恢复（scatter→marshal→absorb）
 	if _, ok := a.rowOf(e1.Index()); !ok {
 		t.Fatal("source world table should be restored after marshal")
 	}
 
-	w2 := NewWorldFromData(data)
+	w2, err := NewWorldFromData(data)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := w2.RegisterLight(LightSystem(groupProbeLight),
 		WithDeps(Dep[groupCompA](), Dep[groupCompB]()),
 		WithGroup(Dep[groupCompA](), Dep[groupCompB]())); err != nil {
@@ -66,9 +72,15 @@ func TestGroupSerialization_OffWorldReadsArchive(t *testing.T) {
 	if err := w.Update(); err != nil {
 		t.Fatal(err)
 	}
-	data := w.Marshal()
+	data, err := w.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	w2 := NewWorldFromData(data, WithoutGroups())
+	w2, err := NewWorldFromData(data, WithoutGroups())
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := w2.RegisterLight(LightSystem(groupProbeLight),
 		WithDeps(Dep[groupCompA](), Dep[groupCompB]())); err != nil {
 		t.Fatal(err)

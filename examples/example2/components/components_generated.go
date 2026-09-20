@@ -25,11 +25,11 @@ func init() {
 }
 
 const (
-	PacketIdentifierGameState  = 7825894128469208949
-	PacketIdentifierPosition   = 14274740599321850262
-	PacketIdentifierVelocity   = 11902035645857708318
-	PacketIdentifierEntityData = 13352832190958647436
-	PacketIdentifierInventory  = 12116236019994833376
+	PacketIdentifierGameState  = 17293155660048754789
+	PacketIdentifierPosition   = 13359150070914157970
+	PacketIdentifierVelocity   = 17432993991507742452
+	PacketIdentifierEntityData = 7538947924363124971
+	PacketIdentifierInventory  = 13106593356692099893
 )
 
 // GameState GameState组件 - 游戏状态，用于验证序列化
@@ -460,6 +460,18 @@ func (x *GameStateViewer) size() uint32 {
 	return 48
 }
 
+// Validate 深校验数据边界（不可信输入接入端使用；offset 合法性由 NewGameStateViewer 保证）
+func (x *GameStateViewer) Validate(reader *rockmem.Reader) bool {
+	return x.validate(reader, 0)
+}
+
+func (x *GameStateViewer) validate(reader *rockmem.Reader, depth int) bool {
+	if depth > 32 {
+		return false // 循环引用/超限深度
+	}
+	return true
+}
+
 func (x *GameStateViewer) RockmemReader() *rockmem.Reader {
 	return rockmem.NewReader(x[:])
 }
@@ -480,6 +492,9 @@ func (x *GameStateViewer) GameName() (v []byte) {
 }
 
 func (x *GameStateViewer) sliceGameName() (v []byte) {
+	if 12+32 > x.size() {
+		return nil
+	}
 	return unsafe.Slice((*byte)(unsafe.Add(unsafe.Pointer(x), 12)), 32)
 }
 
@@ -495,6 +510,18 @@ func NewPositionViewer(reader *rockmem.Reader, offset uint32) (v *PositionViewer
 
 func (x *PositionViewer) size() uint32 {
 	return 16
+}
+
+// Validate 深校验数据边界（不可信输入接入端使用；offset 合法性由 NewPositionViewer 保证）
+func (x *PositionViewer) Validate(reader *rockmem.Reader) bool {
+	return x.validate(reader, 0)
+}
+
+func (x *PositionViewer) validate(reader *rockmem.Reader, depth int) bool {
+	if depth > 32 {
+		return false // 循环引用/超限深度
+	}
+	return true
 }
 
 func (x *PositionViewer) RockmemReader() *rockmem.Reader {
@@ -527,6 +554,18 @@ func (x *VelocityViewer) size() uint32 {
 	return 16
 }
 
+// Validate 深校验数据边界（不可信输入接入端使用；offset 合法性由 NewVelocityViewer 保证）
+func (x *VelocityViewer) Validate(reader *rockmem.Reader) bool {
+	return x.validate(reader, 0)
+}
+
+func (x *VelocityViewer) validate(reader *rockmem.Reader, depth int) bool {
+	if depth > 32 {
+		return false // 循环引用/超限深度
+	}
+	return true
+}
+
 func (x *VelocityViewer) RockmemReader() *rockmem.Reader {
 	return rockmem.NewReader(x[:])
 }
@@ -557,6 +596,18 @@ func (x *EntityDataViewer) size() uint32 {
 	return 24
 }
 
+// Validate 深校验数据边界（不可信输入接入端使用；offset 合法性由 NewEntityDataViewer 保证）
+func (x *EntityDataViewer) Validate(reader *rockmem.Reader) bool {
+	return x.validate(reader, 0)
+}
+
+func (x *EntityDataViewer) validate(reader *rockmem.Reader, depth int) bool {
+	if depth > 32 {
+		return false // 循环引用/超限深度
+	}
+	return true
+}
+
 func (x *EntityDataViewer) RockmemReader() *rockmem.Reader {
 	return rockmem.NewReader(x[:])
 }
@@ -569,6 +620,9 @@ func (x *EntityDataViewer) Name() (v []byte) {
 }
 
 func (x *EntityDataViewer) sliceName() (v []byte) {
+	if 0+16 > x.size() {
+		return nil
+	}
 	return unsafe.Slice((*byte)(unsafe.Add(unsafe.Pointer(x), 0)), 16)
 }
 
@@ -594,6 +648,18 @@ func (x *InventoryViewer) size() uint32 {
 	return 40
 }
 
+// Validate 深校验数据边界（不可信输入接入端使用；offset 合法性由 NewInventoryViewer 保证）
+func (x *InventoryViewer) Validate(reader *rockmem.Reader) bool {
+	return x.validate(reader, 0)
+}
+
+func (x *InventoryViewer) validate(reader *rockmem.Reader, depth int) bool {
+	if depth > 32 {
+		return false // 循环引用/超限深度
+	}
+	return true
+}
+
 func (x *InventoryViewer) RockmemReader() *rockmem.Reader {
 	return rockmem.NewReader(x[:])
 }
@@ -606,6 +672,9 @@ func (x *InventoryViewer) Items() (v []int32) {
 }
 
 func (x *InventoryViewer) sliceItems() (v []int32) {
+	if 0+32 > x.size() {
+		return nil
+	}
 	return unsafe.Slice((*int32)(unsafe.Add(unsafe.Pointer(x), 0)), 8)
 }
 
@@ -615,14 +684,15 @@ func (x *InventoryViewer) Count() (v int32) {
 
 type GameStateModifier struct {
 	*GameStateViewer
+	reader *rockmem.Reader
 }
 
 func NewGameStateModifier(reader *rockmem.Reader, offset uint32) (v GameStateModifier) {
-	return GameStateModifier{NewGameStateViewer(reader, offset)}
+	return GameStateModifier{NewGameStateViewer(reader, offset), reader}
 }
 
-func newGameStateModifierByViewer(viewer *GameStateViewer) (v GameStateModifier) {
-	return GameStateModifier{viewer}
+func newGameStateModifierByViewer(viewer *GameStateViewer, reader *rockmem.Reader) (v GameStateModifier) {
+	return GameStateModifier{viewer, reader}
 }
 
 func (x *GameStateModifier) SetTick(v int64) {
@@ -645,14 +715,15 @@ func (x *GameStateModifier) SetGameName(v *[32]byte) {
 
 type PositionModifier struct {
 	*PositionViewer
+	reader *rockmem.Reader
 }
 
 func NewPositionModifier(reader *rockmem.Reader, offset uint32) (v PositionModifier) {
-	return PositionModifier{NewPositionViewer(reader, offset)}
+	return PositionModifier{NewPositionViewer(reader, offset), reader}
 }
 
-func newPositionModifierByViewer(viewer *PositionViewer) (v PositionModifier) {
-	return PositionModifier{viewer}
+func newPositionModifierByViewer(viewer *PositionViewer, reader *rockmem.Reader) (v PositionModifier) {
+	return PositionModifier{viewer, reader}
 }
 
 func (x *PositionModifier) SetX(v float32) {
@@ -669,14 +740,15 @@ func (x *PositionModifier) SetZ(v float32) {
 
 type VelocityModifier struct {
 	*VelocityViewer
+	reader *rockmem.Reader
 }
 
 func NewVelocityModifier(reader *rockmem.Reader, offset uint32) (v VelocityModifier) {
-	return VelocityModifier{NewVelocityViewer(reader, offset)}
+	return VelocityModifier{NewVelocityViewer(reader, offset), reader}
 }
 
-func newVelocityModifierByViewer(viewer *VelocityViewer) (v VelocityModifier) {
-	return VelocityModifier{viewer}
+func newVelocityModifierByViewer(viewer *VelocityViewer, reader *rockmem.Reader) (v VelocityModifier) {
+	return VelocityModifier{viewer, reader}
 }
 
 func (x *VelocityModifier) SetX(v float32) {
@@ -693,14 +765,15 @@ func (x *VelocityModifier) SetZ(v float32) {
 
 type EntityDataModifier struct {
 	*EntityDataViewer
+	reader *rockmem.Reader
 }
 
 func NewEntityDataModifier(reader *rockmem.Reader, offset uint32) (v EntityDataModifier) {
-	return EntityDataModifier{NewEntityDataViewer(reader, offset)}
+	return EntityDataModifier{NewEntityDataViewer(reader, offset), reader}
 }
 
-func newEntityDataModifierByViewer(viewer *EntityDataViewer) (v EntityDataModifier) {
-	return EntityDataModifier{viewer}
+func newEntityDataModifierByViewer(viewer *EntityDataViewer, reader *rockmem.Reader) (v EntityDataModifier) {
+	return EntityDataModifier{viewer, reader}
 }
 
 func (x *EntityDataModifier) SetName(v *[16]byte) {
@@ -723,14 +796,15 @@ func (x *EntityDataModifier) SetFlags(v uint32) {
 
 type InventoryModifier struct {
 	*InventoryViewer
+	reader *rockmem.Reader
 }
 
 func NewInventoryModifier(reader *rockmem.Reader, offset uint32) (v InventoryModifier) {
-	return InventoryModifier{NewInventoryViewer(reader, offset)}
+	return InventoryModifier{NewInventoryViewer(reader, offset), reader}
 }
 
-func newInventoryModifierByViewer(viewer *InventoryViewer) (v InventoryModifier) {
-	return InventoryModifier{viewer}
+func newInventoryModifierByViewer(viewer *InventoryViewer, reader *rockmem.Reader) (v InventoryModifier) {
+	return InventoryModifier{viewer, reader}
 }
 
 func (x *InventoryModifier) SetItems(v *[8]int32) {
