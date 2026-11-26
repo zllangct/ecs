@@ -194,16 +194,27 @@ func intersectPools(world *World, minSet ComponentSet, pools []ComponentSet) ite
 		return intersectPair(world, minSet, other)
 	}
 	if mergeable(pools) {
-		// Near-equal pools benefit from the tight sequential merge loop. An
-		// occasional very large peer can instead skip runs of unrelated rows.
+		keys := minSet.EntityIndexes()
+		// Even a very large peer is cheap to merge if only its prefix can be
+		// scanned before the driver ends. Only inspect native outliers' keys.
 		const seekRatio = 16
-		driverLen := minSet.Len()
-		for _, pool := range pools {
-			if driverLen > 0 && int64(pool.Len()) >= seekRatio*int64(driverLen) {
-				return seekJoinIter(world, minSet, pools)
+		minScan := seekRatio * int64(len(keys))
+		if minScan > 0 {
+			for _, pool := range pools {
+				if int64(pool.Len()) < minScan {
+					continue
+				}
+				native, ok := pool.(orderedKeySeeker)
+				if !ok || native.nativeCSet() != pool {
+					continue
+				}
+				peer := pool.EntityIndexes()
+				if len(peer) > 0 && int64(keys[len(keys)-1])-int64(peer[0])+1 >= minScan {
+					return seekJoinIter(world, minSet, pools, keys)
+				}
 			}
 		}
-		return mergeJoinIter(world, minSet, pools)
+		return mergeJoinIter(world, minSet, pools, keys)
 	}
 	return existFilterIter(world, minSet, pools)
 }
@@ -360,8 +371,7 @@ func mergeable(pools []ComponentSet) bool {
 
 // mergeJoinIter 有序归并求交：以最小池 key 序列为基准，其余池游标同步推进。
 // 归并命中即交集，全程顺序内存访问；游标在闭包内初始化，迭代器可重复消费。
-func mergeJoinIter(world *World, minSet ComponentSet, pools []ComponentSet) iter.Seq2[EntityIndex, *EntityInfo] {
-	keys := minSet.EntityIndexes()
+func mergeJoinIter(world *World, minSet ComponentSet, pools []ComponentSet, keys []EntityIndex) iter.Seq2[EntityIndex, *EntityInfo] {
 	others := make([][]EntityIndex, 0, len(pools)-1)
 	for _, p := range pools {
 		if p != minSet {
@@ -403,6 +413,8 @@ type orderedKeySeeker interface {
 	seekOrderedKey([]EntityIndex, int, EntityIndex) int
 }
 
+const orderedSeekLookahead = 8
+
 func (c *CSet[T, TP]) seekOrderedKey(keys []EntityIndex, cursor int, key EntityIndex) int {
 	if c.isKOrder && len(c.idx2Key) >= len(keys) &&
 		unsafe.Pointer(unsafe.SliceData(c.idx2Key)) == unsafe.Pointer(unsafe.SliceData(keys)) {
@@ -410,10 +422,12 @@ func (c *CSet[T, TP]) seekOrderedKey(keys []EntityIndex, cursor int, key EntityI
 		if row >= cursor && row < len(keys) {
 			return row
 		}
-		// Keep the original merge cursor on a miss as well. The caller may
-		// later resume the sequence after the driver or a peer has changed.
-		pos, _ := slices.BinarySearch(keys[cursor:], key)
-		return cursor + pos
+		// Find the original merge cursor on a miss. The lookahead row is
+		// below key, and native keys increase by at least one per row.
+		lo := cursor + orderedSeekLookahead
+		span := min(int64(len(keys)-lo), int64(key)-int64(keys[lo]))
+		pos, _ := slices.BinarySearch(keys[lo+1:lo+int(span)], key)
+		return lo + 1 + pos
 	}
 	for cursor < len(keys) && keys[cursor] < key {
 		cursor++
@@ -421,12 +435,11 @@ func (c *CSet[T, TP]) seekOrderedKey(keys []EntityIndex, cursor int, key EntityI
 	return cursor
 }
 
-func seekJoinIter(world *World, driver ComponentSet, pools []ComponentSet) iter.Seq2[EntityIndex, *EntityInfo] {
+func seekJoinIter(world *World, driver ComponentSet, pools []ComponentSet, keys []EntityIndex) iter.Seq2[EntityIndex, *EntityInfo] {
 	type peer struct {
 		keys []EntityIndex
 		seek orderedKeySeeker
 	}
-	keys := driver.EntityIndexes()
 	peers := make([]peer, 0, len(pools)-1)
 	for _, p := range pools {
 		if p == driver {
@@ -446,8 +459,7 @@ func seekJoinIter(world *World, driver ComponentSet, pools []ComponentSet) iter.
 				cur := cursors[j]
 				// Short gaps use the ordinary merge, including all custom
 				// pools. A sparse lookup pays off across a longer sorted run.
-				const lookahead = 8
-				if p.seek != nil && len(p.keys)-cur > lookahead && p.keys[cur+lookahead] < key {
+				if p.seek != nil && len(p.keys)-cur > orderedSeekLookahead && p.keys[cur+orderedSeekLookahead] < key {
 					cur = p.seek.seekOrderedKey(p.keys, cur, key)
 				} else {
 					for cur < len(p.keys) && p.keys[cur] < key {

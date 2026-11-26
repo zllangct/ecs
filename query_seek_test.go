@@ -56,7 +56,8 @@ func TestSkewedQueryPreservesCapturedPeerCursors(t *testing.T) {
 					}
 				}
 				next, stop = iter.Pull2(rows)
-				reference, stopReference = iter.Pull2(mergeJoinIter(w, pickMinNonEmptyPool(q.cached.pools), q.cached.pools))
+				driver := pickMinNonEmptyPool(q.cached.pools)
+				reference, stopReference = iter.Pull2(mergeJoinIter(w, driver, q.cached.pools, driver.EntityIndexes()))
 				first, _, ok := next()
 				refFirst, _, refOK := reference()
 				if first != want[0] || first != refFirst || !ok || !refOK {
@@ -120,5 +121,27 @@ func TestSkewedQueryUsesCustomPeerKeys(t *testing.T) {
 	}
 	if !slices.Equal(got, want) {
 		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
+func TestOrderedKeySeekMissCursor(t *testing.T) {
+	set := NewCSet[p2CompB]()
+	for k := range EntityIndex(134) {
+		if k%11 != 5 && k >= 10 {
+			set.SparseArray.Add(k, &p2CompB{})
+		}
+	}
+	keys := set.EntityIndexes()
+	for cursor := 0; cursor+orderedSeekLookahead < len(keys); cursor++ {
+		first := keys[cursor+orderedSeekLookahead] + 1
+		for _, k := range []EntityIndex{first, first + 1, first + 22, 132, 133, 134, 1<<31 - 1} {
+			if k < first {
+				continue
+			}
+			off, _ := slices.BinarySearch(keys[cursor:], k)
+			if got, want := set.seekOrderedKey(keys, cursor, k), cursor+off; got != want {
+				t.Fatalf("cursor %d key %d: got %d, want %d", cursor, k, got, want)
+			}
+		}
 	}
 }
