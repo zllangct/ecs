@@ -207,7 +207,8 @@ func main() {
 - **高效遍历**：
   - `ecs.View2[A, B](ctx)` / `ecs.View2RO[A, BReadOnly](ctx)`：双变量 lockstep 遍历；
   - `ecs.View3..View8` / `ecs.View3RO..View8RO`：多元组遍历，返回 `TupleN`（首组件可写、其余只读视图）；
-  - `ctx.NewQuery(WithComp[A](), WithComp[B]())` + `QueryGet[T](&q, idx)`：支持任意读写混合、组表子集、跨组/非组混合查询，非组路径下各组件池按 `EntityIndex` 有序时自动启用 `merge-join` 归并连接。
+  - `ctx.NewQuery(WithComp[A](), WithComp[B]())` 可查询组表子集及跨组、非组的组合。遍历时可用 `QueryGet[T](&q, idx)` 获取已声明为可写的组件，用 `ctx.GetBuddyReadOnly[TReadOnly](idx)` 获取只读视图。
+  - 两个 CSet 求交时，以较小池为驱动。有序键范围互斥时直接返回空集，另一池的连续键范围完全覆盖驱动池时直接遍历驱动池。其余有序双池按预计扫描量选择归并或逐键探测，失序时逐键探测。三个及以上 CSet 均有序时使用归并。
 
 ### 帧同步点与操作日志（OpLog）
 
