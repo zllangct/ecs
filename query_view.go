@@ -5,9 +5,9 @@ import (
 	"unsafe"
 )
 
-// View2 组表双列 lockstep 迭代：行内零查找，双列指针同步递增。
-// 要求 A、B 均为本 system 声明的非只读依赖；两者同属一张组表时走 lockstep，
-// 否则回退 Query{A,B} 通用路径（结果集恒正确，仅性能差异）。
+// View2 遍历同时拥有 A、B 的实体，返回两个可写组件指针。
+// 同组时按行读取两列。若 A、B 只覆盖组的一部分，再遍历两个残段的交集。
+// 其他布局通过 Query 定位组件。
 // 约定（静默失败）：约束失效、依赖未声明、任一依赖为只读时返回空迭代器。
 func View2[A, B any, PA ComponentPointer[A], PB ComponentPointer[B]](ctx *SystemContext) iter.Seq2[*A, *B] {
 	empty := func(yield func(*A, *B) bool) {}
@@ -67,9 +67,10 @@ func View2[A, B any, PA ComponentPointer[A], PB ComponentPointer[B]](ctx *System
 	}
 }
 
-// View2RO 组表双列 lockstep 迭代（A 可写 + B 只读视图）。
-// 要求 A 为非只读依赖、B 为只读依赖（视图自描述类型信息）；
-// 同属一张组表时走 lockstep，否则回退通用路径。
+// View2RO 遍历同时拥有 A、B 的实体，返回可写的 *A 和 B 的只读视图。
+// 同组时先读组行，查询真子集时再读残段。两个独立原生池可按键求交。
+// 若 A 属于组、A 的残段和独立的 B 均为原生 CSet，则按较小一方的顺序取件。
+// 其余布局通过 Query 匹配实体。A 需要可写依赖，B 需要只读依赖。
 // 约定（静默失败）：约束失效、依赖未声明/权限不匹配时返回空迭代器。
 func View2RO[A any, BR ReadOnlyView[BR], PA ComponentPointer[A]](ctx *SystemContext) iter.Seq2[*A, BR] {
 	return buildView2RO(ctx, prepareView2RO[A, BR, PA])

@@ -22,7 +22,7 @@
 
 ## 特性概览
 
-- **连续内存与两级存储**：组件默认存储在基于 `SparseArray` + `USet` 的连续数组中，支持 O(1) 稀疏索引与 swap-remove；通过 `WithGroup` 可将联合高频访问的组件自动合并为列式组表（`Archetype`），配合 `View2..View8` / `View2RO..View8RO` 实现同步列指针遍历。
+- 默认组件池 **`CSet`** 用稀疏索引按实体编号 O(1) 定位组件，用密集数组连续存放组件值。`WithGroup` 将集齐指定组件的实体收入列式组表，供 `View2..View8` 和对应的只读视图按行遍历。尚未集齐组内组件的实体，其已有组件仍在各自的 `CSet`。
 - **自动依赖冲突调度**：`WithWorldASyncMode()` 下框架根据系统声明的 `WithDep`（`ReadWrite` / `ReadOnly`）自动划分无冲突批次并行执行，并在同 `Order` 档位内为冲突系统保持注册顺序；`Sync*` 同步阶段始终在主 goroutine 串行执行。
 - **编译期只读防护**：`rockmem-ecs` 代码生成器为每个组件及其嵌套结构体生成零拷贝只读视图 `TReadOnly`，只读依赖仅可通过 `ReadOnlyView` 访问，编译期阻断误写。
 - **整世界快照与确定性步进**：支持 `World.Marshal` / `MarshalTo` 只读联合导出与 `NewWorldFromData` / `Unmarshal` 原子恢复；支持 `World.Step(delta)` 固定步长确定性推进。
@@ -153,7 +153,7 @@ func main() {
 - `ecs.WithWorldASyncMode()` 在 `Start`、`PreUpdate`、`Update`、`PostUpdate` 阶段按依赖冲突分批并发执行，同 `Order` 档位内的冲突系统依注册顺序执行。`Sync*` 和 `World.Destroy()` 的收尾回调均在调用者的 goroutine 串行执行。
 - `ecs.WithWorldAutoOptimize()` 使 `Update()` 在帧末利用剩余墙钟预算整理 `CSet`。`Step(delta)` 只推进模拟，使固定输入的遍历顺序与本机帧耗时无关。
 - `ecs.WithWorldDefaultUpdateRate(rate)`：设置默认目标帧率（默认 `30`）。
-- `ecs.WithoutGroups()`：全局关闭 `Archetype` 组表存储，所有组件保留在 `CSet`（用于回归对照，与开启组表语义完全等价）。
+- `ecs.WithoutGroups()` 全局关闭组表，所有组件保留在 `CSet`。切换该选项时查询匹配的实体集合相同，遍历顺序可能改变。
 
 外部代码可在 `Update()` / `Step()` 之外读取或装配实体：
 - `world.NewEntity(opts...)` 创建实体并返回 `Entity` 值；
@@ -204,16 +204,28 @@ func main() {
 ### 固定访问组（WithGroup / 组表存储）与 View API
 
 - **组声明**：在系统注册时通过 `ecs.WithGroup(ecs.Dep[A](), ecs.Dep[B]())` 声明联合访问组（至少 2 个不同类型、非 `disposable`/`nomadic`、无 Go 指针且非零大小）。多系统声明的重叠组在首帧自动合并为互不相交的并集组。
-- **高效遍历**：
-  - `ecs.View2[A, B](ctx)` / `ecs.View2RO[A, BReadOnly](ctx)`：双变量 lockstep 遍历；
-  - `ecs.View3..View8` / `ecs.View3RO..View8RO`：多元组遍历，返回 `TupleN`（首组件可写、其余只读视图）；
-  - `ctx.NewQuery(WithComp[A](), WithComp[B]())` 可查询组表子集及跨组、非组的组合。遍历时可用 `QueryGet[T](&q, idx)` 获取已声明为可写的组件，用 `ctx.GetBuddyReadOnly[TReadOnly](idx)` 获取只读视图。
-  - 两个 CSet 求交时，以较小池为驱动。有序键范围互斥时直接返回空集，另一池的连续键范围完全覆盖驱动池时直接遍历驱动池。其余有序双池按预计扫描量选择归并或逐键探测，失序时逐键探测。三个及以上 CSet 均有序时使用归并。
+- `ecs.View2[A, B](ctx)` 返回两个可写组件指针。`ecs.View2RO[A, BReadOnly](ctx)` 返回可写的 A 和 B 的只读视图。`View3..View8` 的元组各列均可写，`View3RO..View8RO` 的元组只有首列可写。
+
+以 `View2RO[A, BReadOnly]` 为例，调用方式相同，取件由实际布局决定。
+
+| 组件布局 | 遍历方式 |
+|---|---|
+| A、B 恰好组成完整组 | 按组行同步读取两列。 |
+| A、B 是同一组的真子集 | 先读取组行，再取两个残段的交集，覆盖拥有 A、B 但缺少其他组内组件的实体。 |
+| A 属于组，B 仅存于独立原生池 | 当 A 的残段也使用原生池时，按 A 的总行数（组行加残段）与 B 的行数选择较小一方。由 A 驱动时复用当前组行或残段行，由 B 驱动时按实体编号定位 A。 |
+| 两者都在原生 `CSet` | 由较小池驱动。双方有序时，键范围不相交可直接结束，对侧连续键覆盖驱动池可直接遍历驱动池，其他情况按预计扫描量归并或逐键探测。有池失序时逐键探测。 |
+
+仅 B 属于组、跨两张组表或使用自定义组件池时，迭代仍按查询匹配实体。遍历顺序取决于当前存储布局和驱动列。组行迁移或组件池扩容可能移动组件，后续帧应重新取得指针和只读视图。[View2 与 View2RO 实现](query_view.go)
+
+`ctx.NewQuery(WithComp[A](), WithComp[B]())` 也支持跨组和残段。三个及以上有序 `CSet` 求交时，以最小池驱动归并。驱动键密集的三池查询可用两个局部游标。如果对侧原生池很大、要跨越的键区间也很长，则可借助稀疏索引跳过大段无关行。通过 `QueryGet[T](&q, idx)` 获取可写组件，或通过 `ctx.GetBuddyReadOnly[TReadOnly](idx)` 获取只读视图。[查询实现](query.go)
+
+有序池删除密集数组的末行后仍可走有序查询。删除中间行时会将末行移入空位，并清除有序标志。卸载高编号实体上的稀有组件若触发索引收缩，首次峰值会释放原数组。相同高键再次触发收缩时，每池最多可留存 1 MiB 的稀疏索引底层数组，以便下次挂载时复用。[稀疏索引实现](sparse_array.go)
 
 ### 帧同步点与操作日志（OpLog）
 
 - 在系统执行期间请使用 `ctx.AddComponents(entity, comps...)` 写入所属系统的无锁操作队列（切勿在并行系统内直接调用非线程安全的 `world.NewEntity`）。
 - 帧首先处理挂起的实体销毁，再合并组件命令。系统回调结束后清理一次性和游牧组件，再合并本帧产生的组件命令。每次合并先更新 `CSet` 与实体的组件集合，再按确定顺序收拢或拆出组行。系统内提交的新增组件在下一帧对系统可见。
+- 同步点先取默认队列，再按注册顺序检查系统队列。每个队列只遍历本次有命令的组件类型，同一类型的命令保留各队列内的提交顺序。大量系统曾经写入多种组件、随后空闲时，可以省去扫描历史空桶的开销。[OpLog 实现](op_log.go)
 
 ---
 
@@ -224,6 +236,8 @@ func main() {
 `ecs.NewWorldFromData(data, opts...)` 创建新的世界。续跑前按原顺序注册系统，并恢复应用自行维护的系统状态。`world.Unmarshal(data)` 和 `world.UnmarshalFrom(reader)` 可在已初始化、尚未运行的世界上原位恢复，保留现有系统和它们的注册顺序，丢弃旧世界的待执行命令。首个 `Step` 或 `Update` 按所声明的组重建列存储。
 
 当前写出的 V1 快照按每种组件的残段顺序和组行顺序编码。以相同的组件组重新装配后，首帧会沿存档顺序恢复这些行。旧 V1 快照仍可读取，旧写入器已排序的组件只能从存档保留的顺序开始。改变组声明、关闭组表或调用 `Optimize` 都可能改变后续遍历顺序。
+
+V1 编码包含稀疏索引的逻辑长度和有序标志 `IsKOrder`。旧版在有序池删尾后可能把该标志写为 `false`，新版会保留 `true`。因此跨版本回放时，即使组件值和行顺序相同，快照的原始字节和哈希也可能不同。运行时为重复高键留存的额外容量不写入快照。[序列化实现](serialization.go)
 
 固定步长回放使用 `world.Step(fixedDelta)`。要让顺序敏感的系统从检查点复现原结果，还需保持相同的系统配置、外部输入顺序和系统私有状态，并确保并发回调的共享副作用具备确定的顺序。
 
@@ -242,5 +256,5 @@ go -C examples/example1 run .
 go -C examples/example2 run .
 
 # 运行组表与视图基准测试
-go -C examples/bench test -bench "BenchmarkGroupStorage_|BenchmarkView2RO_" -benchmem -benchtime 100x -run xxx .
+go -C examples/bench test -run '^$' -bench 'BenchmarkGroupStorage_|BenchmarkView2RO_' -benchmem -benchtime 100x .
 ```

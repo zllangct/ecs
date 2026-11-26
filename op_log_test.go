@@ -58,6 +58,37 @@ func TestOpLog_SystemCtxAddComponents(t *testing.T) {
 	}
 }
 
+func TestOpLog_OpOnDestroyedEntityDropped(t *testing.T) {
+	w := NewWorld()
+	if err := w.RegisterLight(groupProbeLight, WithDeps(Dep[groupCompA](), Dep[groupCompB]())); err != nil {
+		t.Fatal(err)
+	}
+	destroyed := w.NewEntity(WithComponents(newGroupCompA(1)))
+	alive := w.NewEntity(WithComponents(newGroupCompA(2)))
+	if err := w.Update(); err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range []Entity{destroyed, alive} {
+		info, ok := w.GetEntityInfo(e)
+		if !ok {
+			t.Fatalf("entity %v missing before flush", e)
+		}
+		info.Add(newGroupCompB(514))
+	}
+	w.DestroyEntity(destroyed)
+	if err := w.Update(); err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := w.GetComponent[groupCompB](alive); !ok || got.V != 514 {
+		t.Fatalf("live entity component = %v, want 514", got)
+	}
+	// An entity lookup alone would hide an orphaned row behind the stale handle.
+	pool, ok := w.getComponentSet(GetIntType[groupCompB]())
+	if !ok || pool.Exist(destroyed.Index()) {
+		t.Fatal("component pool missing or retains a row for the destroyed entity")
+	}
+}
+
 // Main-queue writers can submit more work after the synchronization point
 // has detached a batch and before its cleanup returns the old nodes.
 func TestOpLog_ReactivateBucketWhileBatchIsDetached(t *testing.T) {

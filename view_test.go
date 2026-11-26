@@ -72,6 +72,7 @@ func TestView2ROExactGroupIterator(t *testing.T) {
 		t.Fatal("system did not run with an empty group")
 	}
 	denied = View2RO[PositionTestComp, groupCompBSnapshot](savedCtx)
+	unmatched := w.NewEntity(WithComponents(&PositionTestComp{X: 4}))
 	for i := 1; i <= 3; i++ {
 		entities = append(entities, w.NewEntity(WithComponents(&PositionTestComp{X: float32(i)}, newGroupCompB(10*int32(i)))))
 	}
@@ -83,39 +84,22 @@ func TestView2ROExactGroupIterator(t *testing.T) {
 			t.Fatalf("reused iterator must write to entity %v once, got %v", entity, a)
 		}
 	}
+	if a, ok := w.GetComponent[PositionTestComp](unmatched); !ok || a.Y != 0 {
+		t.Fatalf("iterator wrote to an entity missing its peer component: %v", a)
+	}
 }
 
 type viewRecorder struct {
-	pairs map[EntityIndex][2]int32
+	pair  [2]int32
 	count int
 }
 
-// View2 双写版本 probe
-type view2Probe struct{ rec *viewRecorder }
-
-func (s *view2Probe) Update(ctx *SystemContext, event Event) error {
-	s.rec.pairs = map[EntityIndex][2]int32{}
-	s.rec.count = 0
+func (rec *viewRecorder) update(ctx *SystemContext, _ Event) error {
+	rec.count = 0
 	for a, b := range View2[groupCompA, groupCompB](ctx) {
-		s.rec.count++
-		s.rec.pairs[0] = [2]int32{a.V, b.V} // 无 index 语义，仅记录值
-		a.V++                               // 写穿透验证
-	}
-	return nil
-}
-
-// View2RO probe：A 可写 + B 只读视图，记录实体与值
-type view2ROProbe struct{ rec *viewRecorder }
-
-func (s *view2ROProbe) Update(ctx *SystemContext, event Event) error {
-	s.rec.pairs = map[EntityIndex][2]int32{}
-	s.rec.count = 0
-	q := ctx.NewQuery(WithComp[groupCompA, *groupCompA](), WithComp[groupCompB, *groupCompB]())
-	_ = q
-	for a, bv := range View2RO[groupCompA, groupCompBView](ctx) {
-		s.rec.count++
-		s.rec.pairs[EntityIndex(s.rec.count)] = [2]int32{a.V, bv.V()}
-		a.V += 10
+		rec.count++
+		rec.pair = [2]int32{a.V, b.V}
+		a.V++
 	}
 	return nil
 }
@@ -124,7 +108,7 @@ func (s *view2ROProbe) Update(ctx *SystemContext, event Event) error {
 func TestView2_Lockstep(t *testing.T) {
 	w := NewWorld()
 	rec := &viewRecorder{}
-	err := w.RegisterLight(LightSystem((&view2Probe{rec: rec}).Update),
+	err := w.RegisterLight(rec.update,
 		WithDeps(Dep[groupCompA](), Dep[groupCompB]()),
 		WithGroup(Dep[groupCompA](), Dep[groupCompB]()),
 	)
@@ -139,8 +123,8 @@ func TestView2_Lockstep(t *testing.T) {
 	if rec.count != 1 {
 		t.Fatalf("View2 count = %d, want 1", rec.count)
 	}
-	if rec.pairs[0] != [2]int32{1, 11} {
-		t.Fatalf("pairs = %v", rec.pairs)
+	if rec.pair != [2]int32{1, 11} {
+		t.Fatalf("pair = %v", rec.pair)
 	}
 	// 写穿透：a.V++ 应落到表内存
 	got, _ := w.GetComponent[groupCompA, *groupCompA](e1)
@@ -149,39 +133,11 @@ func TestView2_Lockstep(t *testing.T) {
 	}
 }
 
-// View2RO：只读视图版本
-func TestView2RO_Lockstep(t *testing.T) {
-	w := NewWorld()
-	rec := &viewRecorder{}
-	err := w.RegisterLight(LightSystem((&view2ROProbe{rec: rec}).Update),
-		WithDeps(Dep[groupCompA](), Dep[groupCompB](ReadOnly)),
-		WithGroup(Dep[groupCompA](), Dep[groupCompB]()),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	e1 := w.NewEntity(WithComponents(newGroupCompA(1), newGroupCompB(11)))
-	w.NewEntity(WithComponents(newGroupCompA(2)))
-	if err := w.Update(); err != nil {
-		t.Fatal(err)
-	}
-	if rec.count != 1 {
-		t.Fatalf("View2RO count = %d, want 1", rec.count)
-	}
-	if rec.pairs[EntityIndex(1)] != [2]int32{1, 11} {
-		t.Fatalf("pairs = %v", rec.pairs)
-	}
-	got, _ := w.GetComponent[groupCompA, *groupCompA](e1)
-	if got.V != 11 {
-		t.Fatalf("write-through failed: A.V = %d, want 11", got.V)
-	}
-}
-
 // View2 权限：B 为只读依赖时，可写 View2 静默返回空
 func TestView2_ReadonlyRejected(t *testing.T) {
 	w := NewWorld()
 	rec := &viewRecorder{}
-	err := w.RegisterLight(LightSystem((&view2Probe{rec: rec}).Update),
+	err := w.RegisterLight(rec.update,
 		WithDeps(Dep[groupCompA](), Dep[groupCompB](ReadOnly)),
 		WithGroup(Dep[groupCompA](), Dep[groupCompB]()),
 	)
@@ -201,7 +157,7 @@ func TestView2_ReadonlyRejected(t *testing.T) {
 func TestView2_FallbackNonGrouped(t *testing.T) {
 	w := NewWorld(WithoutGroups())
 	rec := &viewRecorder{}
-	err := w.RegisterLight(LightSystem((&view2Probe{rec: rec}).Update),
+	err := w.RegisterLight(rec.update,
 		WithDeps(Dep[groupCompA](), Dep[groupCompB]()),
 		WithGroup(Dep[groupCompA](), Dep[groupCompB]()),
 	)
@@ -216,8 +172,8 @@ func TestView2_FallbackNonGrouped(t *testing.T) {
 	if rec.count != 1 {
 		t.Fatalf("fallback count = %d, want 1", rec.count)
 	}
-	if rec.pairs[0] != [2]int32{1, 11} {
-		t.Fatalf("fallback pairs = %v", rec.pairs)
+	if rec.pair != [2]int32{1, 11} {
+		t.Fatalf("fallback pair = %v", rec.pair)
 	}
 	got, _ := w.GetComponent[groupCompA, *groupCompA](e1)
 	if got.V != 2 {

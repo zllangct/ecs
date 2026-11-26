@@ -82,44 +82,6 @@ func init() {
 // ============================================================================
 
 func TestQueryAndView_MergedGroupSubsetIncludesResidual(t *testing.T) {
-	run := func(disableGroups bool) (map[EntityIndex][2]int32, map[[2]int32]int, map[[2]int32]int) {
-		var opts []WorldOption
-		if disableGroups {
-			opts = append(opts, WithoutGroups())
-		}
-		w := NewWorld(opts...)
-		// 声明两个重叠组，Finalize 后合并为 3 列组 {A, B, C}
-		w.RegisterLight(LightSystem(func(ctx *SystemContext, event Event) error { return nil }),
-			WithDeps(Dep[p2CompA](), Dep[p2CompB](), Dep[p2CompC]()),
-			WithGroup(Dep[p2CompA](), Dep[p2CompB]()),
-			WithGroup(Dep[p2CompB](), Dep[p2CompC]()),
-		)
-		qRes := map[EntityIndex][2]int32{}
-		v2Res := map[[2]int32]int{}
-		v2roRes := map[[2]int32]int{}
-		w.RegisterLight(LightSystem(func(ctx *SystemContext, event Event) error {
-			q := ctx.NewQuery(WithComp[p2CompA](), WithComp[p2CompB]())
-			for idx := range q.Iter() {
-				a, aok := QueryGet[p2CompA](&q, idx)
-				b, bok := QueryGet[p2CompB](&q, idx)
-				if !aok || !bok {
-					t.Fatalf("QueryGet missing for idx %d: aok=%v bok=%v", idx, aok, bok)
-				}
-				qRes[idx] = [2]int32{a.V, b.V}
-			}
-			for a, b := range View2[p2CompA, p2CompB](ctx) {
-				v2Res[[2]int32{a.V, b.V}]++
-			}
-			for a, bv := range View2RO[p2CompA, p2CompBView](ctx) {
-				v2roRes[[2]int32{a.V, bv.V()}]++
-			}
-			return nil
-		}), WithDeps(Dep[p2CompA](), Dep[p2CompB](ReadOnly)), WithName("move"))
-		// 重建一个只写 A/B 的移动系统以便测试 View2
-		return qRes, v2Res, v2roRes
-	}
-	_, _, _ = run(false)
-
 	checkMode := func(disableGroups bool) (map[EntityIndex][2]int32, map[[2]int32]int, map[[2]int32]int, map[[2]int32]int) {
 		var opts []WorldOption
 		if disableGroups {

@@ -4,6 +4,8 @@
 环境：Windows / amd64 / Intel i9-10900K，Go 1.27，benchtime=100x
 对照：移动系统 `{Transform, Velocity}` 联合遍历
 
+以下数据和归并策略描述对应 2026-09-16 的实现。当前版本的完整组、子集残段、混合布局与纯池行为见 [ECS 使用说明](../README.md#固定访问组withgroup--组表存储与-view-api)。
+
 ## 二轮结果（查询优化后，10 万实体）
 
 | 访问方式 | 耗时 | vs 一轮基线（CSet 5.78ms） |
@@ -40,8 +42,9 @@
 
 ## 复现
 
-```
-cd ecs/example/bench
-go test -bench "BenchmarkGroupStorage_|BenchmarkView2RO_" -benchmem -benchtime 100x -run xxx .
+从 ECS 子仓根目录运行同名基准。输出反映当前检出版本的性能。
+
+```shell
+go -C examples/bench test -run '^$' -bench 'BenchmarkGroupStorage_|BenchmarkView2RO_' -benchmem -benchtime 100x .
 ```
 
