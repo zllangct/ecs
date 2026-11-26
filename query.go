@@ -209,7 +209,7 @@ func intersectPair(world *World, driver, other ComponentSet) iter.Seq2[EntityInd
 		}
 		// Distinct sorted peer keys filling their entire range prove membership
 		// for every driver key inside it, with no per-entity peer access.
-		if int64(last)-int64(first)+1 == int64(len(peers)) && keys[0] >= first && keys[len(keys)-1] <= last {
+		if orderedPoolCovers(keys, peers) {
 			return func(yield func(EntityIndex, *EntityInfo) bool) {
 				for _, key := range keys {
 					if info := world.entities.getByIndex(key); info != nil && !yield(key, info) {
@@ -251,6 +251,12 @@ func intersectPair(world *World, driver, other ComponentSet) iter.Seq2[EntityInd
 			}
 		}
 	}
+}
+
+// 两个键数组均非空且有序。若另一池无间隙地覆盖驱动池，驱动池的每个键都属于交集。
+func orderedPoolCovers(keys, peers []EntityIndex) bool {
+	first, last := peers[0], peers[len(peers)-1]
+	return int64(last)-int64(first)+1 == int64(len(peers)) && keys[0] >= first && keys[len(keys)-1] <= last
 }
 
 // pickMinNonEmptyPool 存在任一 nil 或空池则返回 nil；否则返回元素最少的池

@@ -152,8 +152,6 @@ func prepareView2RO[A any, BR ReadOnlyView[BR], PA ComponentPointer[A]](ctx *Sys
 		return
 	}
 
-	// 回退路径
-	q := ctx.NewQuery(WithComp[A, PA](), WithBuddies(*NewQueryBuddies(itB)))
 	if !okA && !okB {
 		// 两列只存于 CSet，依赖权限在入口已校验；每行直接从这两个池取组件。
 		setA, hasA := ctx.world.getComponentSet(itA)
@@ -161,6 +159,13 @@ func prepareView2RO[A any, BR ReadOnlyView[BR], PA ComponentPointer[A]](ctx *Sys
 		if !hasA || !hasB {
 			return
 		}
+		nativeA, okA := setA.(*CSet[A, PA])
+		nativeB, okB := setB.(interface{ nativeCSet() ComponentSet })
+		if okA && okB && nativeB.nativeCSet() == setB {
+			plan.fallback = view2ROCSet[A, BR](ctx, itA, itB, nativeA, setB)
+			return
+		}
+		q := ctx.NewQuery(WithComp[A, PA](), WithBuddies(*NewQueryBuddies(itB)))
 		plan.fallback = func(yield func(*A, BR) bool) {
 			for index := range q.Iter() {
 				if !ctx.constraint.isValid() {
@@ -174,6 +179,7 @@ func prepareView2RO[A any, BR ReadOnlyView[BR], PA ComponentPointer[A]](ctx *Sys
 		}
 		return
 	}
+	q := ctx.NewQuery(WithComp[A, PA](), WithBuddies(*NewQueryBuddies(itB)))
 	plan.fallback = func(yield func(*A, BR) bool) {
 		for index := range q.Iter() {
 			a, okA := QueryGet[A, PA](&q, index)
@@ -190,4 +196,57 @@ func prepareView2RO[A any, BR ReadOnlyView[BR], PA ComponentPointer[A]](ctx *Sys
 		}
 	}
 	return
+}
+
+// 两池按当前大小选择驱动列；等长时与 Query 一样使用类型编号较小的一列。
+func view2ROCSet[A any, BR ReadOnlyView[BR], PA ComponentPointer[A]](ctx *SystemContext, itA, itB ComponentIntType, a *CSet[A, PA], b ComponentSet) iter.Seq2[*A, BR] {
+	shape := FixedCompound2{min(itA, itB), max(itA, itB)}
+	return func(yield func(*A, BR) bool) {
+		if !ctx.constraint.isValid() {
+			return
+		}
+		ctx.info.getOptReporter().shapeUsageAddKey(shape)
+		keys, others := a.EntityIndexes(), b.EntityIndexes()
+		if len(keys) == 0 || len(others) == 0 {
+			return
+		}
+		var driver, peer ComponentSet = a, b
+		if len(others) < len(keys) || (len(others) == len(keys) && itB < itA) {
+			driver, peer = peer, driver
+			keys, others = others, keys
+		}
+		var view BR
+		if !a.IsKeyOrdered() || !b.IsKeyOrdered() || !orderedPoolCovers(keys, others) {
+			// 复用归并和稀疏探测，暂停后恢复时继续使用原查询的游标。
+			for key := range intersectPair(ctx.world, driver, peer) {
+				if !ctx.constraint.isValid() {
+					return
+				}
+				pa, pb := a.getByIndex(key), b.get(key)
+				if pa != nil && pb != nil && !yield(pa, view.FromPtr(pb)) {
+					return
+				}
+			}
+			return
+		}
+		for row, key := range keys {
+			if !ctx.constraint.isValid() {
+				return
+			}
+			if !ctx.world.entities.SparseArray.Exist(key) {
+				continue
+			}
+			var pa *A
+			// 只有当前行仍属于该实体才能直接寻址。跨同步点恢复时池可能已重排或扩容。
+			if row < len(a.idx2Key) && a.idx2Key[row] == int32(key) {
+				pa = &a.data[row]
+			} else {
+				pa = a.getByIndex(key)
+			}
+			pb := b.get(key)
+			if pa != nil && pb != nil && !yield(pa, view.FromPtr(pb)) {
+				return
+			}
+		}
+	}
 }

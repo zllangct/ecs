@@ -34,6 +34,9 @@ type CSet[T any, TP ComponentPointer[T]] struct {
 	SparseArray[EntityIndex, T]
 }
 
+// 用于识别泛型参数未知的原生池。嵌入 CSet 的自定义池返回其内层池。
+func (c *CSet[T, TP]) nativeCSet() ComponentSet { return c }
+
 func NewCSet[T any, TP ComponentPointer[T]](initSize ...int) *CSet[T, TP] {
 	c := &CSet[T, TP]{
 		SparseArray: *NewSparseArray[EntityIndex, T](initSize...),
