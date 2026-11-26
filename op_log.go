@@ -1,7 +1,8 @@
 package ecs
 
 import (
-	"sort"
+	"cmp"
+	"slices"
 	"sync"
 )
 
@@ -107,16 +108,19 @@ func appendOp(b map[ComponentIntType]*opTaskList, op Operate) {
 //   - 第一相：组件集合增删 + compound 维护（可并发）；
 //   - 第二相：组表成员资格 sync（依赖第一相完成后的 CSet/compound 终态，必须滞后执行）。
 func (c *OpLog) getOpTasks() ([]func(), []func(), func()) {
-	combination := make(map[ComponentIntType]*opTaskList)
+	var combination map[ComponentIntType]*opTaskList
 
 	merge := func(src map[ComponentIntType]*opTaskList) {
 		for it, list := range src {
 			if list.Len() == 0 {
 				continue
 			}
-			if _, ok := combination[it]; ok {
-				combination[it].Combine(list)
+			if dst := combination[it]; dst != nil {
+				dst.Combine(list)
 			} else {
+				if combination == nil {
+					combination = make(map[ComponentIntType]*opTaskList)
+				}
 				combination[it] = list.Clone()
 			}
 			list.Reset()
@@ -130,6 +134,9 @@ func (c *OpLog) getOpTasks() ([]func(), []func(), func()) {
 	for _, id := range c.sysOrder {
 		merge(c.sys[id])
 	}
+	if len(combination) == 0 {
+		return nil, nil, func() {}
+	}
 
 	// 按 ComponentIntType 升序排列，保证任务构造成果与 compVersion 递增确定性
 	orderedTypes := make([]ComponentIntType, 0, len(combination))
@@ -138,7 +145,7 @@ func (c *OpLog) getOpTasks() ([]func(), []func(), func()) {
 			orderedTypes = append(orderedTypes, intType)
 		}
 	}
-	sort.Slice(orderedTypes, func(i, j int) bool { return orderedTypes[i] < orderedTypes[j] })
+	slices.Sort(orderedTypes)
 
 	var tasks []func()
 	for _, intType := range orderedTypes {
@@ -203,8 +210,8 @@ func (c *OpLog) getOpTasks() ([]func(), []func(), func()) {
 	for a := range touched {
 		touchedGroups = append(touchedGroups, a)
 	}
-	sort.Slice(touchedGroups, func(i, j int) bool {
-		return touchedGroups[i].types[0] < touchedGroups[j].types[0]
+	slices.SortFunc(touchedGroups, func(left, right *Archetype) int {
+		return cmp.Compare(left.types[0], right.types[0])
 	})
 	var syncTasks []func()
 	for _, a := range touchedGroups {
