@@ -638,6 +638,9 @@ func (e *EntityIDGenerator) Unmarshal(data *SerializableEntityIDGeneratorData) e
 		return fmt.Errorf("ecs: id generator empty ids with non-zero len=%d or delayFree=%d", data.Len, data.DelayFree)
 	}
 
+	// Derived merge hints refer to slots in the old freelist.
+	e.mergeHint = 0
+	e.freePages = nil
 	e.free = EntityIndex(data.Free)
 	e.pending = EntityIndex(data.Pending)
 	e.len = data.Len
@@ -677,7 +680,6 @@ func (e *EntityIDGenerator) Unmarshal(data *SerializableEntityIDGeneratorData) e
 		}
 		e.removeDelay = make([]ReuseID, e.delayCap)
 	}
-	e.mergeHint = 0 // The restored freelist has no relation to the previous one.
 	return nil
 }
 

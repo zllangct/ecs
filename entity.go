@@ -48,7 +48,12 @@ type EntityIDGenerator struct {
 	// Last merged free slot. Allocation and restore invalidate the hint,
 	// so it always points into this generator's current sorted freelist.
 	mergeHint EntityIndex
+	// For scattered frees, keep the largest known free slot per page.
+	// Zero means that the page has no known anchor; the list is authoritative.
+	freePages []EntityIndex
 }
+
+const freePageSize = 128
 
 func NewEntityIDGenerator(initSize int, delayCap int) *EntityIDGenerator {
 	if initSize < 2 {
@@ -86,6 +91,14 @@ func (e *EntityIDGenerator) NewID() Entity {
 		e.free = next
 	}
 	e.len++
+	if e.freePages != nil {
+		page := int(id.index) / freePageSize
+		if page < len(e.freePages) && e.freePages[page] == id.index {
+			// Allocation takes the smallest free ID. Once the largest known
+			// slot is taken, every smaller known slot in that page is gone.
+			e.freePages[page] = 0
+		}
+	}
 	return id.ToEntity()
 }
 
@@ -130,11 +143,30 @@ func (e *EntityIDGenerator) delayFlush() {
 		return cmp.Compare(a.index, b.index)
 	})
 
+	first, last := delayed[0].index, delayed[len(delayed)-1].index
+	pages := int(last)/freePageSize + 1
+	// Sequential frees need only mergeHint. Build the optional index when
+	// a later window overlaps an earlier one and spans multiple pages.
+	if e.freePages != nil || (e.mergeHint > first && last-first >= freePageSize) {
+		if pages > len(e.freePages) {
+			e.freePages = append(e.freePages, make([]EntityIndex, pages-len(e.freePages))...)
+		}
+	}
+
 	link := &e.free
-	if e.mergeHint != 0 && e.mergeHint < delayed[0].index {
+	var previous EntityIndex
+	if e.mergeHint != 0 && e.mergeHint < first {
 		link = &e.ids[e.mergeHint].index
+		previous = e.mergeHint
 	}
 	for _, id := range delayed {
+		page := int(id.index) / freePageSize
+		// Use at most one lookup; a sparse world must not scan empty pages.
+		if e.freePages != nil && page > 0 {
+			if anchor := e.freePages[page-1]; anchor > previous {
+				link = &e.ids[anchor].index
+			}
+		}
 		for *link != e.pending && *link < id.index {
 			link = &e.ids[*link].index
 		}
@@ -142,7 +174,11 @@ func (e *EntityIDGenerator) delayFlush() {
 		*link = id.index
 		link = &e.ids[id.index].index
 		*link = next
+		if e.freePages != nil && id.index > e.freePages[page] {
+			e.freePages[page] = id.index
+		}
+		previous = id.index
 	}
 	e.delayFree = 0
-	e.mergeHint = delayed[len(delayed)-1].index
+	e.mergeHint = last
 }

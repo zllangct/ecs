@@ -1,6 +1,7 @@
 package ecs
 
 import (
+	"math/rand"
 	"reflect"
 	"slices"
 	"testing"
@@ -89,6 +90,51 @@ func TestEntityFreeMergeHintInvalidation(t *testing.T) {
 		got := g.NewID().toReuseID()
 		if got.index != ids[i].Index() || got.reuse != 1 || g.mergeHint != 0 {
 			t.Fatalf("bad reuse or cached predecessor after allocation: %+v", got)
+		}
+	}
+}
+
+func TestEntityFreePageAnchorsSurviveReuseAndRestore(t *testing.T) {
+	const n = 4096
+	g := NewEntityIDGenerator(n+2, 10)
+	reference := NewEntityIDGenerator(n+2, 10)
+	var live []Entity
+	for range n {
+		live = append(live, g.NewID())
+		reference.NewID()
+	}
+	rng := rand.New(rand.NewSource(37))
+	freeScattered := func(ids []Entity) {
+		rng.Shuffle(len(ids), func(i, j int) { ids[i], ids[j] = ids[j], ids[i] })
+		for _, id := range ids {
+			g.FreeID(id)
+			reference.mergeHint = 0 // Head-only merge; no page index is created.
+			reference.FreeID(id)
+		}
+		if !reflect.DeepEqual(g.Marshal(), reference.Marshal()) {
+			t.Fatal("accelerated freelist differs from head-only merge")
+		}
+	}
+	freeScattered(live[:3000])
+	if len(g.freePages) == 0 {
+		t.Fatal("scattered input did not exercise the page index")
+	}
+	var reused []Entity
+	for range 2500 {
+		id := g.NewID()
+		if id != reference.NewID() {
+			t.Fatal("page anchor changed smallest-ID reuse")
+		}
+		reused = append(reused, id)
+	}
+	freeScattered(reused)
+	if err := g.Unmarshal(reference.Marshal()); err != nil || len(g.freePages) != 0 {
+		t.Fatalf("restore retained previous page anchors, err=%v", err)
+	}
+	freeScattered(live[3000:])
+	for range n {
+		if g.NewID() != reference.NewID() {
+			t.Fatal("restored generator changed the reuse sequence")
 		}
 	}
 }
