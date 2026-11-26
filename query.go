@@ -216,7 +216,8 @@ func intersectPools(world *World, minSet ComponentSet, pools []ComponentSet) ite
 				}
 			}
 		}
-		if len(pools) == 3 {
+		// Use local cursors for dense drivers and the general merge for wider gaps.
+		if len(pools) == 3 && len(keys) > 0 && int64(keys[len(keys)-1])-int64(keys[0])+1 <= 2*int64(len(keys)) {
 			var peers [2]ComponentSet
 			n := 0
 			for _, p := range pools {

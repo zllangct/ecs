@@ -13,7 +13,7 @@ func TestOrderedThreePoolQueryPreservesCapturedPeerCursors(t *testing.T) {
 		grow   bool
 	}{
 		{"seek/grow", 64, true}, {"seek/swap-remove", 64, false},
-		{"merge/grow", 4, true}, {"merge/swap-remove", 4, false},
+		{"merge/grow", 2, true}, {"merge/swap-remove", 2, false},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
 			w := NewWorld(WithoutGroups())
