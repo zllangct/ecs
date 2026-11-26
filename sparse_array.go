@@ -124,9 +124,16 @@ func (s *SparseArray[K, V]) removeAt(key K, idx int32) {
 	s.indices[key] = 0
 	s.idx2Key = s.idx2Key[:lastIdx]
 
+	switch {
+	case lastIdx == 0:
+		s.isKOrder = true
+		s.lastKey = 0
+	case idx == lastIdx:
+		s.lastKey = K(s.idx2Key[lastIdx-1])
+	default:
+		s.isKOrder = false
+	}
 	s.shrink(key)
-
-	s.isKOrder = false
 }
 
 func (s *SparseArray[K, V]) Exist(key K) bool {
@@ -182,6 +189,9 @@ func (s *SparseArray[K, V]) Less(i, j int) bool {
 func (s *SparseArray[K, V]) Swap(i, j int) {
 	s.USet.Swap(int64(i), int64(j))
 	s.idx2Key[i], s.idx2Key[j] = s.idx2Key[j], s.idx2Key[i]
+	if i != j {
+		s.isKOrder = false
+	}
 	// indices 以 key 为下标，swap 后用 idx2Key 回写两个位置的映射
 	s.indices[s.idx2Key[i]] = int32(i + 1)
 	s.indices[s.idx2Key[j]] = int32(j + 1)

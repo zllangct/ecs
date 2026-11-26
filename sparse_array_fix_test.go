@@ -9,6 +9,35 @@ type saTestVal struct {
 	Seq int
 }
 
+func TestSparseArrayTailOrder(t *testing.T) {
+	s := NewSparseArray[int, saTestVal]()
+	for _, key := range []int{1, 4, 9} {
+		s.Add(key, &saTestVal{key})
+	}
+	s.Remove(9)
+	loaded, err := NewSparseArrayFromData[int, saTestVal](s.Marshal())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, pool := range []*SparseArray[int, saTestVal]{s, loaded} {
+		pool.Add(6, &saTestVal{6})
+		if !pool.isKOrder || pool.lastKey != 6 {
+			t.Fatal("appending between the surviving and removed tails should stay ordered")
+		}
+		pool.Swap(0, 1)
+		pool.Remove(6)
+		if pool.isKOrder {
+			t.Fatal("removing the tail must preserve disorder in the surviving prefix")
+		}
+		pool.Remove(1)
+		pool.Remove(4)
+		pool.Add(0, &saTestVal{})
+		if !pool.isKOrder || pool.lastKey != 0 {
+			t.Fatal("empty pool retained an obsolete last key")
+		}
+	}
+}
+
 // D03: Remove 后 idx2Key 必须截断，不得残留已删除 key
 func TestSparseArrayRemove_Idx2KeyTruncated(t *testing.T) {
 	sa := NewSparseArray[int, saTestVal]()
