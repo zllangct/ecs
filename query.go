@@ -2,6 +2,7 @@ package ecs
 
 import (
 	"iter"
+	"slices"
 	"unsafe"
 )
 
@@ -193,6 +194,15 @@ func intersectPools(world *World, minSet ComponentSet, pools []ComponentSet) ite
 		return intersectPair(world, minSet, other)
 	}
 	if mergeable(pools) {
+		// Near-equal pools benefit from the tight sequential merge loop. An
+		// occasional very large peer can instead skip runs of unrelated rows.
+		const seekRatio = 16
+		driverLen := minSet.Len()
+		for _, pool := range pools {
+			if driverLen > 0 && int64(pool.Len()) >= seekRatio*int64(driverLen) {
+				return seekJoinIter(world, minSet, pools)
+			}
+		}
 		return mergeJoinIter(world, minSet, pools)
 	}
 	return existFilterIter(world, minSet, pools)
@@ -380,6 +390,79 @@ func mergeJoinIter(world *World, minSet ComponentSet, pools []ComponentSet) iter
 				continue
 			}
 			if !yield(k, info) {
+				return
+			}
+		}
+	}
+}
+
+// An ordered query captures each peer's key slice when Iter is called. A live
+// sparse index can accelerate a lookup only while it still describes that slice.
+type orderedKeySeeker interface {
+	nativeCSet() ComponentSet
+	seekOrderedKey([]EntityIndex, int, EntityIndex) int
+}
+
+func (c *CSet[T, TP]) seekOrderedKey(keys []EntityIndex, cursor int, key EntityIndex) int {
+	if c.isKOrder && len(c.idx2Key) >= len(keys) &&
+		unsafe.Pointer(unsafe.SliceData(c.idx2Key)) == unsafe.Pointer(unsafe.SliceData(keys)) {
+		row := int(c.denseIndex(key))
+		if row >= cursor && row < len(keys) {
+			return row
+		}
+		// Keep the original merge cursor on a miss as well. The caller may
+		// later resume the sequence after the driver or a peer has changed.
+		pos, _ := slices.BinarySearch(keys[cursor:], key)
+		return cursor + pos
+	}
+	for cursor < len(keys) && keys[cursor] < key {
+		cursor++
+	}
+	return cursor
+}
+
+func seekJoinIter(world *World, driver ComponentSet, pools []ComponentSet) iter.Seq2[EntityIndex, *EntityInfo] {
+	type peer struct {
+		keys []EntityIndex
+		seek orderedKeySeeker
+	}
+	keys := driver.EntityIndexes()
+	peers := make([]peer, 0, len(pools)-1)
+	for _, p := range pools {
+		if p == driver {
+			continue
+		}
+		current := peer{keys: p.EntityIndexes()}
+		if native, ok := p.(orderedKeySeeker); ok && native.nativeCSet() == p {
+			current.seek = native
+		}
+		peers = append(peers, current)
+	}
+	return func(yield func(EntityIndex, *EntityInfo) bool) {
+		cursors := make([]int, len(peers))
+	outer:
+		for _, key := range keys {
+			for j, p := range peers {
+				cur := cursors[j]
+				// Short gaps use the ordinary merge, including all custom
+				// pools. A sparse lookup pays off across a longer sorted run.
+				const lookahead = 8
+				if p.seek != nil && len(p.keys)-cur > lookahead && p.keys[cur+lookahead] < key {
+					cur = p.seek.seekOrderedKey(p.keys, cur, key)
+				} else {
+					for cur < len(p.keys) && p.keys[cur] < key {
+						cur++
+					}
+				}
+				cursors[j] = cur
+				if cur == len(p.keys) {
+					return
+				}
+				if p.keys[cur] != key {
+					continue outer
+				}
+			}
+			if info := world.entities.getByIndex(key); info != nil && !yield(key, info) {
 				return
 			}
 		}
