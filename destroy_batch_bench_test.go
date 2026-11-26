@@ -2,14 +2,25 @@ package ecs
 
 import (
 	"fmt"
+	"math/rand"
 	"slices"
 	"testing"
 	"time"
 )
 
+func orderDestroyBenchmark(ids []Entity, order string) {
+	switch order {
+	case "Descending":
+		slices.Reverse(ids)
+	case "Shuffled":
+		rng := rand.New(rand.NewSource(915))
+		rng.Shuffle(len(ids), func(i, j int) { ids[i], ids[j] = ids[j], ids[i] })
+	}
+}
+
 func BenchmarkEntityFreeBatch(b *testing.B) {
 	for _, n := range []int{1_000, 100_000} {
-		for _, order := range []string{"Ascending", "Descending"} {
+		for _, order := range []string{"Ascending", "Descending", "Shuffled"} {
 			b.Run(fmt.Sprintf("%d/%s", n, order), func(b *testing.B) {
 				b.StopTimer()
 				b.ReportAllocs()
@@ -19,9 +30,7 @@ func BenchmarkEntityFreeBatch(b *testing.B) {
 					for i := range ids {
 						ids[i] = g.NewID()
 					}
-					if order == "Descending" {
-						slices.Reverse(ids)
-					}
+					orderDestroyBenchmark(ids, order)
 					b.StartTimer()
 					for _, id := range ids {
 						g.FreeID(id)
@@ -43,9 +52,9 @@ func BenchmarkEntityFreeBatch(b *testing.B) {
 // Setup, the initial component flush, and all postconditions are untimed.
 func BenchmarkWorldDestroyBatch(b *testing.B) {
 	for _, n := range []int{1_000, 10_000, 100_000} {
-		for _, order := range []string{"Ascending", "Descending"} {
+		for _, order := range []string{"Ascending", "Descending", "Shuffled"} {
 			b.Run(fmt.Sprintf("%d/%s", n, order), func(b *testing.B) {
-				benchmarkDestroyWorld(b, n, order == "Descending", false)
+				benchmarkDestroyWorld(b, n, order, false)
 			})
 		}
 	}
@@ -54,10 +63,10 @@ func BenchmarkWorldDestroyBatch(b *testing.B) {
 // A world with eight component pools and one component per destroyed entity
 // exercises the cost of searching storage that cannot own the target.
 func BenchmarkWorldDestroySparse(b *testing.B) {
-	benchmarkDestroyWorld(b, 1_000, false, true)
+	benchmarkDestroyWorld(b, 1_000, "Ascending", true)
 }
 
-func benchmarkDestroyWorld(b *testing.B, n int, reverse, sparse bool) {
+func benchmarkDestroyWorld(b *testing.B, n int, order string, sparse bool) {
 	b.StopTimer()
 	b.ReportAllocs()
 	for sample := 0; sample < b.N; sample++ {
@@ -89,9 +98,7 @@ func benchmarkDestroyWorld(b *testing.B, n int, reverse, sparse bool) {
 		if err := w.Step(time.Millisecond); err != nil {
 			b.Fatal(err)
 		}
-		if reverse {
-			slices.Reverse(targets)
-		}
+		orderDestroyBenchmark(targets, order)
 
 		b.StartTimer()
 		for _, target := range targets {
