@@ -138,7 +138,9 @@ type SystemContext struct {
 	info       SystemInfo
 	// queryCache 查询预解析缓存（shapeKey → queryCached），跨帧复用，
 	// world.compVersion 变化或组表未定型时失效重建
-	queryCache map[FixedCompound]*queryCached
+	queryCache   map[FixedCompound]*queryCached
+	buddyColumns map[ComponentIntType]buddyColumn
+	buddyVersion int
 }
 
 // AddComponents 在 system 执行期间提交组件添加操作，写入本 system 的独立队列

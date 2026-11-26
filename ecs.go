@@ -305,35 +305,8 @@ func (ctx *SystemContext) GetBuddy[T any, TP ComponentPointer[T]](index EntityIn
 	if !ctx.constraint.isValid() {
 		return nil, false
 	}
-	it := GetIntType[T, TP]()
-	// 依赖未声明不得访问（约定：静默返回空）
-	dep, ok := ctx.info.getDep(it)
-	if !ok {
-		return nil, false
-	}
-	// 只读依赖不得通过可写 API 访问（约定：静默返回空），
-	// 只读访问请使用 GetBuddyReadOnly（codegen 零拷贝视图）。
-	if dep.readonly() {
-		return nil, false
-	}
-
-	// 组表分派：命中行则直取列内存
-	if a, ok := ctx.world.archetypes.owner(it); ok {
-		if row, ok := a.rowOf(index); ok {
-			col, _ := a.colOf(it)
-			return (*T)(a.cellPtr(col, row)), true
-		}
-	}
-
-	s, ok := ctx.world.getComponentSet(it)
-	if !ok {
-		return nil, false
-	}
-	b := s.get(index)
-	if b == nil {
-		return nil, false
-	}
-	return (*T)(b), true
+	ptr := ctx.buddyPtr(GetIntType[T, TP](), index, false)
+	return (*T)(ptr), ptr != nil
 }
 
 // GetBuddyReadOnly 按实体索引以只读视图读取组件。
@@ -351,30 +324,68 @@ func (ctx *SystemContext) GetBuddyReadOnly[TR ReadOnlyView[TR]](index EntityInde
 	if !ctx.constraint.isValid() {
 		return zero, false
 	}
-	it := ComponentIntType(zero.ComponentPacketIdentifier())
-	dep, ok := ctx.info.getDep(it)
-	if !ok {
+	ptr := ctx.buddyPtr(ComponentIntType(zero.ComponentPacketIdentifier()), index, true)
+	if ptr == nil {
 		return zero, false
 	}
-	if !dep.readonly() {
-		return zero, false
-	}
+	return zero.FromPtr(ptr), true
+}
 
-	// 组表分派：命中行则直取列内存
-	if a, ok := ctx.world.archetypes.owner(it); ok {
-		if row, ok := a.rowOf(index); ok {
-			col, _ := a.colOf(it)
-			return zero.FromPtr(a.cellPtr(col, row)), true
+type buddyColumn struct {
+	group    *Archetype
+	col      int
+	pool     ComponentSet
+	readOnly bool
+}
+
+func (ctx *SystemContext) resolveBuddyColumn(it ComponentIntType, dep ComponentDependency) buddyColumn {
+	group, _ := ctx.world.archetypes.owner(it)
+	entry := buddyColumn{group: group, pool: ctx.world.components[it], readOnly: dep.readonly()}
+	if group != nil {
+		entry.col, _ = group.colOf(it)
+	}
+	return entry
+}
+
+// A callback may read these bindings concurrently. Refresh them only between
+// callbacks, after structural changes. No row or slice address survives a frame.
+func (ctx *SystemContext) bindBuddyColumns() {
+	ctx.buddyVersion = ctx.world.compVersion
+	deps := ctx.info.getDeps()
+	if len(deps) == 0 {
+		return
+	}
+	if ctx.buddyColumns == nil {
+		ctx.buddyColumns = make(map[ComponentIntType]buddyColumn, len(deps))
+	}
+	// getDep uses the first declaration when a type was declared twice.
+	for i := len(deps) - 1; i >= 0; i-- {
+		dep := deps[i]
+		it := dep.intType()
+		ctx.buddyColumns[it] = ctx.resolveBuddyColumn(it, dep)
+	}
+}
+
+func (ctx *SystemContext) buddyPtr(it ComponentIntType, index EntityIndex, readOnly bool) unsafe.Pointer {
+	entry, ok := ctx.buddyColumns[it]
+	if ctx.buddyColumns == nil {
+		// Initialization can access components before the first runtime binding.
+		dep, declared := ctx.info.getDep(it)
+		if !declared {
+			return nil
+		}
+		entry, ok = ctx.resolveBuddyColumn(it, dep), true
+	}
+	if !ok || entry.readOnly != readOnly {
+		return nil
+	}
+	if entry.group != nil {
+		if row, found := entry.group.rowOf(index); found {
+			return entry.group.cellPtr(entry.col, row)
 		}
 	}
-
-	s, ok := ctx.world.getComponentSet(it)
-	if !ok {
-		return zero, false
+	if entry.pool != nil {
+		return entry.pool.get(index)
 	}
-	b := s.get(index)
-	if b == nil {
-		return zero, false
-	}
-	return zero.FromPtr(b), true
+	return nil
 }

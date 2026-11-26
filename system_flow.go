@@ -244,6 +244,9 @@ func (p *flow) runSystem(info SystemInfo, stage Stage, event Event) error {
 		return err
 	}
 	ctx := info.getContext()
+	if ctx.buddyVersion != ctx.world.compVersion {
+		ctx.bindBuddyColumns()
+	}
 	ctx.constraint.activate()
 	defer ctx.constraint.deactivate()
 	return task.fn(ctx, event)
