@@ -17,6 +17,63 @@ type stringyComp struct {
 	Seq  int32
 }
 
+type retainedReaderComp struct {
+	stringyComp
+	reader *rockmem.Reader
+}
+
+func (d *retainedReaderComp) ReadAsRoot(r *rockmem.Reader) {
+	d.reader = r
+	d.stringyComp.ReadAsRoot(r)
+}
+
+func TestIDLRestoreRetainedReaders(t *testing.T) {
+	set := NewCSet[retainedReaderComp]()
+	for i := 1; i <= 260; i++ {
+		set.Add(Entity(i), &retainedReaderComp{stringyComp: stringyComp{Seq: int32(i)}})
+	}
+	data, err := set.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	back, err := NewCSetFromData[retainedReaderComp](data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 1; i <= 260; i++ {
+		c := back.Get(Entity(i)).(*retainedReaderComp)
+		if c.reader == nil || binary.LittleEndian.Uint32(c.reader.Memory[4:8]) != uint32(i) {
+			t.Fatalf("decoder for entity %d lost its original reader", i)
+		}
+	}
+}
+
+func TestRestoreCompoundAppendIsolation(t *testing.T) {
+	w := NewWorld()
+	for range 260 {
+		w.NewEntity(WithComponents(newGroupCompA(3)))
+	}
+	if err := w.Update(); err != nil {
+		t.Fatal(err)
+	}
+	data, err := w.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	back, err := NewWorldFromData(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data.Entities.CompoundData[0] = 0
+	for i := 1; i <= 260; i++ {
+		info, _ := back.GetEntityInfo(Entity(i))
+		if !info.compound.Exist(GetIntType[groupCompA]()) || len(info.compound) != 1 {
+			t.Fatalf("compound for entity %d was overwritten", i)
+		}
+		info.compound.Add(GetIntType[groupCompB]())
+	}
+}
+
 func TestCSetMarshalVariableLengthWireLayout(t *testing.T) {
 	set := NewCSet[stringyComp](8)
 	values := []stringyComp{{Name: strings.Repeat("x", 8192), Seq: 17}, {Seq: 2}, {Name: "字段", Seq: 5}}
@@ -46,7 +103,7 @@ func TestCSetMarshalVariableLengthWireLayout(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, want := range values {
-		if got := back.Get(Entity(i+1)); got == nil || *got.(*stringyComp) != want {
+		if got := back.Get(Entity(i + 1)); got == nil || *got.(*stringyComp) != want {
 			t.Fatalf("element %d: snapshot was not independent of source and encoder scratch", i)
 		}
 	}

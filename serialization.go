@@ -310,34 +310,42 @@ func (c *CSet[T, TP]) unmarshalIDL(data *SerializableSparseArrayData) error {
 	if int64(len(raw)) < hdrLen {
 		return fmt.Errorf("ecs: IDL snapshot header truncated: need %d, got %d", hdrLen, len(raw))
 	}
-	offsets := make([]int64, n+1)
+	var lastOffset uint64
 	for i := 0; i <= n; i++ {
 		off := binary.LittleEndian.Uint64(raw[i*8:])
 		if off > uint64(math.MaxInt64) {
 			return fmt.Errorf("ecs: IDL offset overflow at %d", i)
 		}
-		offsets[i] = int64(off)
-		if offsets[i] < 0 {
-			return fmt.Errorf("ecs: IDL negative offset at %d: %d", i, offsets[i])
-		}
-		if i > 0 && offsets[i] < offsets[i-1] {
+		if off < lastOffset {
 			return fmt.Errorf("ecs: IDL offset table not monotonic at %d", i)
 		}
+		lastOffset = off
 	}
 	blobLen := int64(len(raw)) - hdrLen
-	if offsets[n] > blobLen {
-		return fmt.Errorf("ecs: IDL blob truncated: need %d, got %d", offsets[n], blobLen)
+	if lastOffset > uint64(blobLen) {
+		return fmt.Errorf("ecs: IDL blob truncated: need %d, got %d", lastOffset, blobLen)
 	}
 
 	// 先对临时缓冲区解码与 ValidateAsRoot，避免破坏目标 c（原子失败）
 	tmpData := c.USet.a.alloc(n, n)
+	// Custom decoders may retain their reader. Give each row a distinct
+	// reader, and bound the retained block when just one row survives.
+	var readers []rockmem.Reader
+	blobStart := int(hdrLen) + int(binary.LittleEndian.Uint64(raw))
 	for i := 0; i < n; i++ {
-		blob := raw[hdrLen+offsets[i] : hdrLen+offsets[i+1]]
+		blobEnd := int(hdrLen) + int(binary.LittleEndian.Uint64(raw[(i+1)*8:]))
+		blob := raw[blobStart:blobEnd]
+		blobStart = blobEnd
 		m, ok := any(TP(&tmpData[i])).(rockmemMessage)
 		if !ok {
 			return fmt.Errorf("ecs: component type %T does not implement rockmemMessage for IDL restore", TP(nil))
 		}
-		r := rockmem.NewReader(blob)
+		if len(readers) == 0 {
+			readers = make([]rockmem.Reader, min(128, n-i))
+		}
+		r := &readers[0]
+		readers = readers[1:]
+		*r = *rockmem.NewReader(blob)
 		if vr, ok := any(m).(validatableRoot); ok {
 			if !vr.ValidateAsRoot(r) {
 				return fmt.Errorf("ecs: IDL component %d failed ValidateAsRoot", i)
@@ -517,21 +525,27 @@ func (es *EntitySet) Unmarshal(data *SerializableEntitySetData) error {
 		es.USet.initSize = int64(es.initSize)
 		es.USet.data = es.USet.a.alloc(count, count)
 
-		for i := 0; i < count; i++ {
-			es.data[i].entity = Entity(data.EntityIds[i])
-			es.data[i].world = nil // Must be set by caller
-
-			// Reconstruct compound from flattened data
-			offset := data.CompoundOffsets[i]
-			length := data.CompoundLengths[i]
-			if length > 0 {
-				es.data[i].compound = make(Compound, length)
-				for j := int32(0); j < length; j++ {
-					es.data[i].compound[j] = ComponentIntType(data.CompoundData[offset+j])
-				}
-			} else {
-				es.data[i].compound = NewCompound(4)
+		for first := 0; first < count; {
+			stop := first + min(128, count-first)
+			base := int(data.CompoundOffsets[first])
+			end := int(data.CompoundOffsets[stop-1]) + int(data.CompoundLengths[stop-1])
+			block := make(Compound, end-base)
+			for i, typ := range data.CompoundData[base:end] {
+				block[i] = ComponentIntType(typ)
 			}
+			for i := first; i < stop; i++ {
+				lo := int(data.CompoundOffsets[i]) - base
+				hi := lo + int(data.CompoundLengths[i])
+				info := &es.data[i]
+				info.entity = Entity(data.EntityIds[i])
+				info.world = nil // Must be set by caller.
+				// Appending to one entity must never overwrite its neighbor.
+				info.compound = block[lo:hi:hi]
+				if lo == hi {
+					info.compound = NewCompound(4)
+				}
+			}
+			first = stop
 		}
 	} else {
 		es.USet = *NewUSet[EntityInfo](es.initSize)
