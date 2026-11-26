@@ -41,7 +41,7 @@ type SystemInfo interface {
 	name() string
 	getOrder() Order
 	getRaw() any
-	impl(stage Stage) bool
+	callback(stage Stage) systemCallback
 	getContext() *SystemContext
 	getDep(intType ComponentIntType) (ComponentDependency, bool)
 	getOptReporter() *optReporter
@@ -169,7 +169,7 @@ func (ctx *SystemContext) AddComponents(entity Entity, comps ...Component) {
 type SystemInfoInstance struct {
 	systemId   uint64
 	systemName string
-	impls      uint16
+	callbacks  [StageMaxIndex + 1]systemCallback
 	config     *SystemConfig
 	state      SystemState
 	ctx        SystemContext
@@ -182,15 +182,14 @@ type SystemInfoInstance struct {
 func newSystem(world *World, system any, typ SystemType) *SystemInfoInstance {
 	c := &SystemConfig{}
 	c.initDefault()
-	impls := implsCheck(system)
 	info := &SystemInfoInstance{
-		config:   c,
-		systemId: LocalUniqueID(),
-		typ:      typ,
-		raw:      system,
-		impls:    impls,
-		world:    world,
-		reporter: newOptReporter(),
+		config:    c,
+		systemId:  LocalUniqueID(),
+		typ:       typ,
+		raw:       system,
+		callbacks: bindCallbacks(system),
+		world:     world,
+		reporter:  newOptReporter(),
 	}
 	return info
 }
@@ -248,8 +247,8 @@ func (s *SystemInfoInstance) id() uint64 {
 	return s.systemId
 }
 
-func (s *SystemInfoInstance) impl(stage Stage) bool {
-	return s.impls>>stage&1 == 1
+func (s *SystemInfoInstance) callback(stage Stage) systemCallback {
+	return s.callbacks[stage]
 }
 
 func (s *SystemInfoInstance) name() string {

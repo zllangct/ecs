@@ -74,68 +74,54 @@ type SyncAfterPostDestroyReceiver interface {
 // SyncAfterDestroyReceiver 是 SyncAfterPostDestroyReceiver 的规范别名。
 type SyncAfterDestroyReceiver = SyncAfterPostDestroyReceiver
 
-func implsCheck(system any) uint16 {
-	var impls uint16
-	imp := false
-	_, imp = system.(SyncBeforeStartReceiver)
-	if imp {
-		impls = impls | 1<<StageSyncBeforeStart
+type systemCallback func(*SystemContext, Event) error
+
+// Bind stage receivers once when the system is registered.
+func bindCallbacks(system any) (callbacks [StageMaxIndex + 1]systemCallback) {
+	if r, ok := system.(SyncBeforeStartReceiver); ok {
+		callbacks[StageSyncBeforeStart] = r.SyncBeforeStart
 	}
-	_, imp = system.(StartReceiver)
-	if imp {
-		impls = impls | 1<<StageStart
+	if r, ok := system.(StartReceiver); ok {
+		callbacks[StageStart] = r.Start
 	}
-	_, imp = system.(SyncAfterStartReceiver)
-	if imp {
-		impls = impls | 1<<StageSyncAfterStart
+	if r, ok := system.(SyncAfterStartReceiver); ok {
+		callbacks[StageSyncAfterStart] = r.SyncAfterStart
 	}
-	_, imp = system.(SyncBeforePreUpdateReceiver)
-	if imp {
-		impls = impls | 1<<StageSyncBeforePreUpdate
+	if r, ok := system.(SyncBeforePreUpdateReceiver); ok {
+		callbacks[StageSyncBeforePreUpdate] = r.SyncBeforePreUpdate
 	}
-	_, imp = system.(PreUpdateReceiver)
-	if imp {
-		impls = impls | 1<<StagePreUpdate
+	if r, ok := system.(PreUpdateReceiver); ok {
+		callbacks[StagePreUpdate] = r.PreUpdate
 	}
-	_, imp = system.(SyncAfterPreUpdateReceiver)
-	if imp {
-		impls = impls | 1<<StageSyncAfterPreUpdate
+	if r, ok := system.(SyncAfterPreUpdateReceiver); ok {
+		callbacks[StageSyncAfterPreUpdate] = r.SyncAfterPreUpdate
 	}
-	_, imp = system.(SyncBeforeUpdateReceiver)
-	if imp {
-		impls = impls | 1<<StageSyncBeforeUpdate
+	if r, ok := system.(SyncBeforeUpdateReceiver); ok {
+		callbacks[StageSyncBeforeUpdate] = r.SyncBeforeUpdate
 	}
-	_, imp = system.(UpdateReceiver)
-	if imp {
-		impls = impls | 1<<StageUpdate
+	if r, ok := system.(UpdateReceiver); ok {
+		callbacks[StageUpdate] = r.Update
 	}
-	_, imp = system.(SyncAfterUpdateReceiver)
-	if imp {
-		impls = impls | 1<<StageSyncAfterUpdate
+	if r, ok := system.(SyncAfterUpdateReceiver); ok {
+		callbacks[StageSyncAfterUpdate] = r.SyncAfterUpdate
 	}
-	_, imp = system.(SyncBeforePostUpdateReceiver)
-	if imp {
-		impls = impls | 1<<StageSyncBeforePostUpdate
+	if r, ok := system.(SyncBeforePostUpdateReceiver); ok {
+		callbacks[StageSyncBeforePostUpdate] = r.SyncBeforePostUpdate
 	}
-	_, imp = system.(PostUpdateReceiver)
-	if imp {
-		impls = impls | 1<<StagePostUpdate
+	if r, ok := system.(PostUpdateReceiver); ok {
+		callbacks[StagePostUpdate] = r.PostUpdate
 	}
-	_, imp = system.(SyncAfterPostUpdateReceiver)
-	if imp {
-		impls = impls | 1<<StageSyncAfterPostUpdate
+	if r, ok := system.(SyncAfterPostUpdateReceiver); ok {
+		callbacks[StageSyncAfterPostUpdate] = r.SyncAfterPostUpdate
 	}
-	_, imp = system.(SyncBeforeDestroyReceiver)
-	if imp {
-		impls = impls | 1<<StageSyncBeforeDestroy
+	if r, ok := system.(SyncBeforeDestroyReceiver); ok {
+		callbacks[StageSyncBeforeDestroy] = r.SyncBeforeDestroy
 	}
-	_, imp = system.(DestroyReceiver)
-	if imp {
-		impls = impls | 1<<StageDestroy
+	if r, ok := system.(DestroyReceiver); ok {
+		callbacks[StageDestroy] = r.Destroy
 	}
-	_, imp = system.(SyncAfterPostDestroyReceiver)
-	if imp {
-		impls = impls | 1<<StageSyncAfterDestroy
+	if r, ok := system.(SyncAfterDestroyReceiver); ok {
+		callbacks[StageSyncAfterDestroy] = r.SyncAfterDestroy
 	}
-	return impls
+	return callbacks
 }
