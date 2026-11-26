@@ -53,33 +53,43 @@ func (ctx *SystemContext) NewQuery(opt ...QueryOption) Query {
 // resolveQuery 一次性完成查询的全部循环不变解析：
 // 主迭代源（组表行 或 最小 buddy 池）、buddy 池列表、访问槽位。
 func (ctx *SystemContext) resolveQuery(c *QueryConfig) *queryCached {
-	cached := &queryCached{config: c, version: ctx.world.compVersion}
+	cached := &queryCached{
+		config:      c,
+		version:     ctx.world.compVersion,
+		buddyGroups: make([]*Archetype, len(c.queryBuddies)),
+		pools:       make([]ComponentSet, len(c.queryBuddies)),
+	}
 
-	// 组表分派：buddies 全部属于同一张组表时，直接以组表行为主迭代源
+	// 组表分派：记录每个 buddy 所属组表，判断是否全部属于同一张组表
 	var group *Archetype
+	sameGroup := true
 	for i, buddy := range c.queryBuddies {
 		a, ok := ctx.world.archetypes.owner(buddy)
 		if !ok {
-			group = nil
-			break
+			sameGroup = false
+			continue
 		}
+		cached.buddyGroups[i] = a
+		cached.hasGrouped = true
 		if i == 0 {
 			group = a
 		} else if a != group {
-			group = nil
-			break
+			sameGroup = false
 		}
 	}
-	cached.group = group
+	if sameGroup && group != nil {
+		cached.group = group
+		// queryBuddies 已去重且有序，仅当长度等于组表列数时才完全覆盖组表（无残段可能）
+		cached.groupFull = len(c.queryBuddies) == len(group.types)
+	}
 
 	// buddy 池 + 最小池
-	cached.pools = make([]ComponentSet, len(c.queryBuddies))
 	var minSet ComponentSet
 	for i, buddy := range c.queryBuddies {
 		s, ok := ctx.world.getComponentSet(buddy)
 		if !ok {
-			// 组路径下 buddy 数据可全在表内（无残段池）；CSet 路径缺池即恒空
-			if group == nil {
+			// 非组内组件缺失 CSet 池即恒空；组内组件即使尚无 CSet 池，数据也可能在组表中
+			if cached.buddyGroups[i] == nil {
 				cached.empty = true
 				return cached
 			}
@@ -91,30 +101,33 @@ func (ctx *SystemContext) resolveQuery(c *QueryConfig) *queryCached {
 		}
 	}
 	cached.minSet = minSet
-	if group == nil && minSet == nil {
+	if cached.group == nil && !cached.hasGrouped && minSet == nil {
 		cached.empty = true
 		return cached
 	}
 
 	// 访问槽位：仅声明为非只读依赖的 buddy（权限语义与 GetBuddy 一致）
 	cached.slots = map[ComponentIntType]querySlot{}
-	for _, buddy := range c.queryBuddies {
+	for i, buddy := range c.queryBuddies {
 		dep, ok := ctx.info.getDep(buddy)
 		if !ok || dep.readonly() {
 			continue
 		}
-		if a, ok := ctx.world.archetypes.owner(buddy); ok {
+		a := cached.buddyGroups[i]
+		s := cached.pools[i]
+		if a != nil {
 			col, _ := a.colOf(buddy)
 			cached.slots[buddy] = func(index EntityIndex) unsafe.Pointer {
-				row, ok := a.rowOf(index)
-				if !ok {
-					return nil
+				if row, ok := a.rowOf(index); ok {
+					return a.cellPtr(col, row)
 				}
-				return a.cellPtr(col, row)
+				if s != nil {
+					return s.get(index)
+				}
+				return nil
 			}
 			continue
 		}
-		s := cached.pools[buddyIndex(c, buddy)]
 		if s == nil {
 			continue
 		}

@@ -23,9 +23,9 @@ func init() {
 }
 
 const (
-	PacketIdentifierPoint    = 12809409023221035873
-	PacketIdentifierPosition = 14274740599321850262
-	PacketIdentifierName     = 7328248172266787231
+	PacketIdentifierPoint    = 4729129826657533587
+	PacketIdentifierPosition = 1385431362921285235
+	PacketIdentifierName     = 7388934499422161891
 )
 
 type Point struct {
@@ -76,24 +76,33 @@ func (x *Point) Write(writer rockmem.Writer, start uint) (offset uint, err error
 	return offset, nil
 }
 
-// WriteDefault writes the Point default value to the writer at the specified offset
+var _defaultRoot_Point = [16]byte{}
+
+// WriteDefault writes the Point default value to the writer using a precomputed static template
 func (x *Point) WriteDefault(writer rockmem.Writer, start uint) (offset uint, err error) {
-	offset = start
-	size := uint(16)
-	if offset == 0 {
-		offset, err = writer.Alloc(size)
+	if start == 0 {
+		offset, err = writer.Alloc(16)
 		if err != nil {
 			return 0, err
 		}
+		writer.WriteAt(offset, _defaultRoot_Point[:])
+		return offset, nil
 	}
-
-	writer.Write4At(offset, uint32(size))
-
+	offset = start
+	writer.WriteAt(offset, _defaultRoot_Point[:16])
 	return offset, nil
 }
 
 func (x *Point) ReadAsRoot(reader *rockmem.Reader) {
 	x.Read(NewPointViewer(reader, 0), reader)
+}
+
+// ValidateAsRoot 受检根解码校验（Q12）：校验 inline 固定长度 16 界内 + 深校验。
+func (x *Point) ValidateAsRoot(reader *rockmem.Reader) bool {
+	if !reader.IsValidOffset(0, 16) {
+		return false
+	}
+	return NewPointViewer(reader, 0).Validate(reader)
 }
 
 func (x *Point) ReadWithOffset(reader *rockmem.Reader, offset uint32) {
@@ -157,24 +166,33 @@ func (x *Position) Write(writer rockmem.Writer, start uint) (offset uint, err er
 	return offset, nil
 }
 
-// WriteDefault writes the Position default value to the writer at the specified offset
+var _defaultRoot_Position = [16]byte{}
+
+// WriteDefault writes the Position default value to the writer using a precomputed static template
 func (x *Position) WriteDefault(writer rockmem.Writer, start uint) (offset uint, err error) {
-	offset = start
-	size := uint(16)
-	if offset == 0 {
-		offset, err = writer.Alloc(size)
+	if start == 0 {
+		offset, err = writer.Alloc(16)
 		if err != nil {
 			return 0, err
 		}
+		writer.WriteAt(offset, _defaultRoot_Position[:])
+		return offset, nil
 	}
-
-	writer.Write4At(offset, uint32(size))
-
+	offset = start
+	writer.WriteAt(offset, _defaultRoot_Position[:16])
 	return offset, nil
 }
 
 func (x *Position) ReadAsRoot(reader *rockmem.Reader) {
 	x.Read(NewPositionViewer(reader, 0), reader)
+}
+
+// ValidateAsRoot 受检根解码校验（Q12）：校验 inline 固定长度 16 界内 + 深校验。
+func (x *Position) ValidateAsRoot(reader *rockmem.Reader) bool {
+	if !reader.IsValidOffset(0, 16) {
+		return false
+	}
+	return NewPositionViewer(reader, 0).Validate(reader)
 }
 
 func (x *Position) ReadWithOffset(reader *rockmem.Reader, offset uint32) {
@@ -242,35 +260,33 @@ func (x *Name) Write(writer rockmem.Writer, start uint) (offset uint, err error)
 	return offset, nil
 }
 
-// WriteDefault writes the Name default value to the writer at the specified offset
+var _defaultRoot_Name = [56]byte{}
+
+// WriteDefault writes the Name default value to the writer using a precomputed static template
 func (x *Name) WriteDefault(writer rockmem.Writer, start uint) (offset uint, err error) {
-	offset = start
-	size := uint(56)
-	if offset == 0 {
-		offset, err = writer.Alloc(size)
+	if start == 0 {
+		offset, err = writer.Alloc(56)
 		if err != nil {
 			return 0, err
 		}
+		writer.WriteAt(offset, _defaultRoot_Name[:])
+		return offset, nil
 	}
-
-	writer.Write4At(offset, uint32(size))
-	__valueOffset := offset + 0
-	writer.WriteAt(__valueOffset, (*[16]byte)(unsafe.Pointer(&x.Value))[:])
-	__pointsOffset := offset + 16
-	for i := range x.Points {
-		if _, err := x.Points[i].WriteDefault(writer, __pointsOffset); err != nil {
-			return offset, err
-		}
-		__pointsOffset += 16
-	}
-	__arrOffset := offset + 48
-	writer.WriteAt(__arrOffset, (*[8]byte)(unsafe.Pointer(&x.Arr))[:])
-
+	offset = start
+	writer.WriteAt(offset, _defaultRoot_Name[:56])
 	return offset, nil
 }
 
 func (x *Name) ReadAsRoot(reader *rockmem.Reader) {
 	x.Read(NewNameViewer(reader, 0), reader)
+}
+
+// ValidateAsRoot 受检根解码校验（Q12）：校验 inline 固定长度 56 界内 + 深校验。
+func (x *Name) ValidateAsRoot(reader *rockmem.Reader) bool {
+	if !reader.IsValidOffset(0, 56) {
+		return false
+	}
+	return NewNameViewer(reader, 0).Validate(reader)
 }
 
 func (x *Name) ReadWithOffset(reader *rockmem.Reader, offset uint32) {
@@ -305,6 +321,19 @@ func (x *PointViewer) size() uint32 {
 	return 16
 }
 
+// Validate 深校验数据边界（不可信输入接入端使用；offset 合法性由 NewPointViewer 保证）
+func (x *PointViewer) Validate(reader *rockmem.Reader) bool {
+	return x.ValidateDepth(reader, 0)
+}
+
+// ValidateDepth 带递归深度限制的深校验（跨包嵌套调用使用）
+func (x *PointViewer) ValidateDepth(reader *rockmem.Reader, depth int) bool {
+	if depth > 32 {
+		return false // 循环引用/超限深度
+	}
+	return true
+}
+
 func (x *PointViewer) RockmemReader() *rockmem.Reader {
 	return rockmem.NewReader(x[:])
 }
@@ -333,6 +362,19 @@ func NewPositionViewer(reader *rockmem.Reader, offset uint32) (v *PositionViewer
 
 func (x *PositionViewer) size() uint32 {
 	return 16
+}
+
+// Validate 深校验数据边界（不可信输入接入端使用；offset 合法性由 NewPositionViewer 保证）
+func (x *PositionViewer) Validate(reader *rockmem.Reader) bool {
+	return x.ValidateDepth(reader, 0)
+}
+
+// ValidateDepth 带递归深度限制的深校验（跨包嵌套调用使用）
+func (x *PositionViewer) ValidateDepth(reader *rockmem.Reader, depth int) bool {
+	if depth > 32 {
+		return false // 循环引用/超限深度
+	}
+	return true
 }
 
 func (x *PositionViewer) RockmemReader() *rockmem.Reader {
@@ -365,6 +407,27 @@ func (x *NameViewer) size() uint32 {
 	return 56
 }
 
+// Validate 深校验数据边界（不可信输入接入端使用；offset 合法性由 NewNameViewer 保证）
+func (x *NameViewer) Validate(reader *rockmem.Reader) bool {
+	return x.ValidateDepth(reader, 0)
+}
+
+// ValidateDepth 带递归深度限制的深校验（跨包嵌套调用使用）
+func (x *NameViewer) ValidateDepth(reader *rockmem.Reader, depth int) bool {
+	if depth > 32 {
+		return false // 循环引用/超限深度
+	}
+	{
+		elems := unsafe.Slice((*PointViewer)(unsafe.Add(unsafe.Pointer(x), 16)), 2)
+		for i := range elems {
+			if !elems[i].ValidateDepth(reader, depth+1) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 func (x *NameViewer) RockmemReader() *rockmem.Reader {
 	return rockmem.NewReader(x[:])
 }
@@ -377,6 +440,9 @@ func (x *NameViewer) Value() (v []byte) {
 }
 
 func (x *NameViewer) sliceValue() (v []byte) {
+	if 0+16 > x.size() {
+		return nil
+	}
 	return unsafe.Slice((*byte)(unsafe.Add(unsafe.Pointer(x), 0)), 16)
 }
 
@@ -395,70 +461,97 @@ func (x *NameViewer) Arr() (v []int32) {
 }
 
 func (x *NameViewer) sliceArr() (v []int32) {
+	if 48+8 > x.size() {
+		return nil
+	}
 	return unsafe.Slice((*int32)(unsafe.Add(unsafe.Pointer(x), 48)), 2)
 }
 
 type PointModifier struct {
 	*PointViewer
+	reader *rockmem.Reader
 }
 
 func NewPointModifier(reader *rockmem.Reader, offset uint32) (v PointModifier) {
-	return PointModifier{NewPointViewer(reader, offset)}
+	return PointModifier{NewPointViewer(reader, offset), reader}
 }
 
-func newPointModifierByViewer(viewer *PointViewer) (v PointModifier) {
-	return PointModifier{viewer}
+func newPointModifierByViewer(viewer *PointViewer, reader *rockmem.Reader) (v PointModifier) {
+	return PointModifier{viewer, reader}
 }
 
 func (x *PointModifier) SetX(v float32) {
+	if x.PointViewer == (*PointViewer)(unsafe.Pointer(&_Null_testdata[0])) {
+		return
+	}
 	*(*float32)(unsafe.Add(unsafe.Pointer(x.PointViewer), 0)) = v
 }
 
 func (x *PointModifier) SetY(v float32) {
+	if x.PointViewer == (*PointViewer)(unsafe.Pointer(&_Null_testdata[0])) {
+		return
+	}
 	*(*float32)(unsafe.Add(unsafe.Pointer(x.PointViewer), 4)) = v
 }
 
 func (x *PointModifier) SetZ(v float32) {
+	if x.PointViewer == (*PointViewer)(unsafe.Pointer(&_Null_testdata[0])) {
+		return
+	}
 	*(*float32)(unsafe.Add(unsafe.Pointer(x.PointViewer), 8)) = v
 }
 
 type PositionModifier struct {
 	*PositionViewer
+	reader *rockmem.Reader
 }
 
 func NewPositionModifier(reader *rockmem.Reader, offset uint32) (v PositionModifier) {
-	return PositionModifier{NewPositionViewer(reader, offset)}
+	return PositionModifier{NewPositionViewer(reader, offset), reader}
 }
 
-func newPositionModifierByViewer(viewer *PositionViewer) (v PositionModifier) {
-	return PositionModifier{viewer}
+func newPositionModifierByViewer(viewer *PositionViewer, reader *rockmem.Reader) (v PositionModifier) {
+	return PositionModifier{viewer, reader}
 }
 
 func (x *PositionModifier) SetX(v float32) {
+	if x.PositionViewer == (*PositionViewer)(unsafe.Pointer(&_Null_testdata[0])) {
+		return
+	}
 	*(*float32)(unsafe.Add(unsafe.Pointer(x.PositionViewer), 0)) = v
 }
 
 func (x *PositionModifier) SetY(v float32) {
+	if x.PositionViewer == (*PositionViewer)(unsafe.Pointer(&_Null_testdata[0])) {
+		return
+	}
 	*(*float32)(unsafe.Add(unsafe.Pointer(x.PositionViewer), 4)) = v
 }
 
 func (x *PositionModifier) SetZ(v float32) {
+	if x.PositionViewer == (*PositionViewer)(unsafe.Pointer(&_Null_testdata[0])) {
+		return
+	}
 	*(*float32)(unsafe.Add(unsafe.Pointer(x.PositionViewer), 8)) = v
 }
 
 type NameModifier struct {
 	*NameViewer
+	reader *rockmem.Reader
 }
 
 func NewNameModifier(reader *rockmem.Reader, offset uint32) (v NameModifier) {
-	return NameModifier{NewNameViewer(reader, offset)}
+	return NameModifier{NewNameViewer(reader, offset), reader}
 }
 
-func newNameModifierByViewer(viewer *NameViewer) (v NameModifier) {
-	return NameModifier{viewer}
+func newNameModifierByViewer(viewer *NameViewer, reader *rockmem.Reader) (v NameModifier) {
+	return NameModifier{viewer, reader}
 }
 
 func (x *NameModifier) SetValue(v *[16]byte) {
+	if x.NameViewer == (*NameViewer)(unsafe.Pointer(&_Null_testdata[0])) {
+		return
+	}
 	if len(v) != 16 {
 		if rockmem.IsDebugEnabled() {
 			panic("array length mismatch: expected 16, got " + string(rune(len(v))))
@@ -469,6 +562,9 @@ func (x *NameModifier) SetValue(v *[16]byte) {
 }
 
 func (x *NameModifier) SetArr(v *[2]int32) {
+	if x.NameViewer == (*NameViewer)(unsafe.Pointer(&_Null_testdata[0])) {
+		return
+	}
 	if len(v) != 2 {
 		if rockmem.IsDebugEnabled() {
 			panic("array length mismatch: expected 2, got " + string(rune(len(v))))

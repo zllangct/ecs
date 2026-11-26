@@ -1,6 +1,7 @@
 package ecs
 
 import (
+	"sort"
 	"sync"
 )
 
@@ -29,9 +30,10 @@ type Operate struct {
 type OpLog struct {
 	world *World
 
-	mu   sync.Mutex
-	main map[ComponentIntType]*opTaskList
-	sys  map[uint64]map[ComponentIntType]*opTaskList
+	mu       sync.Mutex
+	main     map[ComponentIntType]*opTaskList
+	sys      map[uint64]map[ComponentIntType]*opTaskList
+	sysOrder []uint64
 }
 
 func NewOpLog(world *World, k int) *OpLog {
@@ -42,11 +44,32 @@ func NewOpLog(world *World, k int) *OpLog {
 	}
 }
 
-// registerSystem 为 system 分配独立操作队列，注册期主线程调用
+// registerSystem 为 system 分配独立操作队列，注册期主线程调用，并记录固定合并顺序
 func (c *OpLog) registerSystem(id uint64) {
 	if _, ok := c.sys[id]; !ok {
 		c.sys[id] = make(map[ComponentIntType]*opTaskList)
+		c.sysOrder = append(c.sysOrder, id)
 	}
+}
+
+// HasPending 是否仍有尚未 flush 到组件存储的操作（Marshal 只读导出前校验用）
+func (c *OpLog) HasPending() bool {
+	c.mu.Lock()
+	for _, list := range c.main {
+		if list.Len() > 0 {
+			c.mu.Unlock()
+			return true
+		}
+	}
+	c.mu.Unlock()
+	for _, id := range c.sysOrder {
+		for _, list := range c.sys[id] {
+			if list.Len() > 0 {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // operate 默认队列入口（主线程 / EntityInfo.Add）
@@ -103,17 +126,23 @@ func (c *OpLog) getOpTasks() ([]func(), []func(), func()) {
 	c.mu.Lock()
 	merge(c.main)
 	c.mu.Unlock()
-	// 帧同步点调用，system 均未运行，sys 队列无并发写
-	for _, q := range c.sys {
-		merge(q)
+	// 帧同步点调用，system 均未运行，按系统注册顺序确定性合并 sys 队列
+	for _, id := range c.sysOrder {
+		merge(c.sys[id])
 	}
 
-	var tasks []func()
+	// 按 ComponentIntType 升序排列，保证任务构造成果与 compVersion 递增确定性
+	orderedTypes := make([]ComponentIntType, 0, len(combination))
 	for intType, list := range combination {
-		taskList := list
-		if taskList.Len() == 0 {
-			continue
+		if list.Len() > 0 {
+			orderedTypes = append(orderedTypes, intType)
 		}
+	}
+	sort.Slice(orderedTypes, func(i, j int) bool { return orderedTypes[i] < orderedTypes[j] })
+
+	var tasks []func()
+	for _, intType := range orderedTypes {
+		taskList := combination[intType]
 		set := c.world.components[intType]
 		if set == nil {
 			set = taskList.head.com.NewComponentSet()
@@ -134,7 +163,8 @@ func (c *OpLog) getOpTasks() ([]func(), []func(), func()) {
 	}
 
 	fn := func() {
-		for it, list := range combination {
+		for _, it := range orderedTypes {
+			list := combination[it]
 			for task := list.head; task != nil; task = task.next {
 				info, ok := c.world.getEntityInfo(task.target)
 				if ok {
@@ -154,9 +184,10 @@ func (c *OpLog) getOpTasks() ([]func(), []func(), func()) {
 	}
 	tasks = append(tasks, fn)
 
-	// 第二相：组表成员资格 sync。收集本帧涉及组内类型的实体，按组聚合。
+	// 第二相：组表成员资格 sync。收集本帧涉及组内类型的实体，按组聚合（按组首类型升序确定性排列）。
 	touched := map[*Archetype]map[EntityIndex]struct{}{}
-	for it, list := range combination {
+	for _, it := range orderedTypes {
+		list := combination[it]
 		a, ok := c.world.archetypes.owner(it)
 		if !ok {
 			continue
@@ -168,9 +199,16 @@ func (c *OpLog) getOpTasks() ([]func(), []func(), func()) {
 			touched[a][task.target.Index()] = struct{}{}
 		}
 	}
+	touchedGroups := make([]*Archetype, 0, len(touched))
+	for a := range touched {
+		touchedGroups = append(touchedGroups, a)
+	}
+	sort.Slice(touchedGroups, func(i, j int) bool {
+		return touchedGroups[i].types[0] < touchedGroups[j].types[0]
+	})
 	var syncTasks []func()
-	for a, entities := range touched {
-		a, entities := a, entities
+	for _, a := range touchedGroups {
+		a, entities := a, touched[a]
 		syncTasks = append(syncTasks, func() {
 			c.world.syncGroup(a, entities)
 		})
@@ -204,6 +242,12 @@ func (c *OpLog) opExecute(taskList *opTaskList, set ComponentSet) {
 			}
 			set.Add(task.target, task.com)
 		case ComponentOperateDelete:
+			// 校验 reuse 代数，避免旧句柄误删新实体组件
+			if !task.com.IsNomadic() {
+				if _, ok := c.world.getEntityInfo(task.target); !ok {
+					continue
+				}
+			}
 			set.Remove(task.target)
 		case ComponentOperateDeleteAll:
 			set.Reset()

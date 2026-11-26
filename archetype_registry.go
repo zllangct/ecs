@@ -24,25 +24,37 @@ func NewArchetypeRegistry() *ArchetypeRegistry {
 	}
 }
 
-// Declare 声明一个固定访问组（types 不要求有序，至少 2 个类型）。
+// Declare 声明一个固定访问组（types 不要求有序，去重后至少 2 个不同类型）。
 // 仅 Finalize 前可调用（注册期）。
 func (r *ArchetypeRegistry) Declare(types []ComponentIntType, sizes map[ComponentIntType]int) error {
 	if r.sealed {
 		return fmt.Errorf("ecs: archetype registry sealed")
 	}
-	if len(types) < 2 {
-		return fmt.Errorf("ecs: group needs >= 2 component types, got %v", types)
+	seen := make(map[ComponentIntType]struct{}, len(types))
+	cp := make([]ComponentIntType, 0, len(types))
+	for _, it := range types {
+		if _, dup := seen[it]; dup {
+			continue
+		}
+		seen[it] = struct{}{}
+		cp = append(cp, it)
 	}
-	cp := make([]ComponentIntType, len(types))
-	copy(cp, types)
+	if len(cp) < 2 {
+		return fmt.Errorf("ecs: group needs >= 2 distinct component types, got %v", types)
+	}
 	sort.Slice(cp, func(i, j int) bool { return cp[i] < cp[j] })
-	r.declared = append(r.declared, cp)
 	for _, it := range cp {
 		s, ok := sizes[it]
-		if !ok || s <= 0 {
+		if !ok || s < 0 {
 			return fmt.Errorf("ecs: component type %d size unknown (not registered?)", it)
 		}
-		r.sizes[it] = s
+		if s == 0 {
+			return fmt.Errorf("ecs: WithGroup rejects zero-sized tag component type %d", it)
+		}
+	}
+	r.declared = append(r.declared, cp)
+	for _, it := range cp {
+		r.sizes[it] = sizes[it]
 	}
 	return nil
 }
@@ -109,6 +121,22 @@ func (r *ArchetypeRegistry) Finalize() error {
 	return nil
 }
 
+// clearRows 清空全部组表行数据（Unmarshal 恢复时清理残留组表）
+func (r *ArchetypeRegistry) clearRows() {
+	for _, a := range r.groups {
+		a.clearRows()
+	}
+}
+
+// clear 释放所有组表注册信息与列缓冲（World.Destroy 时调用）
+func (r *ArchetypeRegistry) clear() {
+	r.clearRows()
+	r.declared = nil
+	r.sizes = nil
+	r.groups = nil
+	r.ownerOf = nil
+}
+
 // owner 组件类型所属组表
 func (r *ArchetypeRegistry) owner(it ComponentIntType) (*Archetype, bool) {
 	a, ok := r.ownerOf[it]
@@ -162,9 +190,15 @@ func (w *World) absorbAll() {
 
 // syncGroup 帧同步点组成员资格重评估（两阶段 flush 的第二相，单线程/组间并发安全——
 // 各组类型集合互不重叠，实体行只属一张表）。
-// 对触及实体：在表中但已失去组内组件 → 拆行散回 CSet；不在表中但已集齐 → 收拢入行。
+// 对触及实体按 EntityIndex 升序确定性重评估：在表中但已失去组内组件 → 拆行散回 CSet；不在表中但已集齐 → 收拢入行。
 func (w *World) syncGroup(a *Archetype, entities map[EntityIndex]struct{}) {
+	ordered := make([]EntityIndex, 0, len(entities))
 	for index := range entities {
+		ordered = append(ordered, index)
+	}
+	sort.Slice(ordered, func(i, j int) bool { return ordered[i] < ordered[j] })
+
+	for _, index := range ordered {
 		info := w.entities.getByIndex(index)
 		if info == nil {
 			continue // 已销毁

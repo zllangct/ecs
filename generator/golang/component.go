@@ -55,8 +55,8 @@ func (c *ComponentGenerator) Init(fileTree *parser.FileTree, file *parser.File) 
 
 		// 如果文件级或结构体级有 @component() 标签，则需要生成组件代码
 		if fileHasComponent || structHasComponent {
-			// 验证组件字段
-			if err := c.validateComponentFields(st); err != nil {
+			// 验证组件字段（递归检查嵌套结构体与结构体数组）
+			if err := c.validateComponentFields(fileTree, st, map[string]bool{}); err != nil {
 				c.errors = append(c.errors, err.Error())
 				continue
 			}
@@ -133,24 +133,29 @@ func (c *ComponentGenerator) collectViewStructs(fileTree *parser.FileTree) error
 
 // calculateComponentSeq 计算组件序列号
 // 优先使用 @ComSeq(n) 标签指定的值，否则基于包名+结构体名生成唯一哈希
-// validateComponentFields 验证组件字段
+// validateComponentFields 验证组件字段（递归覆盖嵌套 struct 与 [n]Struct 数组）
 // ECS 组件要求所有字段必须是内存连续的类型
 // 禁用以下类型（基于生成的 Go 类型判断，而非 IDL 类型）：
 // 1. string 类型 ([]char/[n]char) - 生成 Go string，内部是指针+长度，内存不连续
 // 2. slice 类型 ([]T) - 生成 Go slice，内部是指针+长度+容量，内存不连续
 // 3. @ptr() 标签字段 - 生成 Go 指针类型 (*T)，内存不连续
-//
-// 注意：table 结构体字段生成的 Go 类型是值类型（如 TableA 而非 *TableA），内存是连续的。
-// table 和 inline 的区别仅在于序列化时的二进制布局，Go 结构体层面都是连续内存。
-func (c *ComponentGenerator) validateComponentFields(st *parser.Struct) error {
-	// 检查结构体本身是否为 inline 类型
-	if st.Kind != parser.StructKindInline {
+func (c *ComponentGenerator) validateComponentFields(fileTree *parser.FileTree, st *parser.Struct, visited map[string]bool) error {
+	if visited[st.Name] {
+		return nil
+	}
+	visited[st.Name] = true
+
+	// 顶层组件结构体本身必须为 inline 类型
+	if len(visited) == 1 && st.Kind != parser.StructKindInline {
 		return fmt.Errorf("component '%s' must be inline struct. "+
 			"ECS requires contiguous memory layout. Use 'struct %s inline { ... }' instead",
 			st.Name, st.Name)
 	}
 
 	for _, field := range st.Fields {
+		if field.Type == nil {
+			continue
+		}
 		// 1. 检查 string 类型 - 生成 Go string（指针+长度）
 		if field.Type.IsString() {
 			return fmt.Errorf("component '%s' field '%s' cannot be string type ([]char/[n]char). "+
@@ -170,6 +175,23 @@ func (c *ComponentGenerator) validateComponentFields(st *parser.Struct) error {
 			return fmt.Errorf("component '%s' field '%s' cannot use @ptr() tag. "+
 				"ECS requires contiguous memory layout. Pointer types are not allowed",
 				st.Name, field.Name)
+		}
+
+		// 4. 递归校验嵌套 struct 或定长结构体数组 [n]Struct
+		if field.Type.IsStruct() {
+			if field.Type.Package != nil && !field.Type.Package.IsLocal() {
+				return fmt.Errorf("component '%s' field '%s': cross-package struct type '%s' "+
+					"is not supported in components (cannot generate read-only view across packages)",
+					st.Name, field.Name, field.Type.QualifiedName())
+			}
+			nested := fileTree.FindStructByName(field.Type.PlainSchema)
+			if nested == nil {
+				return fmt.Errorf("component '%s' field '%s': struct type '%s' not found",
+					st.Name, field.Name, field.Type.PlainSchema)
+			}
+			if err := c.validateComponentFields(fileTree, nested, visited); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

@@ -47,6 +47,12 @@ type EntityIDGenerator struct {
 }
 
 func NewEntityIDGenerator(initSize int, delayCap int) *EntityIDGenerator {
+	if initSize < 2 {
+		initSize = 2
+	}
+	if delayCap <= 0 {
+		delayCap = 10
+	}
 	g := &EntityIDGenerator{}
 	g.ids = make([]ReuseID, initSize)
 	for i := 0; i < len(g.ids); i++ {
@@ -89,6 +95,9 @@ func (e *EntityIDGenerator) FreeID(entity Entity) {
 	slot := &e.ids[realID.index]
 	if slot.index == -1 {
 		panic(fmt.Sprintf("ecs: double free, index=%d", realID.index))
+	}
+	if slot.index != realID.index {
+		panic(fmt.Sprintf("ecs: free unallocated entity slot, index=%d", realID.index))
 	}
 	if slot.reuse != realID.reuse {
 		panic(fmt.Sprintf("ecs: stale entity handle, index=%d want reuse=%d got %d",

@@ -1,6 +1,8 @@
 package golang
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -117,5 +119,53 @@ func TestComponentGenerator_NoConvenienceFuncs(t *testing.T) {
 	code := generateReadonlyComponents(t)
 	if strings.Contains(code, "func GetTransformReadOnly(") || strings.Contains(code, "func GetTransformReadOnlyAt(") {
 		t.Error("convenience funcs should not be generated")
+	}
+}
+
+// 4.4: 嵌套结构体或结构体数组中含 string / []T / @ptr() 必须被递归拒绝
+func TestComponentGenerator_RejectsNestedNonContiguousFields(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+	}{
+		{
+			name: "nested_string",
+			src: `rockmem bad @package("bad") @component();
+struct Inner inline { Name []char; }
+struct Outer inline { Info Inner; }
+`,
+		},
+		{
+			name: "nested_slice",
+			src: `rockmem bad @package("bad") @component();
+struct Inner { Items []int32; }
+struct Outer inline { Info Inner; }
+`,
+		},
+		{
+			name: "array_of_struct_with_ptr",
+			src: `rockmem bad @package("bad") @component();
+struct Node inline { Val int32; }
+struct Inner inline { Next Node @ptr(); }
+struct Outer inline { Arr [2]Inner; }
+`,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := filepath.Join(t.TempDir(), tc.name+".rm")
+			if err := os.WriteFile(p, []byte(tc.src), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			ft, err := parser.Parse(p)
+			if err != nil {
+				t.Fatalf("parse failed: %v", err)
+			}
+			file := ft.GetInputFile()
+			g := NewComponentGenerator()
+			if err := g.Init(ft, file); err == nil {
+				t.Fatalf("expected validation error for %s, got nil", tc.name)
+			}
+		})
 	}
 }

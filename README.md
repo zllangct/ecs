@@ -1,818 +1,244 @@
 # ECS
-这是一个ECS（Entity-Component-System）Go语言版本的实现，它聚焦于游戏领域的应用，帮助你快速构建一个高内聚、低耦合、易扩展、高性能的并行化游戏世界。
-## Contents
-* [快速开始](#快速开始)
-    + [安装](#安装)
-    + [简单示例](#简单示例)
-* [快速了解](#快速了解)
-    + [什么是ECS？](#什么是ECS？)
-    + [游戏领域为什么需要ECS？](#游戏领域为什么需要ECS？)
-    + [基本架构](#基本架构)
-    + [基本概念](#基本概念)
-        - [World](#World)
-        - [Entity](#Entity)
-        - [Component](#Component)
-        - [System](#System)
-        - [Utility](#Utility)
-        - [Shape](#Shape)
-        - [FixedString](#FixedString)
-        - [“下一帧生效"](#“下一帧生效")
-    + [设计思路](#设计思路)
-* [使用教程](#使用教程)
-    + [创建一个World](#创建一个World)
-        - [SyncWorld](#SyncWorld)
-        - [AsyncWorld](#AsyncWorld)
-    - [创建一个Entity](#创建一个Entity)
-    - [创建一个Component](#创建一个Component)
-    - [创建一个System](#创建一个System)
-        * [阶段事件](#阶段事件)
-        * [阶段特征](#阶段特征)
-    + [使用Utility与System交互](#使用Utility与System交互)
-    + [ECS与外围系统交互](#ECS与外围系统交互)
-        - [SyncWorld](#SyncWorld)
-        - [AsyncWorld](#AsyncWorld)
-    + [如何处理System的执行顺序](#如何处理System的执行顺序)
-    + [如何选择不同类型的Component](#如何选择不同类型的Component)
-        - [常规组件](#常规组件)
-        - [Free组件](#Free组件)
-        - [Disposable组件](#Disposable组件)
-        - [FreeDisposable组件](#FreeDisposable组件)
-    + [系统中获取组件的方式](#系统中获取组件的方式)
-    + [系统间的数据流动](#系统间的数据流动)
-    + [一个完整的例子](#一个完整的例子)
-* [Benchmark](#Benchmark)
-    + [测试用的代码](#测试用的代码)
-    + [测试结果](#测试结果)
-    + [结论](#结论)
-* [API文档](#API文档)
-* [设计细节](#设计细节)
-    + [架构](#架构)
-    + [日志](#日志)
-    + [World](#World)
-    + [Entity](#Entity)
-    + [Component](#Component)
-    + [System](#System)
-    + [Utility](#Utility)
-    + [Shape](#Shape)
-    + [Compound](#Compound)
-    + [一次Update的执行流程](#一次Update的执行流程)
-    + [从添加Component到生效](#从添加Component到生效)
-    + [容器](#容器)
-    + [迭代器](#迭代器)
-    + [协程池](#协程池)
-    + [ECS序列化和反序列化](#ECS序列化和反序列化)
-    + [ECS中的并行](#ECS中的并行)
-    + [EntityID的管理](#EntityID的管理)
-    + [如何行为限制](#如何行为限制)
-    + [优化器](#优化器)
-    + [统计器](#统计器)
-* [特别注意](#特别注意)
-* [存在的一些问题](#存在的一些问题)
-* [写在最后](#写在最后)
-* [TODO](#TODO)
+
+这是一个面向游戏服务与客户端的数据驱动 ECS（Entity-Component-System）Go 语言实现，聚焦高内聚、低耦合、连续内存布局、无锁并发调度以及整世界快照序列化。
+
+## 目录
+
+- [特性概览](#特性概览)
+- [安装与代码生成](#安装与代码生成)
+- [快速开始](#快速开始)
+- [核心概念](#核心概念)
+  - [World 与执行模式](#world-与执行模式)
+  - [Entity 与句柄代数](#entity-与句柄代数)
+  - [Component 与代码生成约束](#component-与代码生成约束)
+  - [System 与执行阶段](#system-与执行阶段)
+  - [只读依赖与零拷贝只读视图](#只读依赖与零拷贝只读视图)
+  - [固定访问组（WithGroup / 组表存储）与 View API](#固定访问组withgroup--组表存储与-view-api)
+  - [帧同步点与操作日志（OpLog）](#帧同步点与操作日志oplog)
+- [世界序列化与确定性回放](#世界序列化与确定性回放)
+- [运行示例与测试](#运行示例与测试)
+
+---
+
+## 特性概览
+
+- **连续内存与两级存储**：组件默认存储在基于 `SparseArray` + `USet` 的连续数组中，支持 O(1) 稀疏索引与 swap-remove；通过 `WithGroup` 可将联合高频访问的组件自动合并为列式组表（`Archetype`），配合 `View2..View8` / `View2RO..View8RO` 实现同步列指针遍历。
+- **自动依赖冲突调度**：`WithWorldASyncMode()` 下框架根据系统声明的 `WithDep`（`ReadWrite` / `ReadOnly`）自动划分无冲突批次并行执行，并在同 `Order` 档位内为冲突系统保持注册顺序；`Sync*` 同步阶段始终在主 goroutine 串行执行。
+- **编译期只读防护**：`rockmem-ecs` 代码生成器为每个组件及其嵌套结构体生成零拷贝只读视图 `TReadOnly`，只读依赖仅可通过 `ReadOnlyView` 访问，编译期阻断误写。
+- **整世界快照与确定性步进**：支持 `World.Marshal` / `MarshalTo` 只读联合导出与 `NewWorldFromData` / `Unmarshal` 原子恢复；支持 `World.Step(delta)` 固定步长确定性推进。
+
+---
+
+## 安装与代码生成
+
+```shell
+go get github.com/zllangct/ecs
+```
+
+### 定义 Component（`.rm` 文件）
+
+使用 RockMem IDL 语法定义组件（`@component()` 要求结构体为 `inline`，所有字段及可达嵌套结构体必须为连续值布局，禁止 `string`、`[]T` 与 `@ptr()`；固定长度文本请使用 `[n]byte` + `@string()`）：
+
+```text
+rockmem components @package("components") @component();
+
+struct Position inline {
+    x float32;
+    y float32;
+    z float32;
+}
+
+struct Velocity inline {
+    x float32;
+    y float32;
+    z float32;
+}
+
+struct Player inline {
+    name [32]byte @string();
+    level int32;
+}
+
+// 一次性组件：每帧结束自动清空
+struct DamageEvent inline @disposable() {
+    damage float32;
+    target_id int64;
+}
+```
+
+### 生成组件代码
+
+```shell
+go run ./cmd/rockmem-ecs generate -o ./components components.rm
+```
+
+或使用仓库预置构建工具 `bin/rockmem-ecs.exe`（可运行根目录 `generate.bat` 一键重编并重新生成）。生成代码会在 `init()` 中自动调用 `ecs.RegisterComponent[T](pkg)`，同时生成组件接口方法、`GetXString()` / `SetXString()` 辅助方法以及只读视图 `TReadOnly`。
+
+---
+
 ## 快速开始
-### 安装
-```shell
-go install github.com/zllangct/ecs
-```
-### 简单示例
-这是一个简单但完整的示例，可以帮助您快速了解如何在你的程序中接入和使用ecs框架。
 
-#### 定义Component
-使用ecs自定义序列化文件定义Component，内容如下
-```aiignore
-karmem components @golang.package(`testdata`);
-
-component Point {
-    X float32;
-    Y float32;
-    Z float32;
-}
-
-component Position {
-    X float32;
-    Y float32;
-    Z float32;
-}
-```
-#### 生成Component代码
-```shell
-go run ./command/karmem/main.go build -golang -o ./testdata/ testdata/components.km
-```
-#### ECS示例
+完整可运行代码见 [examples/example1](examples/example1/) 与 [examples/example2](examples/example2/)。
 
 ```go
 package main
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/zllangct/ecs"
+	"github.com/zllangct/ecs/example/example1/components"
 )
 
-// standard system
-type _testStandardSystem struct{}
+type MovementSystem struct{}
 
-func (t *_testStandardSystem) Update(ctx *ecs.SystemContext, event ecs.Event) error {
-	for i, p := range ecs.GetComponents[testdata.Point](ctx) {
-		fmt.Printf("StandardExample, EnityIndex: %d, P:%v\n", i, p)
-	}
-	return nil
-}
-
-func (t *_testStandardSystem) Init(ctx *ecs.SystemInitContext) error {
+func (s *MovementSystem) Init(ctx *ecs.SystemInitContext) error {
 	ctx.SetOption(
-		ecs.WithName("StandardExample"),
-		ecs.WithDep[testdata.Point](),
-		ecs.WithDep[testdata.Position](),
+		ecs.WithName("MovementSystem"),
+		ecs.WithDep[components.Position](ecs.ReadWrite),
+		ecs.WithDepReadOnly[components.Velocity](),
+		ecs.WithGroup(ecs.Dep[components.Position](), ecs.Dep[components.Velocity]()),
 	)
 	return nil
 }
 
+func (s *MovementSystem) Update(ctx *ecs.SystemContext, event ecs.Event) error {
+	dt := float32(event.Delta.Seconds())
+	for pos, vel := range ecs.View2RO[components.Position, components.VelocityReadOnly](ctx) {
+		pos.X += vel.X() * dt
+		pos.Y += vel.Y() * dt
+		pos.Z += vel.Z() * dt
+	}
+	return nil
+}
+
 func main() {
-	// new world
-	world := ecs.NewWorld()
+	world := ecs.NewWorld(ecs.WithWorldSyncMode())
+	if err := world.Register[MovementSystem](); err != nil {
+		panic(err)
+	}
 
-	// new entity（返回 Entity 值；EntityInfo 按需通过 GetEntityInfo 查询，勿长期持有其指针）
-	e := world.NewEntity()
-
-	// new component with default data
-	point1 := testdata.Point{X: 1, Y: 2, Z: 3}
-	pos1 := testdata.Position{X: 7}
-
-	// add component to entity
-	info, _ := world.GetEntityInfo(e)
-	info.Add(&point1)
-	info.Add(&pos1)
-
-	// define light system 
-	sys := func(ctx *ecs.SystemContext, event ecs.Event) error {
-		// get single components by ecs.GetComponents
-		for i, p := range ecs.GetComponents[testdata.Point](ctx) {
-			pos, _ := ecs.GetBuddy[testdata.Position](ctx, i)
-			fmt.Printf("LightExample 1, EnityIndex: %d, P:%v, Pos:%v\n", i, p, pos)
+	// 注册轻量级系统（函数形式）
+	if err := world.RegisterLight(func(ctx *ecs.SystemContext, event ecs.Event) error {
+		q := ctx.NewQuery(ecs.WithComp[components.Position]())
+		for idx := range q.Iter() {
+			p, _ := ecs.QueryGet[components.Position](&q, idx)
+			fmt.Printf("Entity %d Pos=(%.2f, %.2f, %.2f)\n", idx, p.X, p.Y, p.Z)
 		}
-
-		//get components by ecs.Query
-		r := ecs.Query(ctx, ecs.WithComp[testdata.Point](), ecs.WithComp[testdata.Position]())
-		for idx, _ := range r.Iter() {
-			p, _ := ecs.GetBuddy[testdata.Point](ctx, idx)
-			pos, _ := ecs.GetBuddy[testdata.Position](ctx, idx)
-			name, _ := ecs.GetBuddy[testdata.Name](ctx, idx)
-			fmt.Printf("LightExample 2, EnityIndex: %d, P:%v, Pos:%v, Name:%s\n", idx, p, pos, name.Value.String())
-		}
-
 		return nil
+	}, ecs.WithName("PrintSystem"), ecs.WithDep[components.Position](ecs.ReadWrite)); err != nil {
+		panic(err)
 	}
 
-	// register light system
-	world.RegisterLight(sys, ecs.WithName("LightExample2"), ecs.WithDep[testdata.Point](), ecs.WithDep[testdata.Position](ecs.ReadWrite))
-	// register standard system
-	world.Register[_testStandardSystem]()
+	world.NewEntity(ecs.WithComponents(
+		&components.Position{X: 1, Y: 2, Z: 3},
+		&components.Velocity{X: 10, Y: 0, Z: 0},
+	))
 
-	// update your world
-	world.Update()
-}
-```
-示例中的 ```__world_Test_S_1``` ```__world_Test_C_1```为系统和组件，后面会详细介绍，完整的代码请移步 [ world_test.go ](./world_test.go)。
-## 快速了解
-### 什么是ECS？
-ECS是Entity-Component-System的缩写，它是一种数据驱动的架构，它将数据和逻辑分离开来，使得数据和逻辑可以独立的扩展和复用。   
-* 实体：实体代表通用对象。例如，在游戏引擎上下文中，每个粗制游戏对象都表示为实体。通常，它仅由一个唯一的ID组成。实现通常为此使用普通整数。  
-* 组件：组件将实体标记为具有特定方面的标签，并保留建模该方面所需的数据。例如，每个可能造成伤害的游戏对象都可能具有与其实体相关的健康组件。实现通常使用结构，类或关联阵列。  
-* 系统：系统是一个过程，可用于所有具有所需组件的实体。 例如，物理系统可能会查询具有质量，速度和位置成分的实体，并迭代对每个实体的组件集进行物理计算的结果。 
-
-实体的行为可以在运行时由添加、删除或修改组件的系统更改。 这消除了在面向对象编程技术中难以理解、维护和扩展的深层和广泛继承层次结构的模糊问题。
-常见的ECS方法与面向数据的设计技术高度兼容，并经常与之结合。 一个组件的所有实例的数据通常一起存储在物理内存中，这使得在多个实体上操作的系统能够有效地访问内存。  
-(来源：[维基百科](https://en.wikipedia.org/wiki/Entity_component_system))
-### 游戏领域为什么需要ECS？
-总结起来大概是两个词：”瓶颈“和”契合“。  
-&emsp;&emsp;此处我们忽略一些ECS的其他特性，比如解耦、易扩展等，在其他设计模式下也能够实现，这不是ECS的显著特点和优势。同时也应该提到，ECS并不是万能的灵丹妙药，
-并不能解决通用编程的所有问题，作为一种设计思路，能够很好的解决一些特定的问题，就已经足以促使我们学习和使用它。谈到“瓶颈”，首先我们来看看游戏领域遇到的一些问题，当然这不是全部，我们重点关注与ECS
-相关的问题。
-* 游戏属于密集型运算类应用，无论是客户端还是游戏后台都需要大量的运算，比如物理、AI、视野等相关的计算。
-* 游戏对时延的要求非常高，比如FPS游戏，每一帧的渲染时间都是有限的，如果超过了这个时间，就会出现卡顿的现象。我们一直在致力于创造更低时延、更流畅的游戏体验，但是随着游戏的复杂度越来越高，计算量越来越大，
-这个问题也越来越严重。虽然现在硬件资源日益强大，可以满足大部分的需求，同事可以通过分布式的计算来解决一些问题，但分布式带来的网络消耗也是非常大的，调用链路复杂后，问题更明显，分布式可以解决大计算量的问题
-，但延时问题并不能有效解决。为了低延时，我们甚至常常使用“直连”的方式处理客户端和服务器之间的通讯，目的仅仅是为了rpc的消耗。除了更优秀的硬件和分布式，我们能做的还有多线程，多线程可以有效的利用多核CPU的资源，
-，并通过内存进行线程间的交互，非常高效，避免了分布式中rpc的网络消耗。但是多线程会使得代码变得复杂，而且线程间的交互也会带来一些问题，比如线程安全、死锁等，甚至由于数据竞争的存在，很容易写出比单线程更低效的
-多线程游戏系统。游戏系统对时序的要求非常高，多线程的异步逻辑往往很难保证正确的逻辑时序，所以通常我们的游戏服务更多的是采用单线程模式，仅仅会把耗时、逻辑独立的部分逻辑使用多线程优化，主体维持单线程。于是不能
-愉快的利用分布式资源和多核资源成为了游戏领域的瓶颈。
-* 游戏系统的更新，大家很熟悉的就是热更新，往往采用内嵌脚本语言的方式去实现，但代价就是性能和动态语言的缺点（同时也算是优点，矛盾总是存在的）。还有一些使用共享内存方案，将游戏系统的状态数据存放在共享内存中，
-重启更新游戏后台程序后从共享内存中读取并恢复游戏状态，但对于OOP的设计模式来说，这将是一个非常复杂的过程，可能你需要一个自定义的内存分配器，因为只有这样你才能处理好共享内存的分配。可能你需要定制化你所使用
-到的容器，可能需要处理恢复虚表等令人头痛的问题。还有一些序列化的方案，将游戏状态在更新前序列化并保存，更新后再反序列化并恢复状态，和共享内存方案相比，这解决了一些头疼的问题，让状态的存储和恢复变得简单了一些
-，但是序列化的过程也是一个非常耗时的过程，而且序列化的数据量也是非常大的，这也是一个非常大的问题。所以游戏系统的更新也是一个非常头疼的问题。
-* 在大世界的游戏世界中，单一的游戏服务器往往不能满足游戏的需求，无论用怎么样的构架方式，都避免不了游戏数据在服务器之前的迁移，不同的数据分布在不同的对象中，转移中数据的处理将是一个复杂的过程，同时也往往
-会在这个环节产生很多的BUG，让你的同事和你非常头疼。  
-
-&emsp;&emsp;刻意提到上面的一些问题，是因为我们可以通过ECS的方式去改善或者解决这些问题。上面的这些“瓶颈”我们总结一下，可以归纳为以下几点：1、怎么利用多核资源 2、怎么做到优雅更新 
-3、怎么做到易于数据迁移，快速的序列化状态数据 4、怎么利用分布式资源。非ECS的方案也能通过一定的方法来解决上诉问题，但我们希望一种更简单，代价更低，甚至是更好的解决办法，我们可以逐个的分析，尝试着用ECS的方式去解决这些问题。
-针对多核并行这一点，我们可以先看看ECS的特点，其中我们注意到，Component中仅有数据，一个对象的抽象，将会是拆分成不同的“数据块”分布在不同的Component中，数据是离散的，数据是边界明显的，单个System中仅是处理
-改系统感兴趣Component，由此可见，数据是根据System的需求组合在一起的，组合后的数据成为System逻辑意义上的“对象”，Component是有关联的最小集合，为组合提供了更多的可能性，更灵活的复用。那么Component上的明显隔离，
-System的互相独立这两点为并行创造了有利条件，因为独立的系统之间不会有数据竞争，当然System之间可能会对同一Component感兴趣，这个问题很好解决，只需要计算出系统间的组件依赖，就可以知道那些系统是可以并行的，
-而这一过程可以在ECS的启动阶段完成计算，不会影响到运行时的性能。 然后利用一定的算法，系统拆分成互不依赖多批次，然后再分批次并行执行。并行的过程中由于没有数据竞争，我们完全不需要使用锁的方式去保证线程安全，
-因为它们天生就是安全的，无锁化的并行将给并行带来巨大的性能提升，永远不会把大量的时间消耗在锁的竞争上，不会导致多线程比单线程性能更低的结果，所以ECS的设计模式就是天生为并行而生的。 第二点，怎么优雅的更新，上面也提到了
-一些更新方案会因为系统状态的复杂性导致很难做到全量状态的存储，并恢复到更新前的状态。ECS中所有的状态即Component都是单独存储的，并且结构异常简单，是通过线性数组存储，数组是内存连续的容器，很容易做到全量的存储，所以
-ECS中仅需要简单的储存所有Component的容器，这个过程非常简单，你可以直接通过二进制的形式转存到文件或者共享内存中，不需要序列化，这个过程非常高效。在恢复上，你可以简单的将二进制转换为原有的Component数组，然后ECS
-系统中的所有状态就恢复了，下一次Update时，系统已经恢复如初。正是这个特性，同样适合解决第三点中提到的问题，数据分离且易于转存的特性使得数据在不同的服务器间的转移逻辑异常简单。第四点，ECS的系统是独立的，数据是界限明显的，
-你可以轻易的找到独立的System和Component的组合，并将他们拆分至其他节点去运行。  
-&emsp;&emsp;接下来再谈谈“契合”，ECS的数据是离散的，是有明显的边界，那么在开发中涉及到的应用中都贴合这个特性么？显然不是的，比如一套复杂的ERP管理系统，每一个API都需要访问到大量的数据，
-API指间需要访问的数据间有大量的耦合，我们根本无法很好的拆分出功能独立的Component，显然这跟ECS不是那么的契合。游戏世界中往往有大量的游戏对象，并且需要高频的创建或者销毁，这在ECS中是非常廉价的操作，因为
-游戏对象在ECS被抽象为Entity和一些Component，然而Entity仅仅是一个整型id，Component的添加和删除也仅仅是数组的操作，我们对Component数组中Component的顺序并不敏感，利用SwapAndRemove的方式能给组件的添加和
-移除带来o(1)级别的效率，创建和销毁并不需要执行额外的逻辑，这一点非常好，我们可总结为，ECS适合大量对象频繁创建销毁的使用场景。游戏世界中虽然对象数据可能非常庞大，但是他们有着非常多的共性，比如，物理是玩家、野怪、载具他们
-都有移动的功能，战斗中的对象都有伤害机制，这些都可以统一抽象成同一个Component，并使用用一个System来处理，我们知道ECS中遍历同一类型的组件是非常高效的，这一点游戏领域跟ECS是贴合的。很多游戏中都有buff机制，在ECS中
-一个特定的buff可以抽象为一个Component，buff的产生和实效可以抽象为ECS中的Component的创建和销毁，非常方便。ECS提倡“组合优于继承”的设计理念，“组合”这个概念在游戏世界中也非常常见，比如，移动组件、伤害组件、敌人标签组件就
-可以组合成一个简单的敌对小兵，稍作改变，我们把敌人标签换成队友标签，那么我们可以得到一个为你战斗的队友，ECS中Component的删除和新增是一个基础特性，所以你可以很轻易的完成这种基于组合的创造，而不用书写多余的逻辑。此外，
-游戏世界中也是具有明显的隔离特性。至此我们可以总结一下游戏世界与ECS的显著契合点, 当然列举的可能并不全面：1、大量对象 2、频繁创建销毁 3、共性行为，比如移动、伤害、buff机制 4、组合在游戏中的抽象优势 5、明确的数据隔离特性
-### 基本架构
-![img.png](res/img4.png)
-### 基本概念
-ECS的整体方向是明确的，但是根据不同的ECS实现，会有一些细节上的差异，比如，命名上的差异，Component存储结构上的差异，甚至可能会根据实际的需要或者开发语言的原因妥协一些特性或者添加一下新的特性，下面会介绍一下，我们当前框架下
-的一些基本概念。
-#### World
-World是ECS的核心，用来存储所有的Entity和Component，并管理所有的System, 它类似于通用开发中的管理器。框架中World分为SyncWorld和AsyncWorld，根据不同的使用场景，尤其是Go语言非常轻松的写出多线程逻辑的时候，我们
-在调用ECS接口时，可能是同一线程，也可能是不同的线程。如果开发的入口逻辑可以保证是同一线程，那么可以选择使用SyncWorld，如果不能，那么选用AsyncWorld，框架会自动帮你处理好ECS与外围系统的交互安全问题。举一个很常见的例子，比如
-使用框架构建一个客户端系统的时候，往往会有一个明确的主线程，此时使用SyncWorld就可以了，但如果是后台服务，我们知道在Go语言的实践中，往往不同的网络消息会交由不同的线程（goroutine，轻量线程，跟协程还是有所区别，我统一叫线程）来处理，
-ECS内部能够很好的处理多线程，但是ECS外部的调用，需要由开发者去控制，此时选择AsyncWorld就可以了，AsyncWorld与SyncWorld的区别在于，AsyncWorld是线程安全的。
-#### Entity
-Entity是ECS中的基本单元，它是一个64位的整数ID，用来标识一个对象。Entity的ID由World来分配，在任意时刻，Entity的ID都是唯一的，但是不严格保证全局唯一，所以应当注意使用途中不应该用Entity代替UID使用，原因是ID低32位被设计成可复用
-，ECS系统单次运行时所申请的ID是唯一的，但重复运行后会重复。有些ECS框架会使用GUID或者使用雪花算法等来生成全局唯一的ID，但我们没有这样做，原因后续会讲到。
-#### Component
-Component是ECS中的数据单元，它是一个结构体，用来存储数据，每个Component都有一个唯一的类型ID，用来标识这个Component的类型，Component的类型ID由World来分配，同样的，Component的类型ID也是唯一的，但不严格保证全局唯一。
-#### System
-System是ECS中的逻辑单元，在其他的ECS框架实现中，可能System会简单到就是一个函数，实际上这足够满足ECS对系统的描述，但在我们的框架中，System会相对复杂一些，但是他的本质还是处理Component的逻辑，后面会介绍具体实现。
-#### Utility
-Utility是ECS中的工具单元，但与其他的ECS实现的不同，我们的Utility不再是公共处理函数的集合，他是System的扩展，每一个Utility都与一个特定的System绑定，我们的原则中，仅有System可以直接操作Component，Component只能被System读写，
-且System总是独立的，但也总是会有例外，Utility就是这个沟通的桥梁，比如我们明确SystemA对Component1感兴趣，那么SystemA是可以光明正大获取到Component1，但其他地方无法获取到Component1，此时我们需要使用绑定在SystemA上的Utility来借助
-SystemA获取Component1，并做一定的操作。Utility的作用非常简单，就是一个桥梁，系统与外界沟通的桥梁，同时也让开发者清楚的感受到各个逻辑直接的界限，突出System独立的这个概念，可以有效的让某一特定的功能内聚到同一System内，降低耦合，
-这是强制的限制，但是开发者可能通过语言层面的技巧突破这个限制，但我们希望开发者能够遵守这个原则，这样可以让代码更加清晰，更加易于维护。
-#### Shape
-Shape是ECS中的辅助单元，用来描述一组同属同一Entity的Component，也有ECS系统称之为Archetype或Sibling, 但是在我们这里不够准确，他们描述的是同一Entity所有Component的组合，而Shape描述的是一个子集，目的是用于同时获取一组Component，
-当某System的某个操作，会固定操作同一Entity的一组组件时，建议使用Shape单元, 通过Shape对象可以获取到Component组迭代器，实现了类似Filter的功能，但我们不准备提供完整的Filter体系，因为我们尽可能不做过于复杂的筛选，API一旦提供
-就避免不了滥用，当确有需要的时候，通过遍历实现，也非常简单。我们的筛选机制是通过系统Requirement的组合和Shape完成。
-#### FixedString
-FixedString是一个固定长度的字符串，适用于Component中的字符串，语言内置string是引用类型，如果内存的方式转移组件，那么内置string会带来一些问题。
-#### “下一帧生效"
-这是一个非常重要的概念，我们的ECS框架中，对Entity的Component创建、删除操作都会在下一帧生效。
-#### 只读依赖与只读视图
-System 的组件依赖默认是可写（ReadWrite），也可以显式声明为只读：
-
-```go
-ctx.SetOption(
-    ecs.WithDep[components.Position](ecs.ReadWrite),   // 可写，等价于 ecs.WithDep[components.Position]()
-    ecs.WithDepReadOnly[components.Velocity](),        // 只读，等价于 ecs.WithDep[components.Velocity](ecs.ReadOnly)
-)
-```
-
-只读依赖是并行调度的依据：两个 System 对同一组件均为只读时不构成冲突，可以并行执行。
-
-只读依赖的组件必须通过**只读视图**访问。代码生成器会为每个组件生成零拷贝只读视图类型 `TReadOnly`（8 字节指针包装，仅 getter，编译期防止误写）。视图自描述组件类型信息，API 仅需一个类型参数：
-
-```go
-// 遍历只读依赖组件
-for idx, vel := range ctx.GetComponentsReadOnly[components.VelocityReadOnly]() {
-    _ = vel.X() // 字段访问语法为 p.X()，而非 p.X
-}
-
-// 按实体索引读取只读视图
-vel, ok := ctx.GetBuddyReadOnly[components.VelocityReadOnly](index)
-```
-
-手写组件使用上述泛型形式时，其视图类型需实现 `ecs.ReadOnlyView` 约束（`ComponentPacketIdentifier()` 返回与源组件一致的 PacketIdentifier，`FromPtr(unsafe.Pointer)` 构造视图）。
-
-视图 getter 规则：基础类型/枚举字段生成 `Field() T`；嵌套 struct 字段生成嵌套视图 `Field() TReadOnly`；定长数组生成 `FieldLen()` 与 `FieldAt(i)`；`[n]byte @string()` 字段生成 `FieldString() string`。
-
-行为约定（静默失败，与框架整体约定一致）：
-
-| 依赖声明 | GetComponents / GetBuddy | GetComponentsReadOnly / GetBuddyReadOnly |
-|----------|--------------------------|-------------------------------------------|
-| 未声明   | 空 / nil                  | 空 / false                                 |
-| ReadWrite| 返回 *T                   | 空 / false                                 |
-| ReadOnly | 空 / nil                  | 返回 TReadOnly 视图                        |
-
-注意：只读保护依赖代码生成。手写组件若未实现 `ReadOnly()` 方法，则无法使用只读视图 API；其只读依赖走可写 API 会静默返回空。组件的嵌套 struct 字段不支持跨包类型（生成器会显式报错）。
-### 设计目标
-* 组件使用连续内存结构，减少cpu cache-miss
-* 快速索引，无遍历获取兄弟组件
-* 无锁化开发流程，开发者无需考虑并发安全问题
-* 并行化System
-* 阶段化执行流程，ecs全执行周期包含多个阶段，如start、update、destroy等
-* ecs有主线程概念
-* 通过语法限制用户行为，而不是靠用户“自觉“
-* 整个世界可序列化，能够根据序列化数据恢复世界
-* 充分利用Tick空档期
-
-## 使用教程
-### 创建一个World
-#### SyncWorld
-```go
-world := ecs.NewSyncWorld()
-```
-#### AsyncWorld
-```go
-world := ecs.NewAsyncWorld()
-```
-### 创建一个Entity
-```go
-// NewEntity() 创建的是一个Entity
-entity := world.NewEntity()
-```
-### 创建一个Component
-```go
-// 创建Component时需要嵌套Component[T], T为Component的实际类型，如下面的TestComponent
-type TestComponent struct {
-    ecs.Component[TestComponent]
-    Field1 int
-    Field2 int
-}
-```
-### 创建一个System
-```go
-type TestSystem struct {
-	ecs.System[TestSystem]
-}
-
-// 所有系统事件都是可选的，如果不需要某个事件，可以不实现
-
-// 系统Init事件
-func (w *TestSystem) Init(sic SystemInitConstraint) error {}
-
-// 系统Start事件
-func (w *TestSystem) Start(event Event) {}
-
-// 系统PreUpdate事件
-func (w *TestSystem) PreUpdate(event Event) {}
-
-// 系统Start事件
-func (w *TestSystem) Update(event Event) {}
-
-// 系统SyncUpdate事件
-func (w *TestSystem) SyncUpdate(event Event) {}
-
-// 系统PostUpdate事件
-func (w *TestSystem) PostUpdate(event Event) {}
-
-```
-我们的ECS是阶段化的执行流程，提供了丰富的阶段性事件，当然最常用的是Update事件，当需要额外控制System先后顺序的时候，可以选择合适的事件混合使用。  
-#### 阶段事件
-* Init
-* SyncBeforeStart
-* Start
-* SyncAfterStart
-* SyncBeforePreUpdate
-* PreUpdate
-* SyncAfterPreUpdate
-* SyncBeforeUpdate
-* Update
-* SyncAfterUpdate
-* SyncBeforePostUpdate
-* PostUpdate
-* SyncAfterPostUpdate
-* SyncBeforeDestroy
-* Destroy
-* SyncAfterDestroy
-#### 阶段特征
-| 阶段事件 | 执行次数 | 执行时机              | 同步 | 异步 |
-| --- |------|-------------------| --- |---|
-| Init | 1    | World Init阶段      | √      | × |
-| SyncBeforeStart | 1    | World Update阶段    |  √         | × |
-| Start | 1    | World Update阶段          | ×          | √ |
-| SyncAfterStart | N    | World Update阶段          | √          | × |
-| SyncBeforePreUpdate | N    | World Update阶段  | √          | × |
-| PreUpdate | N    | World Update阶段  | ×          | √ |
-| SyncAfterPreUpdate | N    | World Update阶段  | √          | × |
-| SyncBeforeUpdate | N    | World Update阶段     | √          | × |
-| Update | N    | World Update阶段     | ×          | √ |
-| SyncAfterUpdate | N    | World Update阶段     | √          | × |
-| SyncBeforePostUpdate | N    | World Update阶段 | √          | × |
-| PostUpdate | N    | World Update阶段 | ×          | √ |
-| SyncAfterPostUpdate | N    | World Update阶段 | √          | × |
-| SyncBeforeDestroy | 1    | World Destroy阶段    | √          | × |
-| Destroy | 1    | World Destroy阶段    | ×          | √ |
-| SyncAfterDestroy | 1    | World Destroy阶段    | √          | × |
-
-### 使用Utility与System交互
-“Component中只有数据，System只有逻辑，只有System可以操作Component”这是我们ECS设计的指导思路，当所有的输入都来源于ECS的内部，所有系统之间
-都不需要通过Component以外的方式进行交互，那么一切都将会是很美好的。当通常情况下，我们的系统会越来越复杂，不可避免会打破这个规则，但是我们并不希望
-破坏我们系统的独立性，逻辑的内聚性，所以我们提供了Utility来解决这个问题。Utility与System一一对应，他可以作为单例的身份存在，同时也是与System
-沟通的桥梁。在[ECS与外围系统交互](#ECS与外围系统交互)中，我们列举一个常见的例子的使用场景，在开发后台系统时，网络事件收到数据包后，需要交给我们
-的ECS处理，那么就需要一次沟通，将数据包安全的交给ECS，这个时候就需要Utility来配合完成这个工作。我们先看如何创建一个Utility，并与对应的系统关联。
-```go
-type TestUtility struct {
-    Utility[TestUtility]
-}
-
-func (u *TestUtility) ChangeName(entity Entity, name string) {
-	sys := u.GetSystem()
-	c := ecs.GetComponent[TestComponent](sys, entity)
-	if c == nil {
-		return
-	}
-	c.Name = name
-	Log.Infof("Name changed, new:%s", name)
-}
-
-func main() {
-        world := ......
-		
-        // 获取并使用Utility
-        utility, _ :=ecs.GetUtility[TestUtility](world)
-        utility.ChangeName(entity, "test")
-		
-        ......
-}
-```
-需要注意的是，Utility与System是一一对应的， 需要再TestSystem的Init事件中绑定Utility,当然在不需要时可省略。
-```go
-func (s *TestSystem) Init(si SystemInitializer) {
-    // 绑定Utility
-    ecs.BindUtility[TestUtility](si)
-}
-```
-### ECS与外围系统交互
-World是ECS外部系统唯一能获取到跟对象，他是外部与ECS交互的入口，World分为SyncWorld和AsyncWorld，
-SyncWorld适用于同步环境，AsyncWorld适用于异步环境。通常情况下，外部系统与ECS的交互流程如下：  
-&emsp;&emsp;外部-->SyncWorld/AsyncWorld-->Utility-->Component  
-直接看下面的例子，可能会觉得不太好理解，根据ECS的设计，只有System能修改Component，但是我们并不能直接获取到System实例，这是有意为之，因为System处于并行状态，不能随便的被调用，
-但是ECS为此设计了Utility，Utility作为System的补充和桥梁，也可以修改Component，示例中```u.ChangeName(entity, name)```正是Utility对Component的
-操作，我们先忽略其内部实现。
-#### SyncWorld
-```go
-type TestUtility struct {
-	Utility[TestUtility]
-}
-
-func (u *TestUtility) ChangeName(entity Entity, name string) {
-	sys := u.GetSystem()
-	c := GetComponent[TestComponent1](sys, entity)
-	if c == nil {
-		return
-	}
-	old := c.Name.String()
-	c.Name.Set(name)
-	Log.Infof("Name changed, old: %s, new:%s", old, name)
-}
-
-func main() {
-    // 获取配置并创建世界
-    config := NewDefaultWorldConfig()
-    world := NewSyncWorld(config)
-
-    // 注册系统
-    RegisterSystem[TestSystem1](world)
-
-    // 启动世界
-    world.Startup()
-
-    // 添加一下测试用的实体
-    entities := make([]Entity, 100)
-    for i := 0; i < 100; i++ {
-        e1 := world.NewEntity()
-        world.Add(e1, &TestComponent1{}, &TestComponent2{}, &TestComponent3{})
-        entities[i] = e1
-    }
-
-    // 尝试更新世界，使实体与他们的组件生效
-    world.Update()
-
-    // 获取Utility，并调用Utility的ChangeName方法，修改实体的Name字段
-    getter := world.GetUtilityGetter()
-    u, ok := GetUtility[TestUtility](getter)
-	if ok {
-        u.ChangeName(entities[0], "name0")
-    }
-
-    // 持续更新你的世界
-    for {
-        world.Update()
-        time.Sleep(time.Second)
-    }
-}
-```
-#### AsyncWorld
-AsyncWorld与SyncWorld不同，AsyncWorld被应用于多线程环境中，具备串行化的能力。
-相较于SyncWorld，AsyncWorld多了一个Sync方法，用于将异步的操作同步化。
-同时AsyncWorld不在需要我们手动调用Update方法，他会自动更新，在使用SyncWorld时我们明确的清楚每次调用Update时都处于同一线程，
-但是在AsyncWorld中，Update方法可能会被多个线程调用，会导致我们的ECS混乱，这也是设计AsyncWorld的主要原因。
-```go
-type TestUtility struct {
-    Utility[TestUtility]
-}
-
-func (u *TestUtility) ChangeName(entity Entity, name string) {
-    sys := u.GetSystem()
-    c := GetComponent[TestComponent1](sys, entity)
-    if c == nil {
-        return
-    }
-    old := c.Name.String()
-    c.Name.Set(name)
-    Log.Infof("Name changed, old: %s, new:%s", old, name)
-}
-
-func main() {
-    // 获取配置并创建世界
-    config := NewDefaultWorldConfig()
-    world := NewSyncWorld(config)
-
-    // 注册系统
-    RegisterSystem[TestSystem1](world)
-
-    // 启动世界
-    world.Startup()
-
-    // 添加一下测试用的实体
-    entities := make([]Entity, __worldTest_Entity_Count)
-    world.Sync(func(gaw SyncWrapper) {
-        for i := 0; i < __worldTest_Entity_Count; i++ {
-            e1 := gaw.NewEntity()
-            gaw.Add(e1, &__world_Test_C_1{}, &__world_Test_C_2{}, &__world_Test_C_3{})
-            entities[i] = e1
-        }
-    })
-	
-    // 获取Utility，并调用Utility的ChangeName方法，修改实体的Name字段
-    time.Sleep(time.Second * 2)
-    world.Sync(func(gaw SyncWrapper) {
-        u, ok := GetUtility[__world_Test_U_Input](gaw)
-        if !ok {
-            return
-        }
-        u.ChangeName(entities[0], "name2")
-    })
-	
-    for {
-        time.Sleep(time.Second)
-    }
-}
-
-```
-### 如何处理System的执行顺序
-我们的ECS中有两种方式可以控制逻辑的顺序：
-* 选择合适的阶段
-* 指定系统的执行顺序  
-
-&emsp;&emsp;文档的前方我们已经提到过，ECS中的设计有16个阶段，非常丰富，足以满足绝大部分的开发需求，其中包含Sync开头的同步点阶段，非Sync开头的异步并行阶段，
-详细请看[支持的阶段事件](#支持的阶段事件)。值得注意的是，当业务逻辑需要某个阶段时可以实现对应阶段的事件，不需要时无需实现。
-```go
-type TestSystem1 struct {
-    ecs.System[TestSystem1]
-}
-
-func (s *TestSystem1) Init(si SystemInitConstraint) error {
-    Log.Info("TestSystem1 Init")
-}
-
-func (s *TestSystem1) Start(event Event) {
-    Log.Info("TestSystem1 Start")
-}
-
-func (s *TestSystem1) Update(event Event) {
-    Log.Info("TestSystem1 Update")
-}
-
-// 前缀为Sync的阶段为同步阶段，同步阶段中ECS系统单线程执行，所以所有的操作都是安全的。
-func (s *TestSystem1) SyncAfterUpdate(event Event) {
-    Log.Info("TestSystem1 SyncAfterUpdate")
+	_ = world.Step(16 * time.Millisecond)
+	_ = world.Destroy()
 }
 ```
 
-&emsp;&emsp;当丰富的阶段任然无法满足你的需求，比如你需要在同一阶段中指定系统的执行顺序，
-这时你可以在系统的注册阶段指定其顺序。先后循序为指定Order数值由小到大执行，如下面代码所以，
-系统的执行顺序为：TestSystem2 -> TestSystem3 -> TestSystem1。
-```go
-world := NewSyncWorld(config)
+---
 
-// 内置顺序选项, 默认为Append
-// OrderFront   Order = 所有系统的前面
-// OrderAppend  Order = 所有系统的后面
+## 核心概念
 
-// 你可以使用的顺序是： 0-99999999
-RegisterSystem[TestSystem1](world, Order(150))
-RegisterSystem[TestSystem2](world, Order(5))
-RegisterSystem[TestSystem3](world, Order(100))
+### World 与执行模式
+
+通过 `ecs.NewWorld(opts...)` 创建世界：
+
+- `ecs.WithWorldSyncMode()`（默认）：所有系统按 `Stage` 与 `Order` 在单线程线性执行。
+- `ecs.WithWorldASyncMode()`：非同步阶段（`Start` / `PreUpdate` / `Update` / `PostUpdate` / `Destroy`）根据依赖冲突关系分批并发执行，同 `Order` 档位内冲突系统保持注册顺序；`Sync*` 阶段仍在主 goroutine 串行执行。
+- `ecs.WithWorldAutoOptimize()`：每帧结束后利用剩余帧预算对 `CSet` 执行有序整理。
+- `ecs.WithWorldDefaultUpdateRate(rate)`：设置默认目标帧率（默认 `30`）。
+- `ecs.WithoutGroups()`：全局关闭 `Archetype` 组表存储，所有组件保留在 `CSet`（用于回归对照，与开启组表语义完全等价）。
+
+外部代码可在 `Update()` / `Step()` 之外读取或装配实体：
+- `world.NewEntity(opts...)` 创建实体并返回 `Entity` 值；
+- `world.GetEntityInfo(e)` 获取短生命周期的 `*EntityInfo` 以调用 `Add(...)` / `Remove(...)`（注意：**切勿跨 `NewEntity` / `DestroyEntity` / 跨帧缓存 `*EntityInfo` 指针**）；
+- `world.GetComponent[T, *T](e)` 在系统外按完整 `Entity` 句柄安全读取组件；
+- `world.DestroyEntity(e)` 提交延迟销毁（下一帧首同步点生效）；
+- `world.Destroy()` 触发 `Destroy` 阶段链并释放组件/实体/组表资源，将世界置为 `WorldStatusStop`（不可继续 `Update` 或原地 `Unmarshal`）。
+
+### Entity 与句柄代数
+
+`Entity` 是 `int64` 句柄，底层为 `{index EntityIndex (int32), reuse int32}`：
+- 低 32 位 `index` 在实体销毁后经 `EntityIDGenerator` 批量归并（`delayCap=10`）按最小索引优先复用，控制稀疏索引数组内存上限；
+- 高 32 位 `reuse` 在每次复用时递增，用于拦截已销毁旧句柄造成的 ABA 误访问。
+
+### Component 与代码生成约束
+
+1. **普通组件**：长期挂载在实体上，随实体或 `Remove` 销毁。
+2. **Disposable 组件（`@disposable()`）**：一次性组件，每帧结束时自动从世界与实体 `compound` 中清空（适合事件通知，不可入 `WithGroup`）。
+3. **Nomadic 组件（`@nomadic()`）**：游牧组件，不绑定具体实体，通过 `world.AddNomadic(comps...)` 添加并在每帧结束自动清空（不可入 `WithGroup`）。
+4. **手写组件与字符串**：
+   - 如不使用 `.rm` 代码生成，手写组件需实现 `ecs.Component` 并显式调用 `ecs.RegisterComponent[T](group)`；
+   - 含 Go 指针（`string`、`[]T`、`*T`、`map` 等）的手写组件禁止通过 `WithGroup` 进入组表；
+   - 手写无 IDL 组件可使用 `ecs.FixedString[[N]byte]` 存储定长字符串；若需支持快照非 POD 字段，需自行实现 `WriteAsRoot` / `ReadAsRoot`（建议优先使用 `rockmem-ecs` 生成）。
+
+### System 与执行阶段
+
+标准系统可按需实现 `InitReceiver` 及以下阶段回调，或通过 `world.RegisterLight` 注册轻量函数系统（仅响应 `Update`）：
+
+| 阶段 | 执行次数 | 时机与并发性 |
+|---|---|---|
+| `Init` | 1 | `World.Register` 注册期（同步，通过 `SystemInitContext.SetOption` 配置） |
+| `SyncBeforeStart` / `Start` / `SyncAfterStart` | 1 | 首帧 `Update`/`Step`（`Sync*` 同步串行，`Start` 并行） |
+| `SyncBeforePreUpdate` / `PreUpdate` / `SyncAfterPreUpdate` | 每帧 | 预更新（`Sync*` 同步串行，`PreUpdate` 并行） |
+| `SyncBeforeUpdate` / `Update` / `SyncAfterUpdate` | 每帧 | 主更新（`Sync*` 同步串行，`Update` 并行） |
+| `SyncBeforePostUpdate` / `PostUpdate` / `SyncAfterPostUpdate` | 每帧 | 后更新（`Sync*` 同步串行，`PostUpdate` 并行） |
+| `SyncBeforeDestroy` / `Destroy` / `SyncAfterDestroy` | 1 | `World.Destroy()`（线性执行销毁收尾，对应 `SyncAfterDestroyReceiver`） |
+
+`SystemOption` 常用选项：`WithName`、`WithOrder`（支持 `OrderFront`、自定义 `Order`、默认 `OrderAppend`）、`WithDep`、`WithDepReadOnly`、`WithGroup`。
+
+### 只读依赖与零拷贝只读视图
+
+系统组件依赖默认为 `ecs.ReadWrite`，也可声明为 `ecs.ReadOnly`（`WithDepReadOnly[T]()`）。两系统对同一组件均只读时不冲突，可并行运行。
+
+- `ReadWrite` 依赖：通过 `ctx.GetComponents[T]()`、`ctx.GetBuddy[T](idx)`、`ecs.QueryGet[T](&q, idx)` 或 `ViewN` 读取可写 `*T`。
+- `ReadOnly` 依赖：必须通过 `ctx.GetComponentsReadOnly[TReadOnly]()`、`ctx.GetBuddyReadOnly[TReadOnly](idx)` 或 `ViewNRO` 读取只读视图。手写只读视图需实现 `ecs.ReadOnlyView[TR]` 接口（`ComponentPacketIdentifier()` 与 `FromPtr(unsafe.Pointer)`）。
+- 行为约定（静默失败）：未声明依赖、权限不匹配（如对只读依赖调可写 API 或对可写依赖调只读视图 API）或组件集不存在时，均静默返回空迭代器或 `(零值, false)`。
+
+### 固定访问组（WithGroup / 组表存储）与 View API
+
+- **组声明**：在系统注册时通过 `ecs.WithGroup(ecs.Dep[A](), ecs.Dep[B]())` 声明联合访问组（至少 2 个不同类型、非 `disposable`/`nomadic`、无 Go 指针且非零大小）。多系统声明的重叠组在首帧自动合并为互不相交的并集组。
+- **高效遍历**：
+  - `ecs.View2[A, B](ctx)` / `ecs.View2RO[A, BReadOnly](ctx)`：双变量 lockstep 遍历；
+  - `ecs.View3..View8` / `ecs.View3RO..View8RO`：多元组遍历，返回 `TupleN`（首组件可写、其余只读视图）；
+  - `ctx.NewQuery(WithComp[A](), WithComp[B]())` + `QueryGet[T](&q, idx)`：支持任意读写混合、组表子集、跨组/非组混合查询，非组路径下各组件池按 `EntityIndex` 有序时自动启用 `merge-join` 归并连接。
+
+### 帧同步点与操作日志（OpLog）
+
+- 在系统执行期间请使用 `ctx.AddComponents(entity, comps...)` 写入所属系统的无锁操作队列（切勿在并行系统内直接调用非线程安全的 `world.NewEntity`）。
+- 帧首与帧尾同步点统一执行实体销毁与两阶段组件合并：第一相更新 `CSet` 与 `entity.compound`，第二相按确定性顺序将实体收拢入组表或拆行散回 `CSet`。
+
+---
+
+## 世界序列化与确定性回放
+
+- **快照导出与恢复**：
+  - `world.Marshal()` / `world.MarshalTo(writer)`：采用只读联合导出（合并读取 `Archetype` 列与 `CSet` 残段，不修改实时世界布局）。**调用前需确保无未应用的挂起操作**（请先调用 `Update()` / `Step()`，否则返回错误）。
+  - `ecs.NewWorldFromData(data, opts...)` / `world.Unmarshal(data)` / `world.UnmarshalFrom(reader)`：内置版本、元素宽度、IDL 偏移、稀疏索引互逆一致性及 `ValidateAsRoot` 校验，任何损坏输入均原子报错不污染目标世界；恢复后需重新注册 `System`，首帧 `Update`/`Step` 自动重新吸收进组表。
+- **确定性推进**：
+  - 使用 `world.Step(fixedDelta)` 替代依赖墙钟的 `world.Update()`；
+  - `OpLog` 合并、`syncGroup` 入行及快照导出均按确定性顺序执行，在相同初始状态与输入序列下（无论同步或异步模式），逐帧状态与导出快照字节完全一致。
+
+---
+
+## 运行示例与测试
+
+```shell
+# 运行全仓单元测试（含竞态检测）
+go test -race -count=1 ./...
+
+# 运行示例 1（移动、伤害、渲染系统循环）
+go -C examples/example1 run .
+
+# 运行示例 2（世界序列化与反序列化往返）
+go -C examples/example2 run .
+
+# 运行组表与视图基准测试
+go -C examples/bench test -bench "BenchmarkGroupStorage_|BenchmarkView2RO_" -benchmem -benchtime 100x -run xxx .
 ```
-
-### 如何选择不同类型的Component
-#### 常规组件
-正常情况下，我们的数据都属于正常组件这一类，比如玩家的位置、等级、血量等，这些数据会伴随实体的全生命周期, 知道实体被销毁。
-类于Buff这样的组件，不会伴随实体全生命周期，但会持续一段时间，也可以视作常规组件。常规组件的定义方式：
-```go
-type Position struct {
-    ecs.Component[Position]
-    X float32
-    Y float32
-    Z float32
-}
-
-type HP struct {
-    ecs.Component[HP]
-    Value int32
-}
-```
-#### Free组件
-Free组件是特殊的组件之一，它不会被添加到实体中，它游离态的组件，通常可作为一些临时数据的载体与多个系统共享。典型的用法是将Free组件
-作为系统间共享数据的“队列”，比如，客户端通过网络上行的移动指令，在实际的开发中往往需要将这些指令缓存起来，多个指令同时处理。
-```go
-type MoveCommand struct {
-    ecs.FreeComponent[MoveCommand]
-    ...
-}
-```
-#### Disposable组件
-Disposable组件特殊的组件之一，它是一次性组件，会在每帧结束后清理。假设我们需要获取新增的Entity，可以在创建Entity时，同时添加Disposable组件，
-在Update中获取该Disposable组件集合，从而获取新增的Entity。Disposable组件
-会在每一帧被清空，可以活的当做一次性tag使用。
-```go
-type TagNew struct {
-    ecs.DisposableComponent[TagNew]
-    ...
-}
-```
-#### FreeDisposable组件
-FreeDisposable组件是Free组件与Disposable组件的结合体，它是一次性的游离态组件，会在每帧结束后清理。
-```go
-type FreeDisposable struct {
-    ecs.FreeDisposableComponent[FreeDisposable]
-    ...
-}
-```
-### 系统中获取组件的方式
-获取Component是System中最常用的操作, 获取和遍历Component的效率是评价ECS框架优良最重要的指标之一，是ECS框架设计的核心和重心。
-我们的ECS框架提供了非常高效的获取和遍历Component的操作，做到了寻址级别的查询效率，同时连续内存的存储方式，使得遍历Component的性能也非常优秀。
-我们提供了两种方式获取和筛选Component。
-* 通过 GetComponent 获取指定Entity的指定Component
-```go
-c := ecs.GetComponent[TestComponent1](entity)
-```
-* 通过 GetComponentAll和GetRelated获取主要组件和其关联组件。
-```go
-type TestSystem1 struct {
-    ecs.System[TestSystem1]
-}
-
-func (s *TestSystem1) Init(si SystemInitConstraint) error {
-    // 设置系统感兴趣的组件
-    s.SetRequirements(si, &TestComponent1{}, &TestComponent1{}, &TestComponent1{})
-}
-
-func (s *TestSystem1) Update(event Event) {
-    Log.Info("TestSystem1 Update")
-
-    iter := ecs.GetComponentAll[TestComponent1](w)
-    for c := iter.Begin(); !iter.End(); c = iter.Next() {
-        c2 := ecs.GetRelated[TestComponent2](w, c.owner)
-        if c2 == nil {
-            continue
-        }
-		
-        c.Field1 += 1
-        c.Field2 += 1
-    }
-}
-```
-* 通过 Shape同时获取兄弟组件, 这种方式非常方便的获取到同一Entity的多个Component，但不如第一种方式灵活。
-```go
-type Shape1 struct {
-    TestComponent1 *TestComponent1
-    TestComponent2 *TestComponent2
-    TestComponent3 *TestComponent3
-}
-
-type TestSystem1 struct {
-    ecs.System[TestSystem1]
-	shp *ecs.Shape[Shape1]
-}
-
-func (s *TestSystem1) Init(si SystemInitConstraint) {
-    // 设置系统感兴趣的组件
-    s.SetRequirements(si, &TestComponent1{}, &TestComponent1{}, &TestComponent1{})
-    // 初始化ShapeGetter
-    s.shp = NewShape[Shape1](si)
-}
-
-func (s *TestSystem1) Update(event Event) {
-    Log.Info("TestSystem1 Update")
-
-    iter := s.shp.Get()
-    for shp := iter.Begin(); !iter.End(); shp = iter.Next() {
-        c.TestComponent1.Field1 += 1
-        c.TestComponent2.Field1 += 1
-        c.TestComponent3.Field1 += 1
-    }
-}
-```
-### 系统间的数据流动
-（努力完善中）
-### 一个完整的例子
-（努力完善中）
-## Benchmark
-
-（努力完善中）
-## API文档
-（努力完善中）
-## 设计细节
-（努力完善中）
-### 架构
-（努力完善中）
-### 日志
-（努力完善中）
-### World
-（努力完善中）
-### Entity
-* Entity复用
-* 不保证全局唯一
-* Entity的ID是一个64位的整数，高32位是世界ID，低32位是EntityID，这样设计的目的是为了支持多个世界的存在，比如，我们可以在一个世界中创建一个Entity，然后把这个Entity
-### Component
-（努力完善中）
-### System
-（努力完善中）
-### Utility
-（努力完善中）
-### Shape
-（努力完善中）
-### Compound
-（努力完善中）
-### 固定访问组（WithGroup / 组表存储）
-* 用途：System 注册时声明"固定联合访问的组件组合"，框架为该组建立列式组表（Archetype Group），拥有组全集的实体在表内占一行，多组件联合遍历按行同步顺序访问，消除跨组件池的随机稀疏查找。
-* 用法：
-  ```go
-  world.Register[MoveSystem](
-      ecs.WithDep[Position](ecs.ReadWrite),
-      ecs.WithDep[Velocity](ecs.ReadOnly),
-      ecs.WithGroup(ecs.Dep[Position](), ecs.Dep[Velocity]()),
-  )
-  ```
-* 约束：至少 2 个组件类型；组件必须已 RegisterComponent；disposable/nomadic 组件禁止入组（注册期报错）；多个 System 声明的重叠组自动合并为并集组；组声明在首个 Update 时定型（Finalize），此后不可再声明。
-* 语义不变量：组件实例只存一处（组表列 或 CSet 残段）；实体集齐组组件 ⟺ 在表中占一行；增删组件在帧同步点自动收拢入行/拆行散回；`WithoutGroups()` 可全局关闭（纯布局优化层，关闭后语义完全等价）。
-* 序列化兼容：导出时组表自动散回 CSet 形态，旧存档可互通；恢复后首个 Update 自动重新收拢。
-* 高性能访问 API（推荐）：
-  ```go
-  // View2RO：组表双列 lockstep，行内零查找（A 可写 + B 只读视图）
-  for t, v := range ecs.View2RO[components.Transform, components.VelocityReadOnly](ctx) {
-      t.PosX += v.LinearX() * dt
-  }
-  // View2：双可写版本；QueryGet：Query 预解析槽位直取（免每实体重复解析）
-  q := ctx.NewQuery(ecs.WithComp[Transform](), ecs.WithComp[Velocity]())
-  for index := range q.Iter() {
-      t, _ := ecs.QueryGet[components.Transform](&q, index)
-  }
-  ```
-  View2/View2RO 在非组表场景自动回退通用路径（结果恒正确，仅性能差异）。
-  3 元及以上使用 View3-View8 / View3RO-View8RO：因 Go range-over-func 最多支持 2 个迭代变量，
-  产出为 TupleN 结构体（`for t := range View3[...](ctx) { t.V1.PosX += t.V2.LinearX() }`）。
-  ViewNRO 形态为"首组件可写 + 其余只读视图"，更复杂的读写混合场景请用 Query + QueryGet/GetBuddyReadOnly。
-* 查询自动优化（零声明）：各组件池按 EntityIndex 有序时（顺序创建实体天然满足，或 optimizer Sort 后），多池查询自动走归并连接（merge-join），失序自动回退。
-* 设计文档：`docs/plans/2026-09-16-archetype-group-storage-design.md`；基准结论：`AgentDocs/GroupStorage_Bench.md`。
-### 一次Update的执行流程
-（努力完善中）
-### 从添加Component到生效
-（努力完善中）
-### 容器
-* unordered_set
-* sparse_array
-* ordered_int_set
-### 迭代器
-（努力完善中）
-### 协程池
-（努力完善中）
-### ECS序列化和反序列化
-（努力完善中）
-### ECS中的并行
-（努力完善中）
-### EntityID的管理
-（努力完善中）
-### 如何行为限制
-* 通过状态量，限制某些API的访问时期，比如某些API只能在初始化阶段执行，否则将收到错误警告
-* 通过guard参数，某些API的调用需要接受一个guard参数，guard参数的作用域受到框架的限制，比如在System的Init事件中
-, guard生命周期为Init事件的执行周期，Init执行结束，guard参数失效，传递、转存无法维持guard参数的有效性，因此限制
-了某些API仅能在特定的事件中被调用。（需要补充实现细节代码介绍）
-### 优化器
-* 优化器的作用，尽可能使得ecs框架内部的数据结构尽可能连续，减少cpu cache-miss
-* 优化器工作时间点，tick驱动时，利用每次update的富裕时间进行优化工作
-* 优化器工作内容，对于每个Component的数据结构，进行连续化优化
-### 统计器
-* 统计器的内容，统计ecs框架内部的运行状态，比如每个System的执行时间，每个Component的内存占用等
-* 作用，帮助开发期调试、性能优化，配合优化器完整优化工作
-## 特别注意
-* 重复添加Component，会失败
-* 同一帧内，多次移除、添加、移除...操作只会保留最终结果，因为“下一帧生效”会丢失中间过程，即使不会丢失，也没有实际的意义，建议避免这样的操作。
-* Component所有成员变量都应该是值类型，string是引用类型，需要字符串类型时请使用 框架内的FixedString类型。
-## 存在的一些问题
-* 稀疏数组的内存占用问题
-* EntityInfo的修改需要再同步点进行
-* 不支持不对等tick，不存在多层次tick，比如A系统tick间隔50ms，B系统tick间隔30ms
-* 并行时task的拆分粒度固定，不支持动态调整，优化器实现后，可以根据优化器的结果，动态调整task的拆分粒度
-* 并行退化，当开发者的系统依赖混乱，会导致系统关联度过高，框架调度时，会将有数据竞争的系统放到同一个线程中执行，从而导致并行退化，
-最糟糕的情况是，退化为单线程系统
-* 行为限制的缺失，由于golang语言的特性，无法严格得按照ECS的设计思路限制开发者的行为，开发者必须对数据驱动有一定的了解，无法严格
-的使用语法规避潜在的危险行为
-## 写在最后
-欢迎大家提出宝贵意见，帮助完善ecs框架，这是一个长期和持续的过程，有不足或错误的地方，欢迎指正，欢迎PR。
-
-## TODO
-* [ ] 优化器实现
-* [ ] 统计器完善
-* [ ] 代码覆盖率
-* [ ] world序列化
-* [ ] 更新Atomic
-* [ ] 测试用例混乱
-* [ ] Example FakeGame 暂不可用

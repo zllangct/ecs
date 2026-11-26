@@ -91,7 +91,6 @@ func WithFlowASyncMode() FlowOption {
 type SystemTaskContext struct {
 	isValid bool
 	fn      func(ctx *SystemContext, event Event) error
-	isAsync bool
 }
 
 // system execute flow
@@ -215,7 +214,6 @@ func (p *flow) getSystemTask(info SystemInfo, stage Stage) (ctx SystemTaskContex
 		return
 	}
 	var imp bool = false
-	var runSync bool = false
 	var fn func(ctx *SystemContext, event Event) error
 
 	state := info.getState()
@@ -237,19 +235,16 @@ func (p *flow) getSystemTask(info SystemInfo, stage Stage) (ctx SystemTaskContex
 			if system, ok := sys.(SyncBeforeStartReceiver); ok {
 				fn = system.SyncBeforeStart
 				imp = true
-				runSync = true
 			}
 		case StageStart:
 			if system, ok := sys.(StartReceiver); ok {
 				fn = system.Start
 				imp = true
-				runSync = false
 			}
 		case StageSyncAfterStart:
 			if system, ok := sys.(SyncAfterStartReceiver); ok {
 				fn = system.SyncAfterStart
 				imp = true
-				runSync = true
 			}
 		}
 	} else if state == SystemStateUpdate {
@@ -261,57 +256,48 @@ func (p *flow) getSystemTask(info SystemInfo, stage Stage) (ctx SystemTaskContex
 			if system, ok := sys.(SyncBeforePreUpdateReceiver); ok {
 				fn = system.SyncBeforePreUpdate
 				imp = true
-				runSync = true
 			}
 		case StagePreUpdate:
 			if system, ok := sys.(PreUpdateReceiver); ok {
 				fn = system.PreUpdate
 				imp = true
-				runSync = true
 			}
 		case StageSyncAfterPreUpdate:
 			if system, ok := sys.(SyncAfterPreUpdateReceiver); ok {
 				fn = system.SyncAfterPreUpdate
 				imp = true
-				runSync = true
 			}
 
 		case StageSyncBeforeUpdate:
 			if system, ok := sys.(SyncBeforeUpdateReceiver); ok {
 				fn = system.SyncBeforeUpdate
 				imp = true
-				runSync = true
 			}
 		case StageUpdate:
 			if system, ok := sys.(UpdateReceiver); ok {
 				fn = system.Update
 				imp = true
-				runSync = false
 			}
 		case StageSyncAfterUpdate:
 			if system, ok := sys.(SyncAfterUpdateReceiver); ok {
 				fn = system.SyncAfterUpdate
 				imp = true
-				runSync = true
 			}
 
 		case StageSyncBeforePostUpdate:
 			if system, ok := sys.(SyncBeforePostUpdateReceiver); ok {
 				fn = system.SyncBeforePostUpdate
 				imp = true
-				runSync = true
 			}
 		case StagePostUpdate:
 			if system, ok := sys.(PostUpdateReceiver); ok {
 				fn = system.PostUpdate
 				imp = true
-				runSync = false
 			}
 		case StageSyncAfterPostUpdate:
 			if system, ok := sys.(SyncAfterPostUpdateReceiver); ok {
 				fn = system.SyncAfterPostUpdate
 				imp = true
-				runSync = true
 			}
 		}
 	} else if state == SystemStateDestroy {
@@ -323,19 +309,16 @@ func (p *flow) getSystemTask(info SystemInfo, stage Stage) (ctx SystemTaskContex
 			if system, ok := sys.(SyncBeforeDestroyReceiver); ok {
 				fn = system.SyncBeforeDestroy
 				imp = true
-				runSync = true
 			}
 		case StageDestroy:
 			if system, ok := sys.(DestroyReceiver); ok {
 				fn = system.Destroy
 				imp = true
-				runSync = false
 			}
 		case StageSyncAfterDestroy:
 			if system, ok := sys.(SyncAfterPostDestroyReceiver); ok {
 				fn = system.SyncAfterDestroy
 				imp = true
-				runSync = true
 
 				info.setState(SystemStateDestroyed)
 			}
@@ -348,7 +331,6 @@ func (p *flow) getSystemTask(info SystemInfo, stage Stage) (ctx SystemTaskContex
 
 	return SystemTaskContext{
 		fn:      fn,
-		isAsync: !runSync,
 		isValid: true,
 	}, nil
 }
@@ -381,10 +363,43 @@ func (p *flow) executeLinear(event Event) error {
 	return nil
 }
 
+func isSyncStage(stage Stage) bool {
+	switch stage {
+	case StageSyncBeforeStart, StageSyncAfterStart,
+		StageSyncBeforePreUpdate, StageSyncAfterPreUpdate,
+		StageSyncBeforeUpdate, StageSyncAfterUpdate,
+		StageSyncBeforePostUpdate, StageSyncAfterPostUpdate,
+		StageSyncBeforeDestroy, StageSyncAfterDestroy:
+		return true
+	default:
+		return false
+	}
+}
+
 func (p *flow) executeParallel(event Event) error {
 	errs := &ExecuteErrors{}
 	wg := &sync.WaitGroup{}
 	for stage, sl := range p.traverserIter() {
+		if isSyncStage(stage) {
+			// Sync* 同步阶段：即使在并行模式下也在主 goroutine 按顺序串行执行
+			for _, info := range sl.all() {
+				task, err := p.getSystemTask(info, stage)
+				if err != nil {
+					errs.AppendWithLock(err)
+					continue
+				}
+				if task.isValid {
+					ctx := info.getContext()
+					ctx.constraint.activate()
+					err := task.fn(ctx, event)
+					ctx.constraint.deactivate()
+					if err != nil {
+						errs.AppendWithLock(err)
+					}
+				}
+			}
+			continue
+		}
 		for batch := range sl.independentGroups() {
 			for _, info := range batch {
 				task, err := p.getSystemTask(info, stage)

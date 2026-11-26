@@ -102,7 +102,9 @@ func (c *OrderedIntSet[T]) Add(it T) bool {
 
 func (c *OrderedIntSet[T]) Merge(otherSet OrderedIntSet[T]) {
 	if len(*c) == 0 {
-		*c = otherSet
+		if len(otherSet) > 0 {
+			*c = append(OrderedIntSet[T](nil), otherSet...)
+		}
 		return
 	}
 	index := 0

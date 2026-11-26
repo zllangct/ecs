@@ -115,6 +115,15 @@ func (a *Archetype) cellPtr(col, row int) unsafe.Pointer {
 // entityIndexes 行序实体索引（Query 主迭代用）
 func (a *Archetype) entityIndexes() []EntityIndex { return a.entities }
 
+// clearRows 清空组表中的所有行与稀疏行索引（保留列元信息）
+func (a *Archetype) clearRows() {
+	a.entities = nil
+	a.rowIdx = nil
+	for i := range a.columns {
+		a.columns[i] = nil
+	}
+}
+
 // compound 组身份
 func (a *Archetype) compound() Compound {
 	c := NewCompound(len(a.types))

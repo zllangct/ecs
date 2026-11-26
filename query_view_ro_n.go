@@ -40,7 +40,7 @@ func View3RO[A any, BR ReadOnlyView[BR], CR ReadOnlyView[CR], PA ComponentPointe
 	if !viewRODeps(ctx, itA, itB, itC) {
 		return empty
 	}
-	if datas, sizes, rows, ok := lockstepColumns(ctx, itA, itB, itC); ok {
+	if datas, sizes, rows, isSubset, ok := lockstepColumns(ctx, itA, itB, itC); ok {
 		return func(yield func(Tuple3[*A, BR, CR]) bool) {
 			for row := 0; row < rows; row++ {
 				if !yield(Tuple3[*A, BR, CR]{
@@ -49,6 +49,17 @@ func View3RO[A any, BR ReadOnlyView[BR], CR ReadOnlyView[CR], PA ComponentPointe
 					V3: zeroC.FromPtr(unsafe.Pointer(&datas[2][row*sizes[2]])),
 				}) {
 					return
+				}
+			}
+			if isSubset {
+				for ptrs := range iterResidualPtrs(ctx, itA, itB, itC) {
+					if !yield(Tuple3[*A, BR, CR]{
+						V1: (*A)(ptrs[0]),
+						V2: zeroB.FromPtr(ptrs[1]),
+						V3: zeroC.FromPtr(ptrs[2]),
+					}) {
+						return
+					}
 				}
 			}
 		}
@@ -84,7 +95,7 @@ func View4RO[A any, BR ReadOnlyView[BR], CR ReadOnlyView[CR], DR ReadOnlyView[DR
 	if !viewRODeps(ctx, itA, itB, itC, itD) {
 		return empty
 	}
-	if datas, sizes, rows, ok := lockstepColumns(ctx, itA, itB, itC, itD); ok {
+	if datas, sizes, rows, isSubset, ok := lockstepColumns(ctx, itA, itB, itC, itD); ok {
 		return func(yield func(Tuple4[*A, BR, CR, DR]) bool) {
 			for row := 0; row < rows; row++ {
 				if !yield(Tuple4[*A, BR, CR, DR]{
@@ -94,6 +105,18 @@ func View4RO[A any, BR ReadOnlyView[BR], CR ReadOnlyView[CR], DR ReadOnlyView[DR
 					V4: zeroD.FromPtr(unsafe.Pointer(&datas[3][row*sizes[3]])),
 				}) {
 					return
+				}
+			}
+			if isSubset {
+				for ptrs := range iterResidualPtrs(ctx, itA, itB, itC, itD) {
+					if !yield(Tuple4[*A, BR, CR, DR]{
+						V1: (*A)(ptrs[0]),
+						V2: zeroB.FromPtr(ptrs[1]),
+						V3: zeroC.FromPtr(ptrs[2]),
+						V4: zeroD.FromPtr(ptrs[3]),
+					}) {
+						return
+					}
 				}
 			}
 		}
@@ -132,7 +155,7 @@ func View5RO[A any, BR ReadOnlyView[BR], CR ReadOnlyView[CR], DR ReadOnlyView[DR
 	if !viewRODeps(ctx, itA, itB, itC, itD, itE) {
 		return empty
 	}
-	if datas, sizes, rows, ok := lockstepColumns(ctx, itA, itB, itC, itD, itE); ok {
+	if datas, sizes, rows, isSubset, ok := lockstepColumns(ctx, itA, itB, itC, itD, itE); ok {
 		return func(yield func(Tuple5[*A, BR, CR, DR, ER]) bool) {
 			for row := 0; row < rows; row++ {
 				if !yield(Tuple5[*A, BR, CR, DR, ER]{
@@ -143,6 +166,19 @@ func View5RO[A any, BR ReadOnlyView[BR], CR ReadOnlyView[CR], DR ReadOnlyView[DR
 					V5: zeroE.FromPtr(unsafe.Pointer(&datas[4][row*sizes[4]])),
 				}) {
 					return
+				}
+			}
+			if isSubset {
+				for ptrs := range iterResidualPtrs(ctx, itA, itB, itC, itD, itE) {
+					if !yield(Tuple5[*A, BR, CR, DR, ER]{
+						V1: (*A)(ptrs[0]),
+						V2: zeroB.FromPtr(ptrs[1]),
+						V3: zeroC.FromPtr(ptrs[2]),
+						V4: zeroD.FromPtr(ptrs[3]),
+						V5: zeroE.FromPtr(ptrs[4]),
+					}) {
+						return
+					}
 				}
 			}
 		}
@@ -184,7 +220,7 @@ func View6RO[A any, BR ReadOnlyView[BR], CR ReadOnlyView[CR], DR ReadOnlyView[DR
 	if !viewRODeps(ctx, itA, itB, itC, itD, itE, itF) {
 		return empty
 	}
-	if datas, sizes, rows, ok := lockstepColumns(ctx, itA, itB, itC, itD, itE, itF); ok {
+	if datas, sizes, rows, isSubset, ok := lockstepColumns(ctx, itA, itB, itC, itD, itE, itF); ok {
 		return func(yield func(Tuple6[*A, BR, CR, DR, ER, FR]) bool) {
 			for row := 0; row < rows; row++ {
 				if !yield(Tuple6[*A, BR, CR, DR, ER, FR]{
@@ -196,6 +232,20 @@ func View6RO[A any, BR ReadOnlyView[BR], CR ReadOnlyView[CR], DR ReadOnlyView[DR
 					V6: zeroF.FromPtr(unsafe.Pointer(&datas[5][row*sizes[5]])),
 				}) {
 					return
+				}
+			}
+			if isSubset {
+				for ptrs := range iterResidualPtrs(ctx, itA, itB, itC, itD, itE, itF) {
+					if !yield(Tuple6[*A, BR, CR, DR, ER, FR]{
+						V1: (*A)(ptrs[0]),
+						V2: zeroB.FromPtr(ptrs[1]),
+						V3: zeroC.FromPtr(ptrs[2]),
+						V4: zeroD.FromPtr(ptrs[3]),
+						V5: zeroE.FromPtr(ptrs[4]),
+						V6: zeroF.FromPtr(ptrs[5]),
+					}) {
+						return
+					}
 				}
 			}
 		}
@@ -240,7 +290,7 @@ func View7RO[A any, BR ReadOnlyView[BR], CR ReadOnlyView[CR], DR ReadOnlyView[DR
 	if !viewRODeps(ctx, itA, itB, itC, itD, itE, itF, itG) {
 		return empty
 	}
-	if datas, sizes, rows, ok := lockstepColumns(ctx, itA, itB, itC, itD, itE, itF, itG); ok {
+	if datas, sizes, rows, isSubset, ok := lockstepColumns(ctx, itA, itB, itC, itD, itE, itF, itG); ok {
 		return func(yield func(Tuple7[*A, BR, CR, DR, ER, FR, GR]) bool) {
 			for row := 0; row < rows; row++ {
 				if !yield(Tuple7[*A, BR, CR, DR, ER, FR, GR]{
@@ -253,6 +303,21 @@ func View7RO[A any, BR ReadOnlyView[BR], CR ReadOnlyView[CR], DR ReadOnlyView[DR
 					V7: zeroG.FromPtr(unsafe.Pointer(&datas[6][row*sizes[6]])),
 				}) {
 					return
+				}
+			}
+			if isSubset {
+				for ptrs := range iterResidualPtrs(ctx, itA, itB, itC, itD, itE, itF, itG) {
+					if !yield(Tuple7[*A, BR, CR, DR, ER, FR, GR]{
+						V1: (*A)(ptrs[0]),
+						V2: zeroB.FromPtr(ptrs[1]),
+						V3: zeroC.FromPtr(ptrs[2]),
+						V4: zeroD.FromPtr(ptrs[3]),
+						V5: zeroE.FromPtr(ptrs[4]),
+						V6: zeroF.FromPtr(ptrs[5]),
+						V7: zeroG.FromPtr(ptrs[6]),
+					}) {
+						return
+					}
 				}
 			}
 		}
@@ -300,7 +365,7 @@ func View8RO[A any, BR ReadOnlyView[BR], CR ReadOnlyView[CR], DR ReadOnlyView[DR
 	if !viewRODeps(ctx, itA, itB, itC, itD, itE, itF, itG, itH) {
 		return empty
 	}
-	if datas, sizes, rows, ok := lockstepColumns(ctx, itA, itB, itC, itD, itE, itF, itG, itH); ok {
+	if datas, sizes, rows, isSubset, ok := lockstepColumns(ctx, itA, itB, itC, itD, itE, itF, itG, itH); ok {
 		return func(yield func(Tuple8[*A, BR, CR, DR, ER, FR, GR, HR]) bool) {
 			for row := 0; row < rows; row++ {
 				if !yield(Tuple8[*A, BR, CR, DR, ER, FR, GR, HR]{
@@ -314,6 +379,22 @@ func View8RO[A any, BR ReadOnlyView[BR], CR ReadOnlyView[CR], DR ReadOnlyView[DR
 					V8: zeroH.FromPtr(unsafe.Pointer(&datas[7][row*sizes[7]])),
 				}) {
 					return
+				}
+			}
+			if isSubset {
+				for ptrs := range iterResidualPtrs(ctx, itA, itB, itC, itD, itE, itF, itG, itH) {
+					if !yield(Tuple8[*A, BR, CR, DR, ER, FR, GR, HR]{
+						V1: (*A)(ptrs[0]),
+						V2: zeroB.FromPtr(ptrs[1]),
+						V3: zeroC.FromPtr(ptrs[2]),
+						V4: zeroD.FromPtr(ptrs[3]),
+						V5: zeroE.FromPtr(ptrs[4]),
+						V6: zeroF.FromPtr(ptrs[5]),
+						V7: zeroG.FromPtr(ptrs[6]),
+						V8: zeroH.FromPtr(ptrs[7]),
+					}) {
+						return
+					}
 				}
 			}
 		}

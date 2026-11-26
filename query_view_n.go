@@ -69,24 +69,77 @@ func viewDepsWritable(ctx *SystemContext, its ...ComponentIntType) bool {
 	return true
 }
 
-// lockstepColumns 全部类型同属一张组表时，解析出各列数据/步长/行数
-func lockstepColumns(ctx *SystemContext, its ...ComponentIntType) (datas [][]byte, sizes []int, rows int, ok bool) {
+// distinctComponentCount 返回去重后的组件类型数（用于判断是否为组表真子集）
+func distinctComponentCount(its ...ComponentIntType) int {
+	if len(its) <= 1 {
+		return len(its)
+	}
+	count := 0
+	for i, it := range its {
+		dup := false
+		for j := 0; j < i; j++ {
+			if its[j] == it {
+				dup = true
+				break
+			}
+		}
+		if !dup {
+			count++
+		}
+	}
+	return count
+}
+
+// lockstepColumns 全部类型同属一张组表时，解析出各列数据/步长/行数与是否真子集
+func lockstepColumns(ctx *SystemContext, its ...ComponentIntType) (datas [][]byte, sizes []int, rows int, isSubset bool, ok bool) {
 	a, ok := ctx.world.archetypes.owner(its[0])
 	if !ok {
-		return nil, nil, 0, false
+		return nil, nil, 0, false, false
 	}
 	datas = make([][]byte, len(its))
 	sizes = make([]int, len(its))
 	for i, it := range its {
 		ai, ok := ctx.world.archetypes.owner(it)
 		if !ok || ai != a {
-			return nil, nil, 0, false
+			return nil, nil, 0, false, false
 		}
 		col, _ := a.colOf(it)
 		datas[i] = a.columns[col]
 		sizes[i] = a.sizes[col]
 	}
-	return datas, sizes, a.Len(), true
+	return datas, sizes, a.Len(), distinctComponentCount(its...) < len(a.types), true
+}
+
+// iterResidualPtrs 遍历组表真子集在 CSet 残段中的交集指针元组（与组表行互斥，不重不漏）
+func iterResidualPtrs(ctx *SystemContext, its ...ComponentIntType) iter.Seq[[]unsafe.Pointer] {
+	return func(yield func([]unsafe.Pointer) bool) {
+		pools := make([]ComponentSet, len(its))
+		minIdx := -1
+		for i, it := range its {
+			s, ok := ctx.world.getComponentSet(it)
+			if !ok || s.Len() == 0 {
+				return
+			}
+			pools[i] = s
+			if minIdx == -1 || s.Len() < pools[minIdx].Len() {
+				minIdx = i
+			}
+		}
+		ptrs := make([]unsafe.Pointer, len(its))
+	outer:
+		for _, index := range pools[minIdx].EntityIndexes() {
+			for j, p := range pools {
+				ptr := p.get(index)
+				if ptr == nil {
+					continue outer
+				}
+				ptrs[j] = ptr
+			}
+			if !yield(ptrs) {
+				return
+			}
+		}
+	}
 }
 
 // ============================================================================
@@ -104,7 +157,7 @@ func View3[A, B, C any, PA ComponentPointer[A], PB ComponentPointer[B], PC Compo
 	if !viewDepsWritable(ctx, itA, itB, itC) {
 		return empty
 	}
-	if datas, sizes, rows, ok := lockstepColumns(ctx, itA, itB, itC); ok {
+	if datas, sizes, rows, isSubset, ok := lockstepColumns(ctx, itA, itB, itC); ok {
 		return func(yield func(Tuple3[*A, *B, *C]) bool) {
 			for row := 0; row < rows; row++ {
 				if !yield(Tuple3[*A, *B, *C]{
@@ -113,6 +166,17 @@ func View3[A, B, C any, PA ComponentPointer[A], PB ComponentPointer[B], PC Compo
 					V3: (*C)(unsafe.Pointer(&datas[2][row*sizes[2]])),
 				}) {
 					return
+				}
+			}
+			if isSubset {
+				for ptrs := range iterResidualPtrs(ctx, itA, itB, itC) {
+					if !yield(Tuple3[*A, *B, *C]{
+						V1: (*A)(ptrs[0]),
+						V2: (*B)(ptrs[1]),
+						V3: (*C)(ptrs[2]),
+					}) {
+						return
+					}
 				}
 			}
 		}
@@ -142,7 +206,7 @@ func View4[A, B, C, D any, PA ComponentPointer[A], PB ComponentPointer[B], PC Co
 	if !viewDepsWritable(ctx, itA, itB, itC, itD) {
 		return empty
 	}
-	if datas, sizes, rows, ok := lockstepColumns(ctx, itA, itB, itC, itD); ok {
+	if datas, sizes, rows, isSubset, ok := lockstepColumns(ctx, itA, itB, itC, itD); ok {
 		return func(yield func(Tuple4[*A, *B, *C, *D]) bool) {
 			for row := 0; row < rows; row++ {
 				if !yield(Tuple4[*A, *B, *C, *D]{
@@ -152,6 +216,18 @@ func View4[A, B, C, D any, PA ComponentPointer[A], PB ComponentPointer[B], PC Co
 					V4: (*D)(unsafe.Pointer(&datas[3][row*sizes[3]])),
 				}) {
 					return
+				}
+			}
+			if isSubset {
+				for ptrs := range iterResidualPtrs(ctx, itA, itB, itC, itD) {
+					if !yield(Tuple4[*A, *B, *C, *D]{
+						V1: (*A)(ptrs[0]),
+						V2: (*B)(ptrs[1]),
+						V3: (*C)(ptrs[2]),
+						V4: (*D)(ptrs[3]),
+					}) {
+						return
+					}
 				}
 			}
 		}
@@ -182,7 +258,7 @@ func View5[A, B, C, D, E any, PA ComponentPointer[A], PB ComponentPointer[B], PC
 	if !viewDepsWritable(ctx, itA, itB, itC, itD, itE) {
 		return empty
 	}
-	if datas, sizes, rows, ok := lockstepColumns(ctx, itA, itB, itC, itD, itE); ok {
+	if datas, sizes, rows, isSubset, ok := lockstepColumns(ctx, itA, itB, itC, itD, itE); ok {
 		return func(yield func(Tuple5[*A, *B, *C, *D, *E]) bool) {
 			for row := 0; row < rows; row++ {
 				if !yield(Tuple5[*A, *B, *C, *D, *E]{
@@ -193,6 +269,19 @@ func View5[A, B, C, D, E any, PA ComponentPointer[A], PB ComponentPointer[B], PC
 					V5: (*E)(unsafe.Pointer(&datas[4][row*sizes[4]])),
 				}) {
 					return
+				}
+			}
+			if isSubset {
+				for ptrs := range iterResidualPtrs(ctx, itA, itB, itC, itD, itE) {
+					if !yield(Tuple5[*A, *B, *C, *D, *E]{
+						V1: (*A)(ptrs[0]),
+						V2: (*B)(ptrs[1]),
+						V3: (*C)(ptrs[2]),
+						V4: (*D)(ptrs[3]),
+						V5: (*E)(ptrs[4]),
+					}) {
+						return
+					}
 				}
 			}
 		}
@@ -224,7 +313,7 @@ func View6[A, B, C, D, E, F any, PA ComponentPointer[A], PB ComponentPointer[B],
 	if !viewDepsWritable(ctx, itA, itB, itC, itD, itE, itF) {
 		return empty
 	}
-	if datas, sizes, rows, ok := lockstepColumns(ctx, itA, itB, itC, itD, itE, itF); ok {
+	if datas, sizes, rows, isSubset, ok := lockstepColumns(ctx, itA, itB, itC, itD, itE, itF); ok {
 		return func(yield func(Tuple6[*A, *B, *C, *D, *E, *F]) bool) {
 			for row := 0; row < rows; row++ {
 				if !yield(Tuple6[*A, *B, *C, *D, *E, *F]{
@@ -236,6 +325,20 @@ func View6[A, B, C, D, E, F any, PA ComponentPointer[A], PB ComponentPointer[B],
 					V6: (*F)(unsafe.Pointer(&datas[5][row*sizes[5]])),
 				}) {
 					return
+				}
+			}
+			if isSubset {
+				for ptrs := range iterResidualPtrs(ctx, itA, itB, itC, itD, itE, itF) {
+					if !yield(Tuple6[*A, *B, *C, *D, *E, *F]{
+						V1: (*A)(ptrs[0]),
+						V2: (*B)(ptrs[1]),
+						V3: (*C)(ptrs[2]),
+						V4: (*D)(ptrs[3]),
+						V5: (*E)(ptrs[4]),
+						V6: (*F)(ptrs[5]),
+					}) {
+						return
+					}
 				}
 			}
 		}
@@ -268,7 +371,7 @@ func View7[A, B, C, D, E, F, G any, PA ComponentPointer[A], PB ComponentPointer[
 	if !viewDepsWritable(ctx, itA, itB, itC, itD, itE, itF, itG) {
 		return empty
 	}
-	if datas, sizes, rows, ok := lockstepColumns(ctx, itA, itB, itC, itD, itE, itF, itG); ok {
+	if datas, sizes, rows, isSubset, ok := lockstepColumns(ctx, itA, itB, itC, itD, itE, itF, itG); ok {
 		return func(yield func(Tuple7[*A, *B, *C, *D, *E, *F, *G]) bool) {
 			for row := 0; row < rows; row++ {
 				if !yield(Tuple7[*A, *B, *C, *D, *E, *F, *G]{
@@ -281,6 +384,21 @@ func View7[A, B, C, D, E, F, G any, PA ComponentPointer[A], PB ComponentPointer[
 					V7: (*G)(unsafe.Pointer(&datas[6][row*sizes[6]])),
 				}) {
 					return
+				}
+			}
+			if isSubset {
+				for ptrs := range iterResidualPtrs(ctx, itA, itB, itC, itD, itE, itF, itG) {
+					if !yield(Tuple7[*A, *B, *C, *D, *E, *F, *G]{
+						V1: (*A)(ptrs[0]),
+						V2: (*B)(ptrs[1]),
+						V3: (*C)(ptrs[2]),
+						V4: (*D)(ptrs[3]),
+						V5: (*E)(ptrs[4]),
+						V6: (*F)(ptrs[5]),
+						V7: (*G)(ptrs[6]),
+					}) {
+						return
+					}
 				}
 			}
 		}
@@ -314,7 +432,7 @@ func View8[A, B, C, D, E, F, G, H any, PA ComponentPointer[A], PB ComponentPoint
 	if !viewDepsWritable(ctx, itA, itB, itC, itD, itE, itF, itG, itH) {
 		return empty
 	}
-	if datas, sizes, rows, ok := lockstepColumns(ctx, itA, itB, itC, itD, itE, itF, itG, itH); ok {
+	if datas, sizes, rows, isSubset, ok := lockstepColumns(ctx, itA, itB, itC, itD, itE, itF, itG, itH); ok {
 		return func(yield func(Tuple8[*A, *B, *C, *D, *E, *F, *G, *H]) bool) {
 			for row := 0; row < rows; row++ {
 				if !yield(Tuple8[*A, *B, *C, *D, *E, *F, *G, *H]{
@@ -328,6 +446,22 @@ func View8[A, B, C, D, E, F, G, H any, PA ComponentPointer[A], PB ComponentPoint
 					V8: (*H)(unsafe.Pointer(&datas[7][row*sizes[7]])),
 				}) {
 					return
+				}
+			}
+			if isSubset {
+				for ptrs := range iterResidualPtrs(ctx, itA, itB, itC, itD, itE, itF, itG, itH) {
+					if !yield(Tuple8[*A, *B, *C, *D, *E, *F, *G, *H]{
+						V1: (*A)(ptrs[0]),
+						V2: (*B)(ptrs[1]),
+						V3: (*C)(ptrs[2]),
+						V4: (*D)(ptrs[3]),
+						V5: (*E)(ptrs[4]),
+						V6: (*F)(ptrs[5]),
+						V7: (*G)(ptrs[6]),
+						V8: (*H)(ptrs[7]),
+					}) {
+						return
+					}
 				}
 			}
 		}

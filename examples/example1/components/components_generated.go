@@ -81,24 +81,33 @@ func (x *Position) Write(writer rockmem.Writer, start uint) (offset uint, err er
 	return offset, nil
 }
 
-// WriteDefault writes the Position default value to the writer at the specified offset
+var _defaultRoot_Position = [16]byte{}
+
+// WriteDefault writes the Position default value to the writer using a precomputed static template
 func (x *Position) WriteDefault(writer rockmem.Writer, start uint) (offset uint, err error) {
-	offset = start
-	size := uint(16)
-	if offset == 0 {
-		offset, err = writer.Alloc(size)
+	if start == 0 {
+		offset, err = writer.Alloc(16)
 		if err != nil {
 			return 0, err
 		}
+		writer.WriteAt(offset, _defaultRoot_Position[:])
+		return offset, nil
 	}
-
-	writer.Write4At(offset, uint32(size))
-
+	offset = start
+	writer.WriteAt(offset, _defaultRoot_Position[:16])
 	return offset, nil
 }
 
 func (x *Position) ReadAsRoot(reader *rockmem.Reader) {
 	x.Read(NewPositionViewer(reader, 0), reader)
+}
+
+// ValidateAsRoot 受检根解码校验（Q12）：校验 inline 固定长度 16 界内 + 深校验。
+func (x *Position) ValidateAsRoot(reader *rockmem.Reader) bool {
+	if !reader.IsValidOffset(0, 16) {
+		return false
+	}
+	return NewPositionViewer(reader, 0).Validate(reader)
 }
 
 func (x *Position) ReadWithOffset(reader *rockmem.Reader, offset uint32) {
@@ -163,24 +172,33 @@ func (x *Velocity) Write(writer rockmem.Writer, start uint) (offset uint, err er
 	return offset, nil
 }
 
-// WriteDefault writes the Velocity default value to the writer at the specified offset
+var _defaultRoot_Velocity = [16]byte{}
+
+// WriteDefault writes the Velocity default value to the writer using a precomputed static template
 func (x *Velocity) WriteDefault(writer rockmem.Writer, start uint) (offset uint, err error) {
-	offset = start
-	size := uint(16)
-	if offset == 0 {
-		offset, err = writer.Alloc(size)
+	if start == 0 {
+		offset, err = writer.Alloc(16)
 		if err != nil {
 			return 0, err
 		}
+		writer.WriteAt(offset, _defaultRoot_Velocity[:])
+		return offset, nil
 	}
-
-	writer.Write4At(offset, uint32(size))
-
+	offset = start
+	writer.WriteAt(offset, _defaultRoot_Velocity[:16])
 	return offset, nil
 }
 
 func (x *Velocity) ReadAsRoot(reader *rockmem.Reader) {
 	x.Read(NewVelocityViewer(reader, 0), reader)
+}
+
+// ValidateAsRoot 受检根解码校验（Q12）：校验 inline 固定长度 16 界内 + 深校验。
+func (x *Velocity) ValidateAsRoot(reader *rockmem.Reader) bool {
+	if !reader.IsValidOffset(0, 16) {
+		return false
+	}
+	return NewVelocityViewer(reader, 0).Validate(reader)
 }
 
 func (x *Velocity) ReadWithOffset(reader *rockmem.Reader, offset uint32) {
@@ -248,26 +266,33 @@ func (x *Player) Write(writer rockmem.Writer, start uint) (offset uint, err erro
 	return offset, nil
 }
 
-// WriteDefault writes the Player default value to the writer at the specified offset
+var _defaultRoot_Player = [48]byte{}
+
+// WriteDefault writes the Player default value to the writer using a precomputed static template
 func (x *Player) WriteDefault(writer rockmem.Writer, start uint) (offset uint, err error) {
-	offset = start
-	size := uint(48)
-	if offset == 0 {
-		offset, err = writer.Alloc(size)
+	if start == 0 {
+		offset, err = writer.Alloc(48)
 		if err != nil {
 			return 0, err
 		}
+		writer.WriteAt(offset, _defaultRoot_Player[:])
+		return offset, nil
 	}
-
-	writer.Write4At(offset, uint32(size))
-	__nameOffset := offset + 0
-	writer.WriteAt(__nameOffset, (*[32]byte)(unsafe.Pointer(&x.Name))[:])
-
+	offset = start
+	writer.WriteAt(offset, _defaultRoot_Player[:48])
 	return offset, nil
 }
 
 func (x *Player) ReadAsRoot(reader *rockmem.Reader) {
 	x.Read(NewPlayerViewer(reader, 0), reader)
+}
+
+// ValidateAsRoot 受检根解码校验（Q12）：校验 inline 固定长度 48 界内 + 深校验。
+func (x *Player) ValidateAsRoot(reader *rockmem.Reader) bool {
+	if !reader.IsValidOffset(0, 48) {
+		return false
+	}
+	return NewPlayerViewer(reader, 0).Validate(reader)
 }
 
 func (x *Player) ReadWithOffset(reader *rockmem.Reader, offset uint32) {
@@ -330,24 +355,33 @@ func (x *Health) Write(writer rockmem.Writer, start uint) (offset uint, err erro
 	return offset, nil
 }
 
-// WriteDefault writes the Health default value to the writer at the specified offset
+var _defaultRoot_Health = [8]byte{}
+
+// WriteDefault writes the Health default value to the writer using a precomputed static template
 func (x *Health) WriteDefault(writer rockmem.Writer, start uint) (offset uint, err error) {
-	offset = start
-	size := uint(8)
-	if offset == 0 {
-		offset, err = writer.Alloc(size)
+	if start == 0 {
+		offset, err = writer.Alloc(8)
 		if err != nil {
 			return 0, err
 		}
+		writer.WriteAt(offset, _defaultRoot_Health[:])
+		return offset, nil
 	}
-
-	writer.Write4At(offset, uint32(size))
-
+	offset = start
+	writer.WriteAt(offset, _defaultRoot_Health[:8])
 	return offset, nil
 }
 
 func (x *Health) ReadAsRoot(reader *rockmem.Reader) {
 	x.Read(NewHealthViewer(reader, 0), reader)
+}
+
+// ValidateAsRoot 受检根解码校验（Q12）：校验 inline 固定长度 8 界内 + 深校验。
+func (x *Health) ValidateAsRoot(reader *rockmem.Reader) bool {
+	if !reader.IsValidOffset(0, 8) {
+		return false
+	}
+	return NewHealthViewer(reader, 0).Validate(reader)
 }
 
 func (x *Health) ReadWithOffset(reader *rockmem.Reader, offset uint32) {
@@ -411,24 +445,33 @@ func (x *DamageEvent) Write(writer rockmem.Writer, start uint) (offset uint, err
 	return offset, nil
 }
 
-// WriteDefault writes the DamageEvent default value to the writer at the specified offset
+var _defaultRoot_DamageEvent = [24]byte{}
+
+// WriteDefault writes the DamageEvent default value to the writer using a precomputed static template
 func (x *DamageEvent) WriteDefault(writer rockmem.Writer, start uint) (offset uint, err error) {
-	offset = start
-	size := uint(24)
-	if offset == 0 {
-		offset, err = writer.Alloc(size)
+	if start == 0 {
+		offset, err = writer.Alloc(24)
 		if err != nil {
 			return 0, err
 		}
+		writer.WriteAt(offset, _defaultRoot_DamageEvent[:])
+		return offset, nil
 	}
-
-	writer.Write4At(offset, uint32(size))
-
+	offset = start
+	writer.WriteAt(offset, _defaultRoot_DamageEvent[:24])
 	return offset, nil
 }
 
 func (x *DamageEvent) ReadAsRoot(reader *rockmem.Reader) {
 	x.Read(NewDamageEventViewer(reader, 0), reader)
+}
+
+// ValidateAsRoot 受检根解码校验（Q12）：校验 inline 固定长度 24 界内 + 深校验。
+func (x *DamageEvent) ValidateAsRoot(reader *rockmem.Reader) bool {
+	if !reader.IsValidOffset(0, 24) {
+		return false
+	}
+	return NewDamageEventViewer(reader, 0).Validate(reader)
 }
 
 func (x *DamageEvent) ReadWithOffset(reader *rockmem.Reader, offset uint32) {
@@ -460,10 +503,11 @@ func (x *PositionViewer) size() uint32 {
 
 // Validate 深校验数据边界（不可信输入接入端使用；offset 合法性由 NewPositionViewer 保证）
 func (x *PositionViewer) Validate(reader *rockmem.Reader) bool {
-	return x.validate(reader, 0)
+	return x.ValidateDepth(reader, 0)
 }
 
-func (x *PositionViewer) validate(reader *rockmem.Reader, depth int) bool {
+// ValidateDepth 带递归深度限制的深校验（跨包嵌套调用使用）
+func (x *PositionViewer) ValidateDepth(reader *rockmem.Reader, depth int) bool {
 	if depth > 32 {
 		return false // 循环引用/超限深度
 	}
@@ -502,10 +546,11 @@ func (x *VelocityViewer) size() uint32 {
 
 // Validate 深校验数据边界（不可信输入接入端使用；offset 合法性由 NewVelocityViewer 保证）
 func (x *VelocityViewer) Validate(reader *rockmem.Reader) bool {
-	return x.validate(reader, 0)
+	return x.ValidateDepth(reader, 0)
 }
 
-func (x *VelocityViewer) validate(reader *rockmem.Reader, depth int) bool {
+// ValidateDepth 带递归深度限制的深校验（跨包嵌套调用使用）
+func (x *VelocityViewer) ValidateDepth(reader *rockmem.Reader, depth int) bool {
 	if depth > 32 {
 		return false // 循环引用/超限深度
 	}
@@ -544,10 +589,11 @@ func (x *PlayerViewer) size() uint32 {
 
 // Validate 深校验数据边界（不可信输入接入端使用；offset 合法性由 NewPlayerViewer 保证）
 func (x *PlayerViewer) Validate(reader *rockmem.Reader) bool {
-	return x.validate(reader, 0)
+	return x.ValidateDepth(reader, 0)
 }
 
-func (x *PlayerViewer) validate(reader *rockmem.Reader, depth int) bool {
+// ValidateDepth 带递归深度限制的深校验（跨包嵌套调用使用）
+func (x *PlayerViewer) ValidateDepth(reader *rockmem.Reader, depth int) bool {
 	if depth > 32 {
 		return false // 循环引用/超限深度
 	}
@@ -600,10 +646,11 @@ func (x *HealthViewer) size() uint32 {
 
 // Validate 深校验数据边界（不可信输入接入端使用；offset 合法性由 NewHealthViewer 保证）
 func (x *HealthViewer) Validate(reader *rockmem.Reader) bool {
-	return x.validate(reader, 0)
+	return x.ValidateDepth(reader, 0)
 }
 
-func (x *HealthViewer) validate(reader *rockmem.Reader, depth int) bool {
+// ValidateDepth 带递归深度限制的深校验（跨包嵌套调用使用）
+func (x *HealthViewer) ValidateDepth(reader *rockmem.Reader, depth int) bool {
 	if depth > 32 {
 		return false // 循环引用/超限深度
 	}
@@ -638,10 +685,11 @@ func (x *DamageEventViewer) size() uint32 {
 
 // Validate 深校验数据边界（不可信输入接入端使用；offset 合法性由 NewDamageEventViewer 保证）
 func (x *DamageEventViewer) Validate(reader *rockmem.Reader) bool {
-	return x.validate(reader, 0)
+	return x.ValidateDepth(reader, 0)
 }
 
-func (x *DamageEventViewer) validate(reader *rockmem.Reader, depth int) bool {
+// ValidateDepth 带递归深度限制的深校验（跨包嵌套调用使用）
+func (x *DamageEventViewer) ValidateDepth(reader *rockmem.Reader, depth int) bool {
 	if depth > 32 {
 		return false // 循环引用/超限深度
 	}
@@ -678,14 +726,23 @@ func newPositionModifierByViewer(viewer *PositionViewer, reader *rockmem.Reader)
 }
 
 func (x *PositionModifier) SetX(v float32) {
+	if x.PositionViewer == (*PositionViewer)(unsafe.Pointer(&_Null_components[0])) {
+		return
+	}
 	*(*float32)(unsafe.Add(unsafe.Pointer(x.PositionViewer), 0)) = v
 }
 
 func (x *PositionModifier) SetY(v float32) {
+	if x.PositionViewer == (*PositionViewer)(unsafe.Pointer(&_Null_components[0])) {
+		return
+	}
 	*(*float32)(unsafe.Add(unsafe.Pointer(x.PositionViewer), 4)) = v
 }
 
 func (x *PositionModifier) SetZ(v float32) {
+	if x.PositionViewer == (*PositionViewer)(unsafe.Pointer(&_Null_components[0])) {
+		return
+	}
 	*(*float32)(unsafe.Add(unsafe.Pointer(x.PositionViewer), 8)) = v
 }
 
@@ -703,14 +760,23 @@ func newVelocityModifierByViewer(viewer *VelocityViewer, reader *rockmem.Reader)
 }
 
 func (x *VelocityModifier) SetX(v float32) {
+	if x.VelocityViewer == (*VelocityViewer)(unsafe.Pointer(&_Null_components[0])) {
+		return
+	}
 	*(*float32)(unsafe.Add(unsafe.Pointer(x.VelocityViewer), 0)) = v
 }
 
 func (x *VelocityModifier) SetY(v float32) {
+	if x.VelocityViewer == (*VelocityViewer)(unsafe.Pointer(&_Null_components[0])) {
+		return
+	}
 	*(*float32)(unsafe.Add(unsafe.Pointer(x.VelocityViewer), 4)) = v
 }
 
 func (x *VelocityModifier) SetZ(v float32) {
+	if x.VelocityViewer == (*VelocityViewer)(unsafe.Pointer(&_Null_components[0])) {
+		return
+	}
 	*(*float32)(unsafe.Add(unsafe.Pointer(x.VelocityViewer), 8)) = v
 }
 
@@ -728,6 +794,9 @@ func newPlayerModifierByViewer(viewer *PlayerViewer, reader *rockmem.Reader) (v 
 }
 
 func (x *PlayerModifier) SetName(v *[32]byte) {
+	if x.PlayerViewer == (*PlayerViewer)(unsafe.Pointer(&_Null_components[0])) {
+		return
+	}
 	if len(v) != 32 {
 		if rockmem.IsDebugEnabled() {
 			panic("array length mismatch: expected 32, got " + string(rune(len(v))))
@@ -738,14 +807,23 @@ func (x *PlayerModifier) SetName(v *[32]byte) {
 }
 
 func (x *PlayerModifier) SetLevel(v int32) {
+	if x.PlayerViewer == (*PlayerViewer)(unsafe.Pointer(&_Null_components[0])) {
+		return
+	}
 	*(*int32)(unsafe.Add(unsafe.Pointer(x.PlayerViewer), 32)) = v
 }
 
 func (x *PlayerModifier) SetHealth(v float32) {
+	if x.PlayerViewer == (*PlayerViewer)(unsafe.Pointer(&_Null_components[0])) {
+		return
+	}
 	*(*float32)(unsafe.Add(unsafe.Pointer(x.PlayerViewer), 36)) = v
 }
 
 func (x *PlayerModifier) SetMaxHealth(v float32) {
+	if x.PlayerViewer == (*PlayerViewer)(unsafe.Pointer(&_Null_components[0])) {
+		return
+	}
 	*(*float32)(unsafe.Add(unsafe.Pointer(x.PlayerViewer), 40)) = v
 }
 
@@ -763,10 +841,16 @@ func newHealthModifierByViewer(viewer *HealthViewer, reader *rockmem.Reader) (v 
 }
 
 func (x *HealthModifier) SetCurrent(v float32) {
+	if x.HealthViewer == (*HealthViewer)(unsafe.Pointer(&_Null_components[0])) {
+		return
+	}
 	*(*float32)(unsafe.Add(unsafe.Pointer(x.HealthViewer), 0)) = v
 }
 
 func (x *HealthModifier) SetMax(v float32) {
+	if x.HealthViewer == (*HealthViewer)(unsafe.Pointer(&_Null_components[0])) {
+		return
+	}
 	*(*float32)(unsafe.Add(unsafe.Pointer(x.HealthViewer), 4)) = v
 }
 
@@ -784,14 +868,23 @@ func newDamageEventModifierByViewer(viewer *DamageEventViewer, reader *rockmem.R
 }
 
 func (x *DamageEventModifier) SetDamage(v float32) {
+	if x.DamageEventViewer == (*DamageEventViewer)(unsafe.Pointer(&_Null_components[0])) {
+		return
+	}
 	*(*float32)(unsafe.Add(unsafe.Pointer(x.DamageEventViewer), 0)) = v
 }
 
 func (x *DamageEventModifier) SetSourceId(v int64) {
+	if x.DamageEventViewer == (*DamageEventViewer)(unsafe.Pointer(&_Null_components[0])) {
+		return
+	}
 	*(*int64)(unsafe.Add(unsafe.Pointer(x.DamageEventViewer), 4)) = v
 }
 
 func (x *DamageEventModifier) SetTargetId(v int64) {
+	if x.DamageEventViewer == (*DamageEventViewer)(unsafe.Pointer(&_Null_components[0])) {
+		return
+	}
 	*(*int64)(unsafe.Add(unsafe.Pointer(x.DamageEventViewer), 12)) = v
 }
 

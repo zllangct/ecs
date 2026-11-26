@@ -2,6 +2,7 @@ package ecs
 
 import (
 	"fmt"
+	"reflect"
 	"sync"
 	"unsafe"
 )
@@ -21,8 +22,11 @@ type ComponentDefineInfo struct {
 	Unmarshaler ComponentSetUnmarshaler
 	// Size 组件定长字节数（unsafe.Sizeof(T)），组表列 stride 用
 	Size int
+	// HasPointers 组件类型是否包含 Go 指针（含 string/slice/map/chan/func/interface/*T）
+	HasPointers bool
 	// Proto 组件原型构造器，注册期读取 IsDisposable/IsNomadic 等标记
-	Proto func() Component
+	Proto  func() Component
+	goType reflect.Type
 }
 
 // ComponentRegistry manages component type registrations for serialization/deserialization
@@ -43,8 +47,12 @@ func GetComponentRegistry() *ComponentRegistry {
 
 // Register registers a component type with its factory and unmarshaler.
 // 设计约定：组件类型进程级全局唯一（rockgo 单 world 场景）；
-// 不同类型组注册同一 compType 属于配置错误，直接 panic。
+// 不同类型组或不同 Go 类型注册同一 compType 属于配置/哈希碰撞错误，直接 panic。
 func (r *ComponentRegistry) Register(group string, compType ComponentIntType, factory ComponentSetFactory, unmarshaler ComponentSetUnmarshaler, size int, proto func() Component) {
+	r.registerWithMeta(group, compType, factory, unmarshaler, size, true, nil, proto)
+}
+
+func (r *ComponentRegistry) registerWithMeta(group string, compType ComponentIntType, factory ComponentSetFactory, unmarshaler ComponentSetUnmarshaler, size int, hasPointers bool, goType reflect.Type, proto func() Component) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -52,6 +60,9 @@ func (r *ComponentRegistry) Register(group string, compType ComponentIntType, fa
 	if info, ok := r.infos[compType]; ok {
 		if info.Group != group {
 			panic(fmt.Sprintf("component type %d is conflict, group %s vs %s", compType, info.Group, group))
+		}
+		if info.goType != nil && goType != nil && info.goType != goType {
+			panic(fmt.Sprintf("component type %d is conflict in group %s: %v vs %v", compType, group, info.goType, goType))
 		}
 		return
 	}
@@ -62,7 +73,34 @@ func (r *ComponentRegistry) Register(group string, compType ComponentIntType, fa
 		Factory:     factory,
 		Unmarshaler: unmarshaler,
 		Size:        size,
+		HasPointers: hasPointers,
 		Proto:       proto,
+		goType:      goType,
+	}
+}
+
+// typeHasPointers 递归检查 Go 类型是否包含任何 GC 追踪的指针引用
+func typeHasPointers(t reflect.Type) bool {
+	if t == nil {
+		return true
+	}
+	switch t.Kind() {
+	case reflect.Ptr, reflect.UnsafePointer, reflect.String, reflect.Slice, reflect.Map, reflect.Chan, reflect.Func, reflect.Interface:
+		return true
+	case reflect.Array:
+		if t.Len() == 0 {
+			return false
+		}
+		return typeHasPointers(t.Elem())
+	case reflect.Struct:
+		for i := 0; i < t.NumField(); i++ {
+			if typeHasPointers(t.Field(i).Type) {
+				return true
+			}
+		}
+		return false
+	default:
+		return false
 	}
 }
 
@@ -70,7 +108,8 @@ func (r *ComponentRegistry) Register(group string, compType ComponentIntType, fa
 // It automatically creates the factory and unmarshaler from the component type
 func RegisterComponent[T any, TP ComponentPointer[T]](group string) {
 	compType := GetIntType[T, TP]()
-	globalComponentRegistry.Register(
+	typ := TypeOf[T]()
+	globalComponentRegistry.registerWithMeta(
 		group,
 		compType,
 		func() ComponentSet {
@@ -80,6 +119,8 @@ func RegisterComponent[T any, TP ComponentPointer[T]](group string) {
 			return NewCSetFromData[T, TP](data)
 		},
 		int(unsafe.Sizeof(*new(T))),
+		typeHasPointers(typ),
+		typ,
 		func() Component {
 			return TP(new(T))
 		},

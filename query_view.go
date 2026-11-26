@@ -31,6 +31,7 @@ func View2[A, B any, PA ComponentPointer[A], PB ComponentPointer[B]](ctx *System
 		sizeA, sizeB := aA.sizes[colA], aA.sizes[colB]
 		dataA, dataB := aA.columns[colA], aA.columns[colB]
 		rows := aA.Len()
+		isSubset := distinctComponentCount(itA, itB) < len(aA.types)
 		return func(yield func(*A, *B) bool) {
 			for row := 0; row < rows; row++ {
 				if !yield(
@@ -38,6 +39,13 @@ func View2[A, B any, PA ComponentPointer[A], PB ComponentPointer[B]](ctx *System
 					(*B)(unsafe.Pointer(&dataB[row*sizeB])),
 				) {
 					return
+				}
+			}
+			if isSubset {
+				for ptrs := range iterResidualPtrs(ctx, itA, itB) {
+					if !yield((*A)(ptrs[0]), (*B)(ptrs[1])) {
+						return
+					}
 				}
 			}
 		}
@@ -85,6 +93,7 @@ func View2RO[A any, BR ReadOnlyView[BR], PA ComponentPointer[A]](ctx *SystemCont
 		sizeA, sizeB := aA.sizes[colA], aA.sizes[colB]
 		dataA, dataB := aA.columns[colA], aA.columns[colB]
 		rows := aA.Len()
+		isSubset := distinctComponentCount(itA, itB) < len(aA.types)
 		return func(yield func(*A, BR) bool) {
 			for row := 0; row < rows; row++ {
 				if !yield(
@@ -92,6 +101,13 @@ func View2RO[A any, BR ReadOnlyView[BR], PA ComponentPointer[A]](ctx *SystemCont
 					zeroB.FromPtr(unsafe.Pointer(&dataB[row*sizeB])),
 				) {
 					return
+				}
+			}
+			if isSubset {
+				for ptrs := range iterResidualPtrs(ctx, itA, itB) {
+					if !yield((*A)(ptrs[0]), zeroB.FromPtr(ptrs[1])) {
+						return
+					}
 				}
 			}
 		}

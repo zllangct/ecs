@@ -71,6 +71,9 @@ func (u *USet[T]) Remove(idx int64) (*T, int64, int64) {
 	u.shrink()
 	u.len--
 	removed := u.data[lastIdx]
+	// 清零空出的尾槽，释放可能持有的 Go 指针/GC 引用
+	var zero T
+	u.data[lastIdx] = zero
 	return &removed, lastIdx, idx
 }
 

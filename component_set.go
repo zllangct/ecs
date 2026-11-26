@@ -8,6 +8,7 @@ import (
 type ComponentSet interface {
 	Len() int
 	Reset()
+	Free()
 	Add(entity Entity, comp Component) Component
 	// AddRaw 从裸内存拷贝一个元素入集（组表拆行散回用，src 指向组件定长内存）
 	AddRaw(entity Entity, src unsafe.Pointer)
@@ -24,6 +25,8 @@ type ComponentSet interface {
 	// 不持有具体类型参数的访问路径使用
 	iterPtr() iter.Seq2[EntityIndex, unsafe.Pointer]
 	Sort()
+	// marshalWithGroup 只读联合导出组表列与 CSet 残段，不修改实时世界布局
+	marshalWithGroup(a *Archetype, col int) (*SerializableSparseArrayData, error)
 }
 
 type CSet[T any, TP ComponentPointer[T]] struct {
@@ -42,14 +45,45 @@ func (c *CSet[T, TP]) EntityIndexes() []EntityIndex {
 }
 
 func (c *CSet[T, TP]) Add(entity Entity, comp Component) Component {
+	if comp == nil {
+		return nil
+	}
+	ptr := (*iface)(unsafe.Pointer(&comp)).data
+	if ptr == nil {
+		return nil
+	}
 	index := entity.Index()
 	// 注意：此处复刻 Go runtime 的 iface 布局直接取 data 指针（见 internal_type_mock.go），
 	// 零断言开销，但与 Go 版本的接口内存布局绑定，升级 toolchain 需回归验证。
-	data := c.SparseArray.Add(index, (*T)((*iface)(unsafe.Pointer(&comp)).data))
+	data := c.SparseArray.Add(index, (*T)(ptr))
 	if data == nil {
 		return nil
 	}
 	return any(data).(Component)
+}
+
+func (c *CSet[T, TP]) Free() {
+	c.SparseArray.USet.Free()
+	c.SparseArray.indices = nil
+	c.SparseArray.idx2Key = nil
+	c.SparseArray.maxKey = 0
+	c.SparseArray.lastKey = 0
+	c.SparseArray.isKOrder = true
+}
+
+func (c *CSet[T, TP]) marshalWithGroup(a *Archetype, col int) (*SerializableSparseArrayData, error) {
+	if a == nil || a.Len() == 0 {
+		return c.Marshal()
+	}
+	merged := NewCSet[T, TP](c.Len() + a.Len())
+	for idx, val := range c.Iter() {
+		merged.SparseArray.Add(idx, val)
+	}
+	for row := 0; row < a.Len(); row++ {
+		merged.SparseArray.Add(a.entities[row], (*T)(a.cellPtr(col, row)))
+	}
+	merged.Sort()
+	return merged.Marshal()
 }
 
 // AddRaw 从裸内存拷贝一个元素入集（USet.Add 为拷贝语义，不与 src 共享内存）

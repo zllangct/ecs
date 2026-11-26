@@ -27,7 +27,15 @@ func (f *FixedString[T]) Len() int {
 }
 
 func (f *FixedString[T]) String() string {
-	return string((*(*[__FixedMax]byte)(unsafe.Pointer(&(f.data))))[:f.len])
+	max := int(unsafe.Sizeof(f.data))
+	n := f.len
+	if n <= 0 {
+		return ""
+	}
+	if n > max {
+		n = max
+	}
+	return string(unsafe.Slice((*byte)(unsafe.Pointer(&f.data)), max)[:n])
 }
 
 func (f *FixedString[T]) Set(s string) {
@@ -38,6 +46,6 @@ func (f *FixedString[T]) Set(s string) {
 	}
 	f.len = n
 	if n != 0 {
-		copy((*(*[__FixedMax]byte)(unsafe.Pointer(&(f.data))))[:max], s[:n])
+		copy(unsafe.Slice((*byte)(unsafe.Pointer(&f.data)), max), s[:n])
 	}
 }

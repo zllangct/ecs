@@ -126,14 +126,25 @@ func NewWorld(opts ...WorldOption) *World {
 }
 
 // declareGroups 收集 system 声明的固定访问组（注册期调用）。
-// 校验：组内组件必须已 RegisterComponent 且非 disposable/nomadic。
+// 两阶段原子校验：全部组通过校验（已注册、非 disposable/nomadic、无 Go 指针、去重后 >=2 类型）后才统一写入 archetypes。
 func (w *World) declareGroups(s *SystemInfoInstance) error {
 	if w.config.DisableGroups {
 		return nil
 	}
+	type pendingGroup struct {
+		types []ComponentIntType
+		sizes map[ComponentIntType]int
+	}
+	validated := make([]pendingGroup, 0, len(s.config.groups))
 	for _, g := range s.config.groups {
+		seen := make(map[ComponentIntType]struct{}, len(g))
+		unique := make([]ComponentIntType, 0, len(g))
 		sizes := make(map[ComponentIntType]int, len(g))
 		for _, it := range g {
+			if _, dup := seen[it]; dup {
+				continue
+			}
+			seen[it] = struct{}{}
 			info, ok := GetComponentRegistry().GetInfo(it)
 			if !ok {
 				return fmt.Errorf("ecs: WithGroup component type %d not registered", it)
@@ -142,9 +153,22 @@ func (w *World) declareGroups(s *SystemInfoInstance) error {
 			if proto.IsDisposable() || proto.IsNomadic() {
 				return fmt.Errorf("ecs: WithGroup rejects disposable/nomadic component type %d", it)
 			}
+			if info.HasPointers {
+				return fmt.Errorf("ecs: WithGroup rejects component type %d containing Go pointers (unsafe for raw byte columns)", it)
+			}
+			if info.Size == 0 {
+				return fmt.Errorf("ecs: WithGroup rejects zero-sized tag component type %d", it)
+			}
+			unique = append(unique, it)
 			sizes[it] = info.Size
 		}
-		if err := w.archetypes.Declare(g, sizes); err != nil {
+		if len(unique) < 2 {
+			return fmt.Errorf("ecs: group needs >= 2 distinct component types, got %v", g)
+		}
+		validated = append(validated, pendingGroup{types: unique, sizes: sizes})
+	}
+	for _, pg := range validated {
+		if err := w.archetypes.Declare(pg.types, pg.sizes); err != nil {
 			return err
 		}
 	}
@@ -182,10 +206,13 @@ func (w *World) getComponentSet(it ComponentIntType) (ComponentSet, bool) {
 }
 
 // GetComponent 类型安全地直读实体组件，无需接口断言。
-// 组件集不存在或实体无此组件时返回 (nil, false)。
+// 实体不存在/句柄代数已过期、组件集不存在或实体无此组件时返回 (nil, false)。
 // 适用于 system 之外的世界装配/检查代码，不经过 WithDep 依赖校验；
 // system 执行期内应使用 (*SystemContext).GetBuddy。
 func (w *World) GetComponent[T any, TP ComponentPointer[T]](e Entity) (*T, bool) {
+	if _, ok := w.entities.Get(e); !ok {
+		return nil, false
+	}
 	it := GetIntType[T, TP]()
 	if a, ok := w.archetypes.owner(it); ok {
 		if row, ok := a.rowOf(e.Index()); ok {
@@ -252,6 +279,21 @@ func (w *World) flushPendingDestroy() {
 }
 
 func (w *World) Update() error {
+	now := time.Now()
+	if w.lastUpdate.IsZero() {
+		w.lastUpdate = now
+	}
+	delta := now.Sub(w.lastUpdate)
+	w.lastUpdate = now
+	return w.stepWithStart(delta, now)
+}
+
+// Step 使用调用方显式传入的固定帧间隔 delta 推进一帧，用于确定性回放/帧同步场景。
+func (w *World) Step(delta time.Duration) error {
+	return w.stepWithStart(delta, time.Now())
+}
+
+func (w *World) stepWithStart(delta time.Duration, start time.Time) error {
 	if w.status == WorldStatusStop {
 		return errors.New("ecs: update on stopped world")
 	}
@@ -263,14 +305,9 @@ func (w *World) Update() error {
 		w.absorbAll()
 		w.status = WorldStatusRunning
 	}
-	now := time.Now()
-	if w.lastUpdate.IsZero() {
-		w.lastUpdate = now
-	}
 
 	w.frame++
-	w.delta = now.Sub(w.lastUpdate)
-	w.lastUpdate = now
+	w.delta = delta
 	e := Event{
 		Frame: w.frame,
 		Delta: w.delta,
@@ -281,7 +318,7 @@ func (w *World) Update() error {
 	}
 
 	if w.config.AutoOptimize {
-		elapsed := time.Since(now) // 本帧系统执行耗时
+		elapsed := time.Since(start) // 本帧系统执行耗时
 		t := (time.Second / time.Duration(w.config.Rate)) - elapsed
 		err = w.Optimize(t, false)
 		if err != nil {
@@ -304,6 +341,23 @@ func (w *World) Destroy() error {
 	if err := w.systems.executeLinear(e); err != nil {
 		return err
 	}
+	// 释放组件集合（含 arena）、实体集合、组表与调度流资源
+	for _, set := range w.components {
+		set.Free()
+	}
+	w.components = nil
+	if w.entities != nil {
+		w.entities.Free()
+	}
+	if w.archetypes != nil {
+		w.archetypes.clear()
+	}
+	w.destroyMu.Lock()
+	w.pendingDestroy = nil
+	w.destroyMu.Unlock()
+	if w.systems != nil {
+		w.systems.stop()
+	}
 	w.setStatus(WorldStatusStop)
 	return nil
 }
@@ -317,6 +371,9 @@ func (w *World) Optimize(t time.Duration, force bool) error {
 }
 
 func (w *World) Register[T System, TP SystemPointer[T]](opts ...SystemOption) error {
+	if w.status != WorldStatusInitialized {
+		panic("system register only in world init")
+	}
 	system := TP(new(T))
 	s := newSystem(w, system, SystemTypeStandard)
 	s.setState(SystemStateInit)
@@ -346,6 +403,9 @@ func (w *World) Register[T System, TP SystemPointer[T]](opts ...SystemOption) er
 }
 
 func (w *World) RegisterLight(system LightSystem, opts ...SystemOption) error {
+	if w.status != WorldStatusInitialized {
+		panic("system register only in world init")
+	}
 	// LightSystem 的 Update 定义在指针接收者上，需传指针以实现 UpdateReceiver
 	s := newSystem(w, &system, SystemTypeLight)
 	s.setState(SystemStateInit)

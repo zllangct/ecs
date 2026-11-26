@@ -97,6 +97,7 @@ func (s *RenderSystem) Init(ctx *ecs.SystemInitContext) error {
 		ecs.WithName("RenderSystem"),
 		ecs.WithDep[components.Position](ecs.ReadOnly),
 		ecs.WithDep[components.Player](ecs.ReadOnly),
+		ecs.WithDep[components.Health](ecs.ReadOnly),
 	)
 	return nil
 }
@@ -111,13 +112,14 @@ func (s *RenderSystem) Update(ctx *ecs.SystemContext, event ecs.Event) error {
 
 	fmt.Printf("\n=== Frame %d (Delta: %v) ===\n", event.Frame, event.Delta)
 
-	// 遍历所有有 Position 和 Player 组件的实体
+	// 遍历所有有 Position、Player 和 Health 组件的实体
 	query := ctx.NewQuery(
 		ecs.WithComp[components.Position](),
 		ecs.WithComp[components.Player](),
+		ecs.WithComp[components.Health](),
 	)
 	for index := range query.Iter() {
-		// Position/Player 均为只读依赖，通过零拷贝只读视图访问
+		// Position/Player/Health 均为只读依赖，通过零拷贝只读视图访问
 		pos, ok := ctx.GetBuddyReadOnly[components.PositionReadOnly](index)
 		if !ok {
 			continue
@@ -126,11 +128,15 @@ func (s *RenderSystem) Update(ctx *ecs.SystemContext, event ecs.Event) error {
 		if !ok {
 			continue
 		}
+		health, ok := ctx.GetBuddyReadOnly[components.HealthReadOnly](index)
+		if !ok {
+			continue
+		}
 
 		fmt.Printf("  Player '%s' (Lv.%d): Position(%.2f, %.2f, %.2f) Health: %.1f/%.1f\n",
 			player.NameString(), player.Level(),
 			pos.X(), pos.Y(), pos.Z(),
-			player.Health(), player.MaxHealth())
+			health.Current(), health.Max())
 	}
 
 	return nil

@@ -75,7 +75,7 @@ func (x *SerializableUSetData) Write(writer rockmem.Writer, start uint) (offset 
 	__InitSizeOffset := offset + 20
 	writer.Write8At(__InitSizeOffset, *(*uint64)(unsafe.Pointer(&x.InitSize)))
 	__DataSize := uint(1 * len(x.Data))
-	__DataCap := __DataSize
+	__DataCap := uint(len(x.Data))
 	__DataOffset, err := writer.Alloc(__DataSize)
 	if err != nil {
 		return 0, err
@@ -94,24 +94,52 @@ func (x *SerializableUSetData) Write(writer rockmem.Writer, start uint) (offset 
 	return offset, nil
 }
 
-// WriteDefault writes the SerializableUSetData default value to the writer at the specified offset
+var _defaultRoot_SerializableUSetData = [44]byte{0: 0x2c, 28: 0x2c, 40: 0x01}
+
+// WriteDefault writes the SerializableUSetData default value to the writer using a precomputed static template
 func (x *SerializableUSetData) WriteDefault(writer rockmem.Writer, start uint) (offset uint, err error) {
-	offset = start
-	size := uint(44)
-	if offset == 0 {
-		offset, err = writer.Alloc(size)
+	if start == 0 {
+		offset, err = writer.Alloc(44)
 		if err != nil {
 			return 0, err
 		}
+		writer.WriteAt(offset, _defaultRoot_SerializableUSetData[:])
+		if offset != 0 {
+			base := uint32(offset)
+			writer.Write4At(offset+28, base+44)
+		}
+		return offset, nil
 	}
-
-	writer.Write4At(offset, uint32(size))
-
+	offset = start
+	writer.WriteAt(offset, _defaultRoot_SerializableUSetData[:44])
+	__dynOffset, err := writer.Alloc(0)
+	if err != nil {
+		return 0, err
+	}
+	dynBase := uint32(__dynOffset)
+	writer.Write4At(offset+28, dynBase+0)
 	return offset, nil
 }
 
 func (x *SerializableUSetData) ReadAsRoot(reader *rockmem.Reader) {
 	x.Read(NewSerializableUSetDataViewer(reader, 0), reader)
+}
+
+// ValidateAsRoot 受检根解码校验（Q12）：校验 4 字节头存在 + content_size >= 4 + content_size 界内 + 深校验。
+// 拒绝缓冲不足、content_size < 4 或越界的非法根；缓冲完整但 content_size 小于固定区的旧版本短表放行。
+func (x *SerializableUSetData) ValidateAsRoot(reader *rockmem.Reader) bool {
+	if !reader.IsValidOffset(0, 4) {
+		return false // 无 content_size 头
+	}
+	contentSize := *(*uint32)(reader.Pointer)
+	if contentSize < 4 || !reader.IsValidOffset(0, contentSize) {
+		return false // content_size 非法（<4）或越界缓冲
+	}
+	v := NewSerializableUSetDataViewer(reader, 0)
+	if v == (*SerializableUSetDataViewer)(unsafe.Pointer(&_Null_ecs[0])) {
+		return false
+	}
+	return v.Validate(reader)
 }
 
 func (x *SerializableUSetData) ReadWithOffset(reader *rockmem.Reader, offset uint32) {
@@ -189,7 +217,7 @@ func (x *SerializableSparseArrayData) Write(writer rockmem.Writer, start uint) (
 		return offset, err
 	}
 	__IndicesSize := uint(4 * len(x.Indices))
-	__IndicesCap := __IndicesSize
+	__IndicesCap := uint(len(x.Indices))
 	__IndicesOffset, err := writer.Alloc(__IndicesSize)
 	if err != nil {
 		return 0, err
@@ -205,7 +233,7 @@ func (x *SerializableSparseArrayData) Write(writer rockmem.Writer, start uint) (
 		writer.WriteAt(__IndicesOffset, unsafe.Slice((*byte)(unsafe.Pointer(&x.Indices[0])), __IndicesSize))
 	}
 	__Idx2KeySize := uint(4 * len(x.Idx2Key))
-	__Idx2KeyCap := __Idx2KeySize
+	__Idx2KeyCap := uint(len(x.Idx2Key))
 	__Idx2KeyOffset, err := writer.Alloc(__Idx2KeySize)
 	if err != nil {
 		return 0, err
@@ -232,33 +260,59 @@ func (x *SerializableSparseArrayData) Write(writer rockmem.Writer, start uint) (
 	return offset, nil
 }
 
-// WriteDefault writes the SerializableSparseArrayData default value to the writer at the specified offset
+var _defaultRoot_SerializableSparseArrayData = [101]byte{0: 0x39, 4: 0x39, 8: 0x65, 20: 0x04, 24: 0x65, 36: 0x04, 57: 0x2c, 85: 0x65, 97: 0x01}
+
+// WriteDefault writes the SerializableSparseArrayData default value to the writer using a precomputed static template
 func (x *SerializableSparseArrayData) WriteDefault(writer rockmem.Writer, start uint) (offset uint, err error) {
-	offset = start
-	size := uint(57)
-	if offset == 0 {
-		offset, err = writer.Alloc(size)
+	if start == 0 {
+		offset, err = writer.Alloc(101)
 		if err != nil {
 			return 0, err
 		}
+		writer.WriteAt(offset, _defaultRoot_SerializableSparseArrayData[:])
+		if offset != 0 {
+			base := uint32(offset)
+			writer.Write4At(offset+4, base+57)
+			writer.Write4At(offset+85, base+101)
+			writer.Write4At(offset+8, base+101)
+			writer.Write4At(offset+24, base+101)
+		}
+		return offset, nil
 	}
-
-	writer.Write4At(offset, uint32(size))
-	__USetDataSize := uint(44)
-	__USetDataOffset, err := writer.Alloc(__USetDataSize)
+	offset = start
+	writer.WriteAt(offset, _defaultRoot_SerializableSparseArrayData[:57])
+	__dynOffset, err := writer.Alloc(44)
 	if err != nil {
 		return 0, err
 	}
-	writer.Write4At(offset+4, uint32(__USetDataOffset))
-	if _, err := x.USetData.WriteDefault(writer, __USetDataOffset); err != nil {
-		return offset, err
-	}
-
+	writer.WriteAt(__dynOffset, _defaultRoot_SerializableSparseArrayData[57:])
+	dynBase := uint32(__dynOffset)
+	writer.Write4At(offset+4, dynBase+0)
+	writer.Write4At(__dynOffset+28, dynBase+44)
+	writer.Write4At(offset+8, dynBase+44)
+	writer.Write4At(offset+24, dynBase+44)
 	return offset, nil
 }
 
 func (x *SerializableSparseArrayData) ReadAsRoot(reader *rockmem.Reader) {
 	x.Read(NewSerializableSparseArrayDataViewer(reader, 0), reader)
+}
+
+// ValidateAsRoot 受检根解码校验（Q12）：校验 4 字节头存在 + content_size >= 4 + content_size 界内 + 深校验。
+// 拒绝缓冲不足、content_size < 4 或越界的非法根；缓冲完整但 content_size 小于固定区的旧版本短表放行。
+func (x *SerializableSparseArrayData) ValidateAsRoot(reader *rockmem.Reader) bool {
+	if !reader.IsValidOffset(0, 4) {
+		return false // 无 content_size 头
+	}
+	contentSize := *(*uint32)(reader.Pointer)
+	if contentSize < 4 || !reader.IsValidOffset(0, contentSize) {
+		return false // content_size 非法（<4）或越界缓冲
+	}
+	v := NewSerializableSparseArrayDataViewer(reader, 0)
+	if v == (*SerializableSparseArrayDataViewer)(unsafe.Pointer(&_Null_ecs[0])) {
+		return false
+	}
+	return v.Validate(reader)
 }
 
 func (x *SerializableSparseArrayData) ReadWithOffset(reader *rockmem.Reader, offset uint32) {
@@ -343,7 +397,7 @@ func (x *SerializableEntitySetData) Write(writer rockmem.Writer, start uint) (of
 
 	writer.Write4At(offset, uint32(size))
 	__EntityIdsSize := uint(8 * len(x.EntityIds))
-	__EntityIdsCap := __EntityIdsSize
+	__EntityIdsCap := uint(len(x.EntityIds))
 	__EntityIdsOffset, err := writer.Alloc(__EntityIdsSize)
 	if err != nil {
 		return 0, err
@@ -359,7 +413,7 @@ func (x *SerializableEntitySetData) Write(writer rockmem.Writer, start uint) (of
 		writer.WriteAt(__EntityIdsOffset, unsafe.Slice((*byte)(unsafe.Pointer(&x.EntityIds[0])), __EntityIdsSize))
 	}
 	__CompoundOffsetsSize := uint(4 * len(x.CompoundOffsets))
-	__CompoundOffsetsCap := __CompoundOffsetsSize
+	__CompoundOffsetsCap := uint(len(x.CompoundOffsets))
 	__CompoundOffsetsOffset, err := writer.Alloc(__CompoundOffsetsSize)
 	if err != nil {
 		return 0, err
@@ -375,7 +429,7 @@ func (x *SerializableEntitySetData) Write(writer rockmem.Writer, start uint) (of
 		writer.WriteAt(__CompoundOffsetsOffset, unsafe.Slice((*byte)(unsafe.Pointer(&x.CompoundOffsets[0])), __CompoundOffsetsSize))
 	}
 	__CompoundLengthsSize := uint(4 * len(x.CompoundLengths))
-	__CompoundLengthsCap := __CompoundLengthsSize
+	__CompoundLengthsCap := uint(len(x.CompoundLengths))
 	__CompoundLengthsOffset, err := writer.Alloc(__CompoundLengthsSize)
 	if err != nil {
 		return 0, err
@@ -391,7 +445,7 @@ func (x *SerializableEntitySetData) Write(writer rockmem.Writer, start uint) (of
 		writer.WriteAt(__CompoundLengthsOffset, unsafe.Slice((*byte)(unsafe.Pointer(&x.CompoundLengths[0])), __CompoundLengthsSize))
 	}
 	__CompoundDataSize := uint(8 * len(x.CompoundData))
-	__CompoundDataCap := __CompoundDataSize
+	__CompoundDataCap := uint(len(x.CompoundData))
 	__CompoundDataOffset, err := writer.Alloc(__CompoundDataSize)
 	if err != nil {
 		return 0, err
@@ -407,7 +461,7 @@ func (x *SerializableEntitySetData) Write(writer rockmem.Writer, start uint) (of
 		writer.WriteAt(__CompoundDataOffset, unsafe.Slice((*byte)(unsafe.Pointer(&x.CompoundData[0])), __CompoundDataSize))
 	}
 	__IndicesSize := uint(4 * len(x.Indices))
-	__IndicesCap := __IndicesSize
+	__IndicesCap := uint(len(x.Indices))
 	__IndicesOffset, err := writer.Alloc(__IndicesSize)
 	if err != nil {
 		return 0, err
@@ -423,7 +477,7 @@ func (x *SerializableEntitySetData) Write(writer rockmem.Writer, start uint) (of
 		writer.WriteAt(__IndicesOffset, unsafe.Slice((*byte)(unsafe.Pointer(&x.Indices[0])), __IndicesSize))
 	}
 	__Idx2KeySize := uint(4 * len(x.Idx2Key))
-	__Idx2KeyCap := __Idx2KeySize
+	__Idx2KeyCap := uint(len(x.Idx2Key))
 	__Idx2KeyOffset, err := writer.Alloc(__Idx2KeySize)
 	if err != nil {
 		return 0, err
@@ -450,24 +504,62 @@ func (x *SerializableEntitySetData) Write(writer rockmem.Writer, start uint) (of
 	return offset, nil
 }
 
-// WriteDefault writes the SerializableEntitySetData default value to the writer at the specified offset
+var _defaultRoot_SerializableEntitySetData = [117]byte{0: 0x75, 4: 0x75, 16: 0x08, 20: 0x75, 32: 0x04, 36: 0x75, 48: 0x04, 52: 0x75, 64: 0x08, 68: 0x75, 80: 0x04, 84: 0x75, 96: 0x04}
+
+// WriteDefault writes the SerializableEntitySetData default value to the writer using a precomputed static template
 func (x *SerializableEntitySetData) WriteDefault(writer rockmem.Writer, start uint) (offset uint, err error) {
-	offset = start
-	size := uint(117)
-	if offset == 0 {
-		offset, err = writer.Alloc(size)
+	if start == 0 {
+		offset, err = writer.Alloc(117)
 		if err != nil {
 			return 0, err
 		}
+		writer.WriteAt(offset, _defaultRoot_SerializableEntitySetData[:])
+		if offset != 0 {
+			base := uint32(offset)
+			writer.Write4At(offset+4, base+117)
+			writer.Write4At(offset+20, base+117)
+			writer.Write4At(offset+36, base+117)
+			writer.Write4At(offset+52, base+117)
+			writer.Write4At(offset+68, base+117)
+			writer.Write4At(offset+84, base+117)
+		}
+		return offset, nil
 	}
-
-	writer.Write4At(offset, uint32(size))
-
+	offset = start
+	writer.WriteAt(offset, _defaultRoot_SerializableEntitySetData[:117])
+	__dynOffset, err := writer.Alloc(0)
+	if err != nil {
+		return 0, err
+	}
+	dynBase := uint32(__dynOffset)
+	writer.Write4At(offset+4, dynBase+0)
+	writer.Write4At(offset+20, dynBase+0)
+	writer.Write4At(offset+36, dynBase+0)
+	writer.Write4At(offset+52, dynBase+0)
+	writer.Write4At(offset+68, dynBase+0)
+	writer.Write4At(offset+84, dynBase+0)
 	return offset, nil
 }
 
 func (x *SerializableEntitySetData) ReadAsRoot(reader *rockmem.Reader) {
 	x.Read(NewSerializableEntitySetDataViewer(reader, 0), reader)
+}
+
+// ValidateAsRoot 受检根解码校验（Q12）：校验 4 字节头存在 + content_size >= 4 + content_size 界内 + 深校验。
+// 拒绝缓冲不足、content_size < 4 或越界的非法根；缓冲完整但 content_size 小于固定区的旧版本短表放行。
+func (x *SerializableEntitySetData) ValidateAsRoot(reader *rockmem.Reader) bool {
+	if !reader.IsValidOffset(0, 4) {
+		return false // 无 content_size 头
+	}
+	contentSize := *(*uint32)(reader.Pointer)
+	if contentSize < 4 || !reader.IsValidOffset(0, contentSize) {
+		return false // content_size 非法（<4）或越界缓冲
+	}
+	v := NewSerializableEntitySetDataViewer(reader, 0)
+	if v == (*SerializableEntitySetDataViewer)(unsafe.Pointer(&_Null_ecs[0])) {
+		return false
+	}
+	return v.Validate(reader)
 }
 
 func (x *SerializableEntitySetData) ReadWithOffset(reader *rockmem.Reader, offset uint32) {
@@ -577,7 +669,7 @@ func (x *SerializableEntityIDGeneratorData) Write(writer rockmem.Writer, start u
 
 	writer.Write4At(offset, uint32(size))
 	__IdsSize := uint(8 * len(x.Ids))
-	__IdsCap := __IdsSize
+	__IdsCap := uint(len(x.Ids))
 	__IdsOffset, err := writer.Alloc(__IdsSize)
 	if err != nil {
 		return 0, err
@@ -599,7 +691,7 @@ func (x *SerializableEntityIDGeneratorData) Write(writer rockmem.Writer, start u
 	__LenOffset := offset + 28
 	writer.Write4At(__LenOffset, *(*uint32)(unsafe.Pointer(&x.Len)))
 	__RemoveDelaySize := uint(8 * len(x.RemoveDelay))
-	__RemoveDelayCap := __RemoveDelaySize
+	__RemoveDelayCap := uint(len(x.RemoveDelay))
 	__RemoveDelayOffset, err := writer.Alloc(__RemoveDelaySize)
 	if err != nil {
 		return 0, err
@@ -622,24 +714,54 @@ func (x *SerializableEntityIDGeneratorData) Write(writer rockmem.Writer, start u
 	return offset, nil
 }
 
-// WriteDefault writes the SerializableEntityIDGeneratorData default value to the writer at the specified offset
+var _defaultRoot_SerializableEntityIDGeneratorData = [56]byte{0: 0x38, 4: 0x38, 16: 0x08, 32: 0x38, 44: 0x08}
+
+// WriteDefault writes the SerializableEntityIDGeneratorData default value to the writer using a precomputed static template
 func (x *SerializableEntityIDGeneratorData) WriteDefault(writer rockmem.Writer, start uint) (offset uint, err error) {
-	offset = start
-	size := uint(56)
-	if offset == 0 {
-		offset, err = writer.Alloc(size)
+	if start == 0 {
+		offset, err = writer.Alloc(56)
 		if err != nil {
 			return 0, err
 		}
+		writer.WriteAt(offset, _defaultRoot_SerializableEntityIDGeneratorData[:])
+		if offset != 0 {
+			base := uint32(offset)
+			writer.Write4At(offset+4, base+56)
+			writer.Write4At(offset+32, base+56)
+		}
+		return offset, nil
 	}
-
-	writer.Write4At(offset, uint32(size))
-
+	offset = start
+	writer.WriteAt(offset, _defaultRoot_SerializableEntityIDGeneratorData[:56])
+	__dynOffset, err := writer.Alloc(0)
+	if err != nil {
+		return 0, err
+	}
+	dynBase := uint32(__dynOffset)
+	writer.Write4At(offset+4, dynBase+0)
+	writer.Write4At(offset+32, dynBase+0)
 	return offset, nil
 }
 
 func (x *SerializableEntityIDGeneratorData) ReadAsRoot(reader *rockmem.Reader) {
 	x.Read(NewSerializableEntityIDGeneratorDataViewer(reader, 0), reader)
+}
+
+// ValidateAsRoot 受检根解码校验（Q12）：校验 4 字节头存在 + content_size >= 4 + content_size 界内 + 深校验。
+// 拒绝缓冲不足、content_size < 4 或越界的非法根；缓冲完整但 content_size 小于固定区的旧版本短表放行。
+func (x *SerializableEntityIDGeneratorData) ValidateAsRoot(reader *rockmem.Reader) bool {
+	if !reader.IsValidOffset(0, 4) {
+		return false // 无 content_size 头
+	}
+	contentSize := *(*uint32)(reader.Pointer)
+	if contentSize < 4 || !reader.IsValidOffset(0, contentSize) {
+		return false // content_size 非法（<4）或越界缓冲
+	}
+	v := NewSerializableEntityIDGeneratorDataViewer(reader, 0)
+	if v == (*SerializableEntityIDGeneratorDataViewer)(unsafe.Pointer(&_Null_ecs[0])) {
+		return false
+	}
+	return v.Validate(reader)
 }
 
 func (x *SerializableEntityIDGeneratorData) ReadWithOffset(reader *rockmem.Reader, offset uint32) {
@@ -727,33 +849,52 @@ func (x *SerializableComponentSetEntry) Write(writer rockmem.Writer, start uint)
 	return offset, nil
 }
 
-// WriteDefault writes the SerializableComponentSetEntry default value to the writer at the specified offset
+var _defaultRoot_SerializableComponentSetEntry = [117]byte{8: 0x10, 16: 0x39, 20: 0x49, 24: 0x75, 36: 0x04, 40: 0x75, 52: 0x04, 73: 0x2c, 101: 0x75, 113: 0x01}
+
+// WriteDefault writes the SerializableComponentSetEntry default value to the writer using a precomputed static template
 func (x *SerializableComponentSetEntry) WriteDefault(writer rockmem.Writer, start uint) (offset uint, err error) {
-	offset = start
-	size := uint(16)
-	if offset == 0 {
-		offset, err = writer.Alloc(size)
+	if start == 0 {
+		offset, err = writer.Alloc(117)
 		if err != nil {
 			return 0, err
 		}
+		writer.WriteAt(offset, _defaultRoot_SerializableComponentSetEntry[:])
+		if offset != 0 {
+			base := uint32(offset)
+			writer.Write4At(offset+8, base+16)
+			writer.Write4At(offset+20, base+73)
+			writer.Write4At(offset+101, base+117)
+			writer.Write4At(offset+24, base+117)
+			writer.Write4At(offset+40, base+117)
+		}
+		return offset, nil
 	}
-
-	writer.Write4At(offset, uint32(size))
-	__DataSize := uint(57)
-	__DataOffset, err := writer.Alloc(__DataSize)
+	offset = start
+	writer.WriteAt(offset, _defaultRoot_SerializableComponentSetEntry[:16])
+	__dynOffset, err := writer.Alloc(101)
 	if err != nil {
 		return 0, err
 	}
-	writer.Write4At(offset+8, uint32(__DataOffset))
-	if _, err := x.Data.WriteDefault(writer, __DataOffset); err != nil {
-		return offset, err
-	}
-
+	writer.WriteAt(__dynOffset, _defaultRoot_SerializableComponentSetEntry[16:])
+	dynBase := uint32(__dynOffset)
+	writer.Write4At(offset+8, dynBase+0)
+	writer.Write4At(__dynOffset+4, dynBase+57)
+	writer.Write4At(__dynOffset+85, dynBase+101)
+	writer.Write4At(__dynOffset+8, dynBase+101)
+	writer.Write4At(__dynOffset+24, dynBase+101)
 	return offset, nil
 }
 
 func (x *SerializableComponentSetEntry) ReadAsRoot(reader *rockmem.Reader) {
 	x.Read(NewSerializableComponentSetEntryViewer(reader, 0), reader)
+}
+
+// ValidateAsRoot 受检根解码校验（Q12）：校验 inline 固定长度 16 界内 + 深校验。
+func (x *SerializableComponentSetEntry) ValidateAsRoot(reader *rockmem.Reader) bool {
+	if !reader.IsValidOffset(0, 16) {
+		return false
+	}
+	return NewSerializableComponentSetEntryViewer(reader, 0).Validate(reader)
 }
 
 func (x *SerializableComponentSetEntry) ReadWithOffset(reader *rockmem.Reader, offset uint32) {
@@ -852,7 +993,7 @@ func (x *SerializableWorldData) Write(writer rockmem.Writer, start uint) (offset
 	__FrameOffset := offset + 24
 	writer.Write8At(__FrameOffset, *(*uint64)(unsafe.Pointer(&x.Frame)))
 	__DisposableTypesSize := uint(8 * len(x.DisposableTypes))
-	__DisposableTypesCap := __DisposableTypesSize
+	__DisposableTypesCap := uint(len(x.DisposableTypes))
 	__DisposableTypesOffset, err := writer.Alloc(__DisposableTypesSize)
 	if err != nil {
 		return 0, err
@@ -868,7 +1009,7 @@ func (x *SerializableWorldData) Write(writer rockmem.Writer, start uint) (offset
 		writer.WriteAt(__DisposableTypesOffset, unsafe.Slice((*byte)(unsafe.Pointer(&x.DisposableTypes[0])), __DisposableTypesSize))
 	}
 	__NomadicTypesSize := uint(8 * len(x.NomadicTypes))
-	__NomadicTypesCap := __NomadicTypesSize
+	__NomadicTypesCap := uint(len(x.NomadicTypes))
 	__NomadicTypesOffset, err := writer.Alloc(__NomadicTypesSize)
 	if err != nil {
 		return 0, err
@@ -889,50 +1030,77 @@ func (x *SerializableWorldData) Write(writer rockmem.Writer, start uint) (offset
 	return offset, nil
 }
 
-// WriteDefault writes the SerializableWorldData default value to the writer at the specified offset
+var _defaultRoot_SerializableWorldData = [245]byte{0: 0x48, 4: 0x48, 8: 0xbd, 12: 0xf5, 20: 0x10, 32: 0xf5, 44: 0x08, 48: 0xf5, 60: 0x08, 72: 0x75, 76: 0xbd, 88: 0x08, 92: 0xbd, 104: 0x04, 108: 0xbd, 120: 0x04, 124: 0xbd, 136: 0x08, 140: 0xbd, 152: 0x04, 156: 0xbd, 168: 0x04, 189: 0x38, 193: 0xf5, 205: 0x08, 221: 0xf5, 233: 0x08}
+
+// WriteDefault writes the SerializableWorldData default value to the writer using a precomputed static template
 func (x *SerializableWorldData) WriteDefault(writer rockmem.Writer, start uint) (offset uint, err error) {
-	offset = start
-	size := uint(72)
-	if offset == 0 {
-		offset, err = writer.Alloc(size)
+	if start == 0 {
+		offset, err = writer.Alloc(245)
 		if err != nil {
 			return 0, err
 		}
+		writer.WriteAt(offset, _defaultRoot_SerializableWorldData[:])
+		if offset != 0 {
+			base := uint32(offset)
+			writer.Write4At(offset+4, base+72)
+			writer.Write4At(offset+76, base+189)
+			writer.Write4At(offset+92, base+189)
+			writer.Write4At(offset+108, base+189)
+			writer.Write4At(offset+124, base+189)
+			writer.Write4At(offset+140, base+189)
+			writer.Write4At(offset+156, base+189)
+			writer.Write4At(offset+8, base+189)
+			writer.Write4At(offset+193, base+245)
+			writer.Write4At(offset+221, base+245)
+			writer.Write4At(offset+12, base+245)
+			writer.Write4At(offset+32, base+245)
+			writer.Write4At(offset+48, base+245)
+		}
+		return offset, nil
 	}
-
-	writer.Write4At(offset, uint32(size))
-	__EntitiesSize := uint(117)
-	__EntitiesOffset, err := writer.Alloc(__EntitiesSize)
+	offset = start
+	writer.WriteAt(offset, _defaultRoot_SerializableWorldData[:72])
+	__dynOffset, err := writer.Alloc(173)
 	if err != nil {
 		return 0, err
 	}
-	writer.Write4At(offset+4, uint32(__EntitiesOffset))
-	if _, err := x.Entities.WriteDefault(writer, __EntitiesOffset); err != nil {
-		return offset, err
-	}
-	__IdGeneratorSize := uint(56)
-	__IdGeneratorOffset, err := writer.Alloc(__IdGeneratorSize)
-	if err != nil {
-		return 0, err
-	}
-	writer.Write4At(offset+8, uint32(__IdGeneratorOffset))
-	if _, err := x.IdGenerator.WriteDefault(writer, __IdGeneratorOffset); err != nil {
-		return offset, err
-	}
-	__ComponentSetsSize := uint(16 * len(x.ComponentSets))
-	__ComponentSetsOffset, err := writer.Alloc(__ComponentSetsSize)
-	if err != nil {
-		return 0, err
-	}
-	writer.Write4At(offset+12, uint32(__ComponentSetsOffset))
-	writer.Write4At(offset+12+4, uint32(__ComponentSetsSize))
-	writer.Write4At(offset+12+4+4, 16)
-
+	writer.WriteAt(__dynOffset, _defaultRoot_SerializableWorldData[72:])
+	dynBase := uint32(__dynOffset)
+	writer.Write4At(offset+4, dynBase+0)
+	writer.Write4At(__dynOffset+4, dynBase+117)
+	writer.Write4At(__dynOffset+20, dynBase+117)
+	writer.Write4At(__dynOffset+36, dynBase+117)
+	writer.Write4At(__dynOffset+52, dynBase+117)
+	writer.Write4At(__dynOffset+68, dynBase+117)
+	writer.Write4At(__dynOffset+84, dynBase+117)
+	writer.Write4At(offset+8, dynBase+117)
+	writer.Write4At(__dynOffset+121, dynBase+173)
+	writer.Write4At(__dynOffset+149, dynBase+173)
+	writer.Write4At(offset+12, dynBase+173)
+	writer.Write4At(offset+32, dynBase+173)
+	writer.Write4At(offset+48, dynBase+173)
 	return offset, nil
 }
 
 func (x *SerializableWorldData) ReadAsRoot(reader *rockmem.Reader) {
 	x.Read(NewSerializableWorldDataViewer(reader, 0), reader)
+}
+
+// ValidateAsRoot 受检根解码校验（Q12）：校验 4 字节头存在 + content_size >= 4 + content_size 界内 + 深校验。
+// 拒绝缓冲不足、content_size < 4 或越界的非法根；缓冲完整但 content_size 小于固定区的旧版本短表放行。
+func (x *SerializableWorldData) ValidateAsRoot(reader *rockmem.Reader) bool {
+	if !reader.IsValidOffset(0, 4) {
+		return false // 无 content_size 头
+	}
+	contentSize := *(*uint32)(reader.Pointer)
+	if contentSize < 4 || !reader.IsValidOffset(0, contentSize) {
+		return false // content_size 非法（<4）或越界缓冲
+	}
+	v := NewSerializableWorldDataViewer(reader, 0)
+	if v == (*SerializableWorldDataViewer)(unsafe.Pointer(&_Null_ecs[0])) {
+		return false
+	}
+	return v.Validate(reader)
 }
 
 func (x *SerializableWorldData) ReadWithOffset(reader *rockmem.Reader, offset uint32) {
@@ -980,13 +1148,14 @@ func (x *SerializableWorldData) Read(viewer *SerializableWorldDataViewer, reader
 type SerializableUSetDataViewer [44]byte
 
 func NewSerializableUSetDataViewer(reader *rockmem.Reader, offset uint32) (v *SerializableUSetDataViewer) {
-	if !reader.IsValidOffset(offset, 44) {
+	if !reader.IsValidOffset(offset, 4) {
+		return (*SerializableUSetDataViewer)(unsafe.Pointer(&_Null_ecs[0]))
+	}
+	sz := *(*uint32)(unsafe.Add(reader.Pointer, offset))
+	if sz < 4 || !reader.IsValidOffset(offset, sz) {
 		return (*SerializableUSetDataViewer)(unsafe.Pointer(&_Null_ecs[0]))
 	}
 	v = (*SerializableUSetDataViewer)(unsafe.Add(reader.Pointer, offset))
-	if !reader.IsValidOffset(offset, v.size()) {
-		return (*SerializableUSetDataViewer)(unsafe.Pointer(&_Null_ecs[0]))
-	}
 	return v
 }
 
@@ -996,10 +1165,11 @@ func (x *SerializableUSetDataViewer) size() uint32 {
 
 // Validate 深校验数据边界（不可信输入接入端使用；offset 合法性由 NewSerializableUSetDataViewer 保证）
 func (x *SerializableUSetDataViewer) Validate(reader *rockmem.Reader) bool {
-	return x.validate(reader, 0)
+	return x.ValidateDepth(reader, 0)
 }
 
-func (x *SerializableUSetDataViewer) validate(reader *rockmem.Reader, depth int) bool {
+// ValidateDepth 带递归深度限制的深校验（跨包嵌套调用使用）
+func (x *SerializableUSetDataViewer) ValidateDepth(reader *rockmem.Reader, depth int) bool {
 	if depth > 32 {
 		return false // 循环引用/超限深度
 	}
@@ -1059,6 +1229,9 @@ func (x *SerializableUSetDataViewer) InitSize() (v int64) {
 }
 
 func (x *SerializableUSetDataViewer) Data(reader *rockmem.Reader) (v []byte) {
+	if 28+16 > x.size() {
+		return []byte{}
+	}
 	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 28))
 	size := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 28+4))
 	if !reader.IsValidOffset(uint32(offset), size) {
@@ -1074,13 +1247,14 @@ func (x *SerializableUSetDataViewer) Data(reader *rockmem.Reader) (v []byte) {
 type SerializableSparseArrayDataViewer [57]byte
 
 func NewSerializableSparseArrayDataViewer(reader *rockmem.Reader, offset uint32) (v *SerializableSparseArrayDataViewer) {
-	if !reader.IsValidOffset(offset, 57) {
+	if !reader.IsValidOffset(offset, 4) {
+		return (*SerializableSparseArrayDataViewer)(unsafe.Pointer(&_Null_ecs[0]))
+	}
+	sz := *(*uint32)(unsafe.Add(reader.Pointer, offset))
+	if sz < 4 || !reader.IsValidOffset(offset, sz) {
 		return (*SerializableSparseArrayDataViewer)(unsafe.Pointer(&_Null_ecs[0]))
 	}
 	v = (*SerializableSparseArrayDataViewer)(unsafe.Add(reader.Pointer, offset))
-	if !reader.IsValidOffset(offset, v.size()) {
-		return (*SerializableSparseArrayDataViewer)(unsafe.Pointer(&_Null_ecs[0]))
-	}
 	return v
 }
 
@@ -1090,10 +1264,11 @@ func (x *SerializableSparseArrayDataViewer) size() uint32 {
 
 // Validate 深校验数据边界（不可信输入接入端使用；offset 合法性由 NewSerializableSparseArrayDataViewer 保证）
 func (x *SerializableSparseArrayDataViewer) Validate(reader *rockmem.Reader) bool {
-	return x.validate(reader, 0)
+	return x.ValidateDepth(reader, 0)
 }
 
-func (x *SerializableSparseArrayDataViewer) validate(reader *rockmem.Reader, depth int) bool {
+// ValidateDepth 带递归深度限制的深校验（跨包嵌套调用使用）
+func (x *SerializableSparseArrayDataViewer) ValidateDepth(reader *rockmem.Reader, depth int) bool {
 	if depth > 32 {
 		return false // 循环引用/超限深度
 	}
@@ -1106,7 +1281,11 @@ func (x *SerializableSparseArrayDataViewer) validate(reader *rockmem.Reader, dep
 			if !reader.IsValidOffset(off, 4) {
 				return false
 			}
-			if !NewSerializableUSetDataViewer(reader, off).validate(reader, depth+1) {
+			subSize := *(*uint32)(unsafe.Add(reader.Pointer, off))
+			if subSize < 4 || !reader.IsValidOffset(off, subSize) {
+				return false
+			}
+			if !NewSerializableUSetDataViewer(reader, off).ValidateDepth(reader, depth+1) {
 				return false
 			}
 		}
@@ -1165,10 +1344,16 @@ func (x *SerializableSparseArrayDataViewer) USetData(reader *rockmem.Reader) (v 
 		return (*SerializableUSetDataViewer)(unsafe.Pointer(&_Null_ecs[0]))
 	}
 	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 4))
+	if offset == 0 {
+		return (*SerializableUSetDataViewer)(unsafe.Pointer(&_Null_ecs[0]))
+	}
 	return NewSerializableUSetDataViewer(reader, offset)
 }
 
 func (x *SerializableSparseArrayDataViewer) Indices(reader *rockmem.Reader) (v []int32) {
+	if 8+16 > x.size() {
+		return []int32{}
+	}
 	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 8))
 	size := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 8+4))
 	if !reader.IsValidOffset(uint32(offset), size) {
@@ -1182,6 +1367,9 @@ func (x *SerializableSparseArrayDataViewer) Indices(reader *rockmem.Reader) (v [
 }
 
 func (x *SerializableSparseArrayDataViewer) Idx2Key(reader *rockmem.Reader) (v []int32) {
+	if 24+16 > x.size() {
+		return []int32{}
+	}
 	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 24))
 	size := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 24+4))
 	if !reader.IsValidOffset(uint32(offset), size) {
@@ -1229,13 +1417,14 @@ func (x *SerializableSparseArrayDataViewer) IsKOrder() (v bool) {
 type SerializableEntitySetDataViewer [117]byte
 
 func NewSerializableEntitySetDataViewer(reader *rockmem.Reader, offset uint32) (v *SerializableEntitySetDataViewer) {
-	if !reader.IsValidOffset(offset, 117) {
+	if !reader.IsValidOffset(offset, 4) {
+		return (*SerializableEntitySetDataViewer)(unsafe.Pointer(&_Null_ecs[0]))
+	}
+	sz := *(*uint32)(unsafe.Add(reader.Pointer, offset))
+	if sz < 4 || !reader.IsValidOffset(offset, sz) {
 		return (*SerializableEntitySetDataViewer)(unsafe.Pointer(&_Null_ecs[0]))
 	}
 	v = (*SerializableEntitySetDataViewer)(unsafe.Add(reader.Pointer, offset))
-	if !reader.IsValidOffset(offset, v.size()) {
-		return (*SerializableEntitySetDataViewer)(unsafe.Pointer(&_Null_ecs[0]))
-	}
 	return v
 }
 
@@ -1245,10 +1434,11 @@ func (x *SerializableEntitySetDataViewer) size() uint32 {
 
 // Validate 深校验数据边界（不可信输入接入端使用；offset 合法性由 NewSerializableEntitySetDataViewer 保证）
 func (x *SerializableEntitySetDataViewer) Validate(reader *rockmem.Reader) bool {
-	return x.validate(reader, 0)
+	return x.ValidateDepth(reader, 0)
 }
 
-func (x *SerializableEntitySetDataViewer) validate(reader *rockmem.Reader, depth int) bool {
+// ValidateDepth 带递归深度限制的深校验（跨包嵌套调用使用）
+func (x *SerializableEntitySetDataViewer) ValidateDepth(reader *rockmem.Reader, depth int) bool {
 	if depth > 32 {
 		return false // 循环引用/超限深度
 	}
@@ -1362,6 +1552,9 @@ func (x *SerializableEntitySetDataViewer) RockmemReader() *rockmem.Reader {
 }
 
 func (x *SerializableEntitySetDataViewer) EntityIds(reader *rockmem.Reader) (v []int64) {
+	if 4+16 > x.size() {
+		return []int64{}
+	}
 	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 4))
 	size := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 4+4))
 	if !reader.IsValidOffset(uint32(offset), size) {
@@ -1375,6 +1568,9 @@ func (x *SerializableEntitySetDataViewer) EntityIds(reader *rockmem.Reader) (v [
 }
 
 func (x *SerializableEntitySetDataViewer) CompoundOffsets(reader *rockmem.Reader) (v []int32) {
+	if 20+16 > x.size() {
+		return []int32{}
+	}
 	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 20))
 	size := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 20+4))
 	if !reader.IsValidOffset(uint32(offset), size) {
@@ -1388,6 +1584,9 @@ func (x *SerializableEntitySetDataViewer) CompoundOffsets(reader *rockmem.Reader
 }
 
 func (x *SerializableEntitySetDataViewer) CompoundLengths(reader *rockmem.Reader) (v []int32) {
+	if 36+16 > x.size() {
+		return []int32{}
+	}
 	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 36))
 	size := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 36+4))
 	if !reader.IsValidOffset(uint32(offset), size) {
@@ -1401,6 +1600,9 @@ func (x *SerializableEntitySetDataViewer) CompoundLengths(reader *rockmem.Reader
 }
 
 func (x *SerializableEntitySetDataViewer) CompoundData(reader *rockmem.Reader) (v []uint64) {
+	if 52+16 > x.size() {
+		return []uint64{}
+	}
 	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 52))
 	size := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 52+4))
 	if !reader.IsValidOffset(uint32(offset), size) {
@@ -1414,6 +1616,9 @@ func (x *SerializableEntitySetDataViewer) CompoundData(reader *rockmem.Reader) (
 }
 
 func (x *SerializableEntitySetDataViewer) Indices(reader *rockmem.Reader) (v []int32) {
+	if 68+16 > x.size() {
+		return []int32{}
+	}
 	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 68))
 	size := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 68+4))
 	if !reader.IsValidOffset(uint32(offset), size) {
@@ -1427,6 +1632,9 @@ func (x *SerializableEntitySetDataViewer) Indices(reader *rockmem.Reader) (v []i
 }
 
 func (x *SerializableEntitySetDataViewer) Idx2Key(reader *rockmem.Reader) (v []int32) {
+	if 84+16 > x.size() {
+		return []int32{}
+	}
 	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 84))
 	size := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 84+4))
 	if !reader.IsValidOffset(uint32(offset), size) {
@@ -1474,13 +1682,14 @@ func (x *SerializableEntitySetDataViewer) IsKOrder() (v bool) {
 type SerializableEntityIDGeneratorDataViewer [56]byte
 
 func NewSerializableEntityIDGeneratorDataViewer(reader *rockmem.Reader, offset uint32) (v *SerializableEntityIDGeneratorDataViewer) {
-	if !reader.IsValidOffset(offset, 56) {
+	if !reader.IsValidOffset(offset, 4) {
+		return (*SerializableEntityIDGeneratorDataViewer)(unsafe.Pointer(&_Null_ecs[0]))
+	}
+	sz := *(*uint32)(unsafe.Add(reader.Pointer, offset))
+	if sz < 4 || !reader.IsValidOffset(offset, sz) {
 		return (*SerializableEntityIDGeneratorDataViewer)(unsafe.Pointer(&_Null_ecs[0]))
 	}
 	v = (*SerializableEntityIDGeneratorDataViewer)(unsafe.Add(reader.Pointer, offset))
-	if !reader.IsValidOffset(offset, v.size()) {
-		return (*SerializableEntityIDGeneratorDataViewer)(unsafe.Pointer(&_Null_ecs[0]))
-	}
 	return v
 }
 
@@ -1490,10 +1699,11 @@ func (x *SerializableEntityIDGeneratorDataViewer) size() uint32 {
 
 // Validate 深校验数据边界（不可信输入接入端使用；offset 合法性由 NewSerializableEntityIDGeneratorDataViewer 保证）
 func (x *SerializableEntityIDGeneratorDataViewer) Validate(reader *rockmem.Reader) bool {
-	return x.validate(reader, 0)
+	return x.ValidateDepth(reader, 0)
 }
 
-func (x *SerializableEntityIDGeneratorDataViewer) validate(reader *rockmem.Reader, depth int) bool {
+// ValidateDepth 带递归深度限制的深校验（跨包嵌套调用使用）
+func (x *SerializableEntityIDGeneratorDataViewer) ValidateDepth(reader *rockmem.Reader, depth int) bool {
 	if depth > 32 {
 		return false // 循环引用/超限深度
 	}
@@ -1550,6 +1760,9 @@ func (x *SerializableEntityIDGeneratorDataViewer) RockmemReader() *rockmem.Reade
 }
 
 func (x *SerializableEntityIDGeneratorDataViewer) Ids(reader *rockmem.Reader) (v []int64) {
+	if 4+16 > x.size() {
+		return []int64{}
+	}
 	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 4))
 	size := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 4+4))
 	if !reader.IsValidOffset(uint32(offset), size) {
@@ -1587,6 +1800,9 @@ func (x *SerializableEntityIDGeneratorDataViewer) Len() (v int32) {
 }
 
 func (x *SerializableEntityIDGeneratorDataViewer) RemoveDelay(reader *rockmem.Reader) (v []int64) {
+	if 32+16 > x.size() {
+		return []int64{}
+	}
 	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 32))
 	size := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 32+4))
 	if !reader.IsValidOffset(uint32(offset), size) {
@@ -1631,10 +1847,11 @@ func (x *SerializableComponentSetEntryViewer) size() uint32 {
 
 // Validate 深校验数据边界（不可信输入接入端使用；offset 合法性由 NewSerializableComponentSetEntryViewer 保证）
 func (x *SerializableComponentSetEntryViewer) Validate(reader *rockmem.Reader) bool {
-	return x.validate(reader, 0)
+	return x.ValidateDepth(reader, 0)
 }
 
-func (x *SerializableComponentSetEntryViewer) validate(reader *rockmem.Reader, depth int) bool {
+// ValidateDepth 带递归深度限制的深校验（跨包嵌套调用使用）
+func (x *SerializableComponentSetEntryViewer) ValidateDepth(reader *rockmem.Reader, depth int) bool {
 	if depth > 32 {
 		return false // 循环引用/超限深度
 	}
@@ -1644,7 +1861,11 @@ func (x *SerializableComponentSetEntryViewer) validate(reader *rockmem.Reader, d
 			if !reader.IsValidOffset(off, 4) {
 				return false
 			}
-			if !NewSerializableSparseArrayDataViewer(reader, off).validate(reader, depth+1) {
+			subSize := *(*uint32)(unsafe.Add(reader.Pointer, off))
+			if subSize < 4 || !reader.IsValidOffset(off, subSize) {
+				return false
+			}
+			if !NewSerializableSparseArrayDataViewer(reader, off).ValidateDepth(reader, depth+1) {
 				return false
 			}
 		}
@@ -1662,19 +1883,23 @@ func (x *SerializableComponentSetEntryViewer) ComponentType() (v uint64) {
 
 func (x *SerializableComponentSetEntryViewer) Data(reader *rockmem.Reader) (v *SerializableSparseArrayDataViewer) {
 	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 8))
+	if offset == 0 {
+		return (*SerializableSparseArrayDataViewer)(unsafe.Pointer(&_Null_ecs[0]))
+	}
 	return NewSerializableSparseArrayDataViewer(reader, offset)
 }
 
 type SerializableWorldDataViewer [72]byte
 
 func NewSerializableWorldDataViewer(reader *rockmem.Reader, offset uint32) (v *SerializableWorldDataViewer) {
-	if !reader.IsValidOffset(offset, 72) {
+	if !reader.IsValidOffset(offset, 4) {
+		return (*SerializableWorldDataViewer)(unsafe.Pointer(&_Null_ecs[0]))
+	}
+	sz := *(*uint32)(unsafe.Add(reader.Pointer, offset))
+	if sz < 4 || !reader.IsValidOffset(offset, sz) {
 		return (*SerializableWorldDataViewer)(unsafe.Pointer(&_Null_ecs[0]))
 	}
 	v = (*SerializableWorldDataViewer)(unsafe.Add(reader.Pointer, offset))
-	if !reader.IsValidOffset(offset, v.size()) {
-		return (*SerializableWorldDataViewer)(unsafe.Pointer(&_Null_ecs[0]))
-	}
 	return v
 }
 
@@ -1684,10 +1909,11 @@ func (x *SerializableWorldDataViewer) size() uint32 {
 
 // Validate 深校验数据边界（不可信输入接入端使用；offset 合法性由 NewSerializableWorldDataViewer 保证）
 func (x *SerializableWorldDataViewer) Validate(reader *rockmem.Reader) bool {
-	return x.validate(reader, 0)
+	return x.ValidateDepth(reader, 0)
 }
 
-func (x *SerializableWorldDataViewer) validate(reader *rockmem.Reader, depth int) bool {
+// ValidateDepth 带递归深度限制的深校验（跨包嵌套调用使用）
+func (x *SerializableWorldDataViewer) ValidateDepth(reader *rockmem.Reader, depth int) bool {
 	if depth > 32 {
 		return false // 循环引用/超限深度
 	}
@@ -1700,7 +1926,11 @@ func (x *SerializableWorldDataViewer) validate(reader *rockmem.Reader, depth int
 			if !reader.IsValidOffset(off, 4) {
 				return false
 			}
-			if !NewSerializableEntitySetDataViewer(reader, off).validate(reader, depth+1) {
+			subSize := *(*uint32)(unsafe.Add(reader.Pointer, off))
+			if subSize < 4 || !reader.IsValidOffset(off, subSize) {
+				return false
+			}
+			if !NewSerializableEntitySetDataViewer(reader, off).ValidateDepth(reader, depth+1) {
 				return false
 			}
 		}
@@ -1714,7 +1944,11 @@ func (x *SerializableWorldDataViewer) validate(reader *rockmem.Reader, depth int
 			if !reader.IsValidOffset(off, 4) {
 				return false
 			}
-			if !NewSerializableEntityIDGeneratorDataViewer(reader, off).validate(reader, depth+1) {
+			subSize := *(*uint32)(unsafe.Add(reader.Pointer, off))
+			if subSize < 4 || !reader.IsValidOffset(off, subSize) {
+				return false
+			}
+			if !NewSerializableEntityIDGeneratorDataViewer(reader, off).ValidateDepth(reader, depth+1) {
 				return false
 			}
 		}
@@ -1734,7 +1968,7 @@ func (x *SerializableWorldDataViewer) validate(reader *rockmem.Reader, depth int
 			}
 			elems := unsafe.Slice((*SerializableComponentSetEntryViewer)(unsafe.Add(reader.Pointer, off)), uintptr(size/16))
 			for i := range elems {
-				if !elems[i].validate(reader, depth+1) {
+				if !elems[i].ValidateDepth(reader, depth+1) {
 					return false
 				}
 			}
@@ -1788,6 +2022,9 @@ func (x *SerializableWorldDataViewer) Entities(reader *rockmem.Reader) (v *Seria
 		return (*SerializableEntitySetDataViewer)(unsafe.Pointer(&_Null_ecs[0]))
 	}
 	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 4))
+	if offset == 0 {
+		return (*SerializableEntitySetDataViewer)(unsafe.Pointer(&_Null_ecs[0]))
+	}
 	return NewSerializableEntitySetDataViewer(reader, offset)
 }
 
@@ -1796,10 +2033,16 @@ func (x *SerializableWorldDataViewer) IdGenerator(reader *rockmem.Reader) (v *Se
 		return (*SerializableEntityIDGeneratorDataViewer)(unsafe.Pointer(&_Null_ecs[0]))
 	}
 	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 8))
+	if offset == 0 {
+		return (*SerializableEntityIDGeneratorDataViewer)(unsafe.Pointer(&_Null_ecs[0]))
+	}
 	return NewSerializableEntityIDGeneratorDataViewer(reader, offset)
 }
 
 func (x *SerializableWorldDataViewer) ComponentSets(reader *rockmem.Reader) (v []SerializableComponentSetEntryViewer) {
+	if 12+12 > x.size() {
+		return []SerializableComponentSetEntryViewer{}
+	}
 	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 12))
 	size := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 12+4))
 	if !reader.IsValidOffset(uint32(offset), size) {
@@ -1821,6 +2064,9 @@ func (x *SerializableWorldDataViewer) Frame() (v uint64) {
 }
 
 func (x *SerializableWorldDataViewer) DisposableTypes(reader *rockmem.Reader) (v []uint64) {
+	if 32+16 > x.size() {
+		return []uint64{}
+	}
 	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 32))
 	size := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 32+4))
 	if !reader.IsValidOffset(uint32(offset), size) {
@@ -1834,6 +2080,9 @@ func (x *SerializableWorldDataViewer) DisposableTypes(reader *rockmem.Reader) (v
 }
 
 func (x *SerializableWorldDataViewer) NomadicTypes(reader *rockmem.Reader) (v []uint64) {
+	if 48+16 > x.size() {
+		return []uint64{}
+	}
 	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 48))
 	size := *(*uint32)(unsafe.Add(unsafe.Pointer(x), 48+4))
 	if !reader.IsValidOffset(uint32(offset), size) {
@@ -1868,23 +2117,47 @@ func newSerializableUSetDataModifierByViewer(viewer *SerializableUSetDataViewer,
 }
 
 func (x *SerializableUSetDataModifier) SetEleSize(v uint64) {
+	if x.SerializableUSetDataViewer == (*SerializableUSetDataViewer)(unsafe.Pointer(&_Null_ecs[0])) {
+		return
+	}
+	if 4+8 > x.size() {
+		return
+	}
 	*(*uint64)(unsafe.Add(unsafe.Pointer(x.SerializableUSetDataViewer), 4)) = v
 }
 
 func (x *SerializableUSetDataModifier) SetLen(v int64) {
+	if x.SerializableUSetDataViewer == (*SerializableUSetDataViewer)(unsafe.Pointer(&_Null_ecs[0])) {
+		return
+	}
+	if 12+8 > x.size() {
+		return
+	}
 	*(*int64)(unsafe.Add(unsafe.Pointer(x.SerializableUSetDataViewer), 12)) = v
 }
 
 func (x *SerializableUSetDataModifier) SetInitSize(v int64) {
+	if x.SerializableUSetDataViewer == (*SerializableUSetDataViewer)(unsafe.Pointer(&_Null_ecs[0])) {
+		return
+	}
+	if 20+8 > x.size() {
+		return
+	}
 	*(*int64)(unsafe.Add(unsafe.Pointer(x.SerializableUSetDataViewer), 20)) = v
 }
 
 func (x *SerializableUSetDataModifier) SetData(v []byte) error {
+	if x.SerializableUSetDataViewer == (*SerializableUSetDataViewer)(unsafe.Pointer(&_Null_ecs[0])) {
+		return errors.New("invalid modifier")
+	}
+	if 28+16 > x.size() {
+		return errors.New("field not present in older table version")
+	}
 	cap := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableUSetDataViewer), 28+8))
-	newSize := 1 * uint32(len(v))
-	if newSize > cap {
+	if uint32(len(v)) > cap {
 		return errors.New("invalid size, new size must less than capacity")
 	}
+	newSize := 1 * uint32(len(v)) // 字节数，与头部 size 语义一致
 	*(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableUSetDataViewer), 28+4)) = newSize
 	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableUSetDataViewer), 28+0))
 	if newSize > 0 && (offset == 0 || !x.reader.IsValidOffset(offset, newSize)) {
@@ -1912,11 +2185,17 @@ func newSerializableSparseArrayDataModifierByViewer(viewer *SerializableSparseAr
 }
 
 func (x *SerializableSparseArrayDataModifier) SetIndices(v []int32) error {
+	if x.SerializableSparseArrayDataViewer == (*SerializableSparseArrayDataViewer)(unsafe.Pointer(&_Null_ecs[0])) {
+		return errors.New("invalid modifier")
+	}
+	if 8+16 > x.size() {
+		return errors.New("field not present in older table version")
+	}
 	cap := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableSparseArrayDataViewer), 8+8))
-	newSize := 4 * uint32(len(v))
-	if newSize > cap {
+	if uint32(len(v)) > cap {
 		return errors.New("invalid size, new size must less than capacity")
 	}
+	newSize := 4 * uint32(len(v)) // 字节数，与头部 size 语义一致
 	*(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableSparseArrayDataViewer), 8+4)) = newSize
 	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableSparseArrayDataViewer), 8+0))
 	if newSize > 0 && (offset == 0 || !x.reader.IsValidOffset(offset, newSize)) {
@@ -1931,11 +2210,17 @@ func (x *SerializableSparseArrayDataModifier) SetIndices(v []int32) error {
 }
 
 func (x *SerializableSparseArrayDataModifier) SetIdx2Key(v []int32) error {
+	if x.SerializableSparseArrayDataViewer == (*SerializableSparseArrayDataViewer)(unsafe.Pointer(&_Null_ecs[0])) {
+		return errors.New("invalid modifier")
+	}
+	if 24+16 > x.size() {
+		return errors.New("field not present in older table version")
+	}
 	cap := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableSparseArrayDataViewer), 24+8))
-	newSize := 4 * uint32(len(v))
-	if newSize > cap {
+	if uint32(len(v)) > cap {
 		return errors.New("invalid size, new size must less than capacity")
 	}
+	newSize := 4 * uint32(len(v)) // 字节数，与头部 size 语义一致
 	*(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableSparseArrayDataViewer), 24+4)) = newSize
 	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableSparseArrayDataViewer), 24+0))
 	if newSize > 0 && (offset == 0 || !x.reader.IsValidOffset(offset, newSize)) {
@@ -1950,18 +2235,42 @@ func (x *SerializableSparseArrayDataModifier) SetIdx2Key(v []int32) error {
 }
 
 func (x *SerializableSparseArrayDataModifier) SetMaxKey(v int64) {
+	if x.SerializableSparseArrayDataViewer == (*SerializableSparseArrayDataViewer)(unsafe.Pointer(&_Null_ecs[0])) {
+		return
+	}
+	if 40+8 > x.size() {
+		return
+	}
 	*(*int64)(unsafe.Add(unsafe.Pointer(x.SerializableSparseArrayDataViewer), 40)) = v
 }
 
 func (x *SerializableSparseArrayDataModifier) SetShrinkThreshold(v int32) {
+	if x.SerializableSparseArrayDataViewer == (*SerializableSparseArrayDataViewer)(unsafe.Pointer(&_Null_ecs[0])) {
+		return
+	}
+	if 48+4 > x.size() {
+		return
+	}
 	*(*int32)(unsafe.Add(unsafe.Pointer(x.SerializableSparseArrayDataViewer), 48)) = v
 }
 
 func (x *SerializableSparseArrayDataModifier) SetInitSize(v int32) {
+	if x.SerializableSparseArrayDataViewer == (*SerializableSparseArrayDataViewer)(unsafe.Pointer(&_Null_ecs[0])) {
+		return
+	}
+	if 52+4 > x.size() {
+		return
+	}
 	*(*int32)(unsafe.Add(unsafe.Pointer(x.SerializableSparseArrayDataViewer), 52)) = v
 }
 
 func (x *SerializableSparseArrayDataModifier) SetIsKOrder(v bool) {
+	if x.SerializableSparseArrayDataViewer == (*SerializableSparseArrayDataViewer)(unsafe.Pointer(&_Null_ecs[0])) {
+		return
+	}
+	if 56+1 > x.size() {
+		return
+	}
 	*(*bool)(unsafe.Add(unsafe.Pointer(x.SerializableSparseArrayDataViewer), 56)) = v
 }
 
@@ -1979,11 +2288,17 @@ func newSerializableEntitySetDataModifierByViewer(viewer *SerializableEntitySetD
 }
 
 func (x *SerializableEntitySetDataModifier) SetEntityIds(v []int64) error {
+	if x.SerializableEntitySetDataViewer == (*SerializableEntitySetDataViewer)(unsafe.Pointer(&_Null_ecs[0])) {
+		return errors.New("invalid modifier")
+	}
+	if 4+16 > x.size() {
+		return errors.New("field not present in older table version")
+	}
 	cap := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 4+8))
-	newSize := 8 * uint32(len(v))
-	if newSize > cap {
+	if uint32(len(v)) > cap {
 		return errors.New("invalid size, new size must less than capacity")
 	}
+	newSize := 8 * uint32(len(v)) // 字节数，与头部 size 语义一致
 	*(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 4+4)) = newSize
 	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 4+0))
 	if newSize > 0 && (offset == 0 || !x.reader.IsValidOffset(offset, newSize)) {
@@ -1998,11 +2313,17 @@ func (x *SerializableEntitySetDataModifier) SetEntityIds(v []int64) error {
 }
 
 func (x *SerializableEntitySetDataModifier) SetCompoundOffsets(v []int32) error {
+	if x.SerializableEntitySetDataViewer == (*SerializableEntitySetDataViewer)(unsafe.Pointer(&_Null_ecs[0])) {
+		return errors.New("invalid modifier")
+	}
+	if 20+16 > x.size() {
+		return errors.New("field not present in older table version")
+	}
 	cap := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 20+8))
-	newSize := 4 * uint32(len(v))
-	if newSize > cap {
+	if uint32(len(v)) > cap {
 		return errors.New("invalid size, new size must less than capacity")
 	}
+	newSize := 4 * uint32(len(v)) // 字节数，与头部 size 语义一致
 	*(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 20+4)) = newSize
 	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 20+0))
 	if newSize > 0 && (offset == 0 || !x.reader.IsValidOffset(offset, newSize)) {
@@ -2017,11 +2338,17 @@ func (x *SerializableEntitySetDataModifier) SetCompoundOffsets(v []int32) error 
 }
 
 func (x *SerializableEntitySetDataModifier) SetCompoundLengths(v []int32) error {
+	if x.SerializableEntitySetDataViewer == (*SerializableEntitySetDataViewer)(unsafe.Pointer(&_Null_ecs[0])) {
+		return errors.New("invalid modifier")
+	}
+	if 36+16 > x.size() {
+		return errors.New("field not present in older table version")
+	}
 	cap := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 36+8))
-	newSize := 4 * uint32(len(v))
-	if newSize > cap {
+	if uint32(len(v)) > cap {
 		return errors.New("invalid size, new size must less than capacity")
 	}
+	newSize := 4 * uint32(len(v)) // 字节数，与头部 size 语义一致
 	*(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 36+4)) = newSize
 	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 36+0))
 	if newSize > 0 && (offset == 0 || !x.reader.IsValidOffset(offset, newSize)) {
@@ -2036,11 +2363,17 @@ func (x *SerializableEntitySetDataModifier) SetCompoundLengths(v []int32) error 
 }
 
 func (x *SerializableEntitySetDataModifier) SetCompoundData(v []uint64) error {
+	if x.SerializableEntitySetDataViewer == (*SerializableEntitySetDataViewer)(unsafe.Pointer(&_Null_ecs[0])) {
+		return errors.New("invalid modifier")
+	}
+	if 52+16 > x.size() {
+		return errors.New("field not present in older table version")
+	}
 	cap := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 52+8))
-	newSize := 8 * uint32(len(v))
-	if newSize > cap {
+	if uint32(len(v)) > cap {
 		return errors.New("invalid size, new size must less than capacity")
 	}
+	newSize := 8 * uint32(len(v)) // 字节数，与头部 size 语义一致
 	*(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 52+4)) = newSize
 	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 52+0))
 	if newSize > 0 && (offset == 0 || !x.reader.IsValidOffset(offset, newSize)) {
@@ -2055,11 +2388,17 @@ func (x *SerializableEntitySetDataModifier) SetCompoundData(v []uint64) error {
 }
 
 func (x *SerializableEntitySetDataModifier) SetIndices(v []int32) error {
+	if x.SerializableEntitySetDataViewer == (*SerializableEntitySetDataViewer)(unsafe.Pointer(&_Null_ecs[0])) {
+		return errors.New("invalid modifier")
+	}
+	if 68+16 > x.size() {
+		return errors.New("field not present in older table version")
+	}
 	cap := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 68+8))
-	newSize := 4 * uint32(len(v))
-	if newSize > cap {
+	if uint32(len(v)) > cap {
 		return errors.New("invalid size, new size must less than capacity")
 	}
+	newSize := 4 * uint32(len(v)) // 字节数，与头部 size 语义一致
 	*(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 68+4)) = newSize
 	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 68+0))
 	if newSize > 0 && (offset == 0 || !x.reader.IsValidOffset(offset, newSize)) {
@@ -2074,11 +2413,17 @@ func (x *SerializableEntitySetDataModifier) SetIndices(v []int32) error {
 }
 
 func (x *SerializableEntitySetDataModifier) SetIdx2Key(v []int32) error {
+	if x.SerializableEntitySetDataViewer == (*SerializableEntitySetDataViewer)(unsafe.Pointer(&_Null_ecs[0])) {
+		return errors.New("invalid modifier")
+	}
+	if 84+16 > x.size() {
+		return errors.New("field not present in older table version")
+	}
 	cap := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 84+8))
-	newSize := 4 * uint32(len(v))
-	if newSize > cap {
+	if uint32(len(v)) > cap {
 		return errors.New("invalid size, new size must less than capacity")
 	}
+	newSize := 4 * uint32(len(v)) // 字节数，与头部 size 语义一致
 	*(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 84+4)) = newSize
 	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 84+0))
 	if newSize > 0 && (offset == 0 || !x.reader.IsValidOffset(offset, newSize)) {
@@ -2093,18 +2438,42 @@ func (x *SerializableEntitySetDataModifier) SetIdx2Key(v []int32) error {
 }
 
 func (x *SerializableEntitySetDataModifier) SetMaxKey(v int64) {
+	if x.SerializableEntitySetDataViewer == (*SerializableEntitySetDataViewer)(unsafe.Pointer(&_Null_ecs[0])) {
+		return
+	}
+	if 100+8 > x.size() {
+		return
+	}
 	*(*int64)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 100)) = v
 }
 
 func (x *SerializableEntitySetDataModifier) SetShrinkThreshold(v int32) {
+	if x.SerializableEntitySetDataViewer == (*SerializableEntitySetDataViewer)(unsafe.Pointer(&_Null_ecs[0])) {
+		return
+	}
+	if 108+4 > x.size() {
+		return
+	}
 	*(*int32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 108)) = v
 }
 
 func (x *SerializableEntitySetDataModifier) SetInitSize(v int32) {
+	if x.SerializableEntitySetDataViewer == (*SerializableEntitySetDataViewer)(unsafe.Pointer(&_Null_ecs[0])) {
+		return
+	}
+	if 112+4 > x.size() {
+		return
+	}
 	*(*int32)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 112)) = v
 }
 
 func (x *SerializableEntitySetDataModifier) SetIsKOrder(v bool) {
+	if x.SerializableEntitySetDataViewer == (*SerializableEntitySetDataViewer)(unsafe.Pointer(&_Null_ecs[0])) {
+		return
+	}
+	if 116+1 > x.size() {
+		return
+	}
 	*(*bool)(unsafe.Add(unsafe.Pointer(x.SerializableEntitySetDataViewer), 116)) = v
 }
 
@@ -2122,11 +2491,17 @@ func newSerializableEntityIDGeneratorDataModifierByViewer(viewer *SerializableEn
 }
 
 func (x *SerializableEntityIDGeneratorDataModifier) SetIds(v []int64) error {
+	if x.SerializableEntityIDGeneratorDataViewer == (*SerializableEntityIDGeneratorDataViewer)(unsafe.Pointer(&_Null_ecs[0])) {
+		return errors.New("invalid modifier")
+	}
+	if 4+16 > x.size() {
+		return errors.New("field not present in older table version")
+	}
 	cap := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntityIDGeneratorDataViewer), 4+8))
-	newSize := 8 * uint32(len(v))
-	if newSize > cap {
+	if uint32(len(v)) > cap {
 		return errors.New("invalid size, new size must less than capacity")
 	}
+	newSize := 8 * uint32(len(v)) // 字节数，与头部 size 语义一致
 	*(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntityIDGeneratorDataViewer), 4+4)) = newSize
 	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntityIDGeneratorDataViewer), 4+0))
 	if newSize > 0 && (offset == 0 || !x.reader.IsValidOffset(offset, newSize)) {
@@ -2141,23 +2516,47 @@ func (x *SerializableEntityIDGeneratorDataModifier) SetIds(v []int64) error {
 }
 
 func (x *SerializableEntityIDGeneratorDataModifier) SetFree(v int32) {
+	if x.SerializableEntityIDGeneratorDataViewer == (*SerializableEntityIDGeneratorDataViewer)(unsafe.Pointer(&_Null_ecs[0])) {
+		return
+	}
+	if 20+4 > x.size() {
+		return
+	}
 	*(*int32)(unsafe.Add(unsafe.Pointer(x.SerializableEntityIDGeneratorDataViewer), 20)) = v
 }
 
 func (x *SerializableEntityIDGeneratorDataModifier) SetPending(v int32) {
+	if x.SerializableEntityIDGeneratorDataViewer == (*SerializableEntityIDGeneratorDataViewer)(unsafe.Pointer(&_Null_ecs[0])) {
+		return
+	}
+	if 24+4 > x.size() {
+		return
+	}
 	*(*int32)(unsafe.Add(unsafe.Pointer(x.SerializableEntityIDGeneratorDataViewer), 24)) = v
 }
 
 func (x *SerializableEntityIDGeneratorDataModifier) SetLen(v int32) {
+	if x.SerializableEntityIDGeneratorDataViewer == (*SerializableEntityIDGeneratorDataViewer)(unsafe.Pointer(&_Null_ecs[0])) {
+		return
+	}
+	if 28+4 > x.size() {
+		return
+	}
 	*(*int32)(unsafe.Add(unsafe.Pointer(x.SerializableEntityIDGeneratorDataViewer), 28)) = v
 }
 
 func (x *SerializableEntityIDGeneratorDataModifier) SetRemoveDelay(v []int64) error {
+	if x.SerializableEntityIDGeneratorDataViewer == (*SerializableEntityIDGeneratorDataViewer)(unsafe.Pointer(&_Null_ecs[0])) {
+		return errors.New("invalid modifier")
+	}
+	if 32+16 > x.size() {
+		return errors.New("field not present in older table version")
+	}
 	cap := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntityIDGeneratorDataViewer), 32+8))
-	newSize := 8 * uint32(len(v))
-	if newSize > cap {
+	if uint32(len(v)) > cap {
 		return errors.New("invalid size, new size must less than capacity")
 	}
+	newSize := 8 * uint32(len(v)) // 字节数，与头部 size 语义一致
 	*(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntityIDGeneratorDataViewer), 32+4)) = newSize
 	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableEntityIDGeneratorDataViewer), 32+0))
 	if newSize > 0 && (offset == 0 || !x.reader.IsValidOffset(offset, newSize)) {
@@ -2172,10 +2571,22 @@ func (x *SerializableEntityIDGeneratorDataModifier) SetRemoveDelay(v []int64) er
 }
 
 func (x *SerializableEntityIDGeneratorDataModifier) SetDelayFree(v int32) {
+	if x.SerializableEntityIDGeneratorDataViewer == (*SerializableEntityIDGeneratorDataViewer)(unsafe.Pointer(&_Null_ecs[0])) {
+		return
+	}
+	if 48+4 > x.size() {
+		return
+	}
 	*(*int32)(unsafe.Add(unsafe.Pointer(x.SerializableEntityIDGeneratorDataViewer), 48)) = v
 }
 
 func (x *SerializableEntityIDGeneratorDataModifier) SetDelayCap(v int32) {
+	if x.SerializableEntityIDGeneratorDataViewer == (*SerializableEntityIDGeneratorDataViewer)(unsafe.Pointer(&_Null_ecs[0])) {
+		return
+	}
+	if 52+4 > x.size() {
+		return
+	}
 	*(*int32)(unsafe.Add(unsafe.Pointer(x.SerializableEntityIDGeneratorDataViewer), 52)) = v
 }
 
@@ -2193,6 +2604,9 @@ func newSerializableComponentSetEntryModifierByViewer(viewer *SerializableCompon
 }
 
 func (x *SerializableComponentSetEntryModifier) SetComponentType(v uint64) {
+	if x.SerializableComponentSetEntryViewer == (*SerializableComponentSetEntryViewer)(unsafe.Pointer(&_Null_ecs[0])) {
+		return
+	}
 	*(*uint64)(unsafe.Add(unsafe.Pointer(x.SerializableComponentSetEntryViewer), 0)) = v
 }
 
@@ -2210,15 +2624,27 @@ func newSerializableWorldDataModifierByViewer(viewer *SerializableWorldDataViewe
 }
 
 func (x *SerializableWorldDataModifier) SetFrame(v uint64) {
+	if x.SerializableWorldDataViewer == (*SerializableWorldDataViewer)(unsafe.Pointer(&_Null_ecs[0])) {
+		return
+	}
+	if 24+8 > x.size() {
+		return
+	}
 	*(*uint64)(unsafe.Add(unsafe.Pointer(x.SerializableWorldDataViewer), 24)) = v
 }
 
 func (x *SerializableWorldDataModifier) SetDisposableTypes(v []uint64) error {
+	if x.SerializableWorldDataViewer == (*SerializableWorldDataViewer)(unsafe.Pointer(&_Null_ecs[0])) {
+		return errors.New("invalid modifier")
+	}
+	if 32+16 > x.size() {
+		return errors.New("field not present in older table version")
+	}
 	cap := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableWorldDataViewer), 32+8))
-	newSize := 8 * uint32(len(v))
-	if newSize > cap {
+	if uint32(len(v)) > cap {
 		return errors.New("invalid size, new size must less than capacity")
 	}
+	newSize := 8 * uint32(len(v)) // 字节数，与头部 size 语义一致
 	*(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableWorldDataViewer), 32+4)) = newSize
 	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableWorldDataViewer), 32+0))
 	if newSize > 0 && (offset == 0 || !x.reader.IsValidOffset(offset, newSize)) {
@@ -2233,11 +2659,17 @@ func (x *SerializableWorldDataModifier) SetDisposableTypes(v []uint64) error {
 }
 
 func (x *SerializableWorldDataModifier) SetNomadicTypes(v []uint64) error {
+	if x.SerializableWorldDataViewer == (*SerializableWorldDataViewer)(unsafe.Pointer(&_Null_ecs[0])) {
+		return errors.New("invalid modifier")
+	}
+	if 48+16 > x.size() {
+		return errors.New("field not present in older table version")
+	}
 	cap := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableWorldDataViewer), 48+8))
-	newSize := 8 * uint32(len(v))
-	if newSize > cap {
+	if uint32(len(v)) > cap {
 		return errors.New("invalid size, new size must less than capacity")
 	}
+	newSize := 8 * uint32(len(v)) // 字节数，与头部 size 语义一致
 	*(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableWorldDataViewer), 48+4)) = newSize
 	offset := *(*uint32)(unsafe.Add(unsafe.Pointer(x.SerializableWorldDataViewer), 48+0))
 	if newSize > 0 && (offset == 0 || !x.reader.IsValidOffset(offset, newSize)) {
@@ -2252,5 +2684,11 @@ func (x *SerializableWorldDataModifier) SetNomadicTypes(v []uint64) error {
 }
 
 func (x *SerializableWorldDataModifier) SetVersion(v uint64) {
+	if x.SerializableWorldDataViewer == (*SerializableWorldDataViewer)(unsafe.Pointer(&_Null_ecs[0])) {
+		return
+	}
+	if 64+8 > x.size() {
+		return
+	}
 	*(*uint64)(unsafe.Add(unsafe.Pointer(x.SerializableWorldDataViewer), 64)) = v
 }

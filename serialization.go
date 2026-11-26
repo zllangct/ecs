@@ -3,7 +3,9 @@ package ecs
 import (
 	"encoding/binary"
 	"fmt"
+	"math"
 	"runtime"
+	"sort"
 	"unsafe"
 
 	rockmem "github.com/zllangct/rockmem/golang"
@@ -11,6 +13,45 @@ import (
 
 // SnapshotVersion 快照格式版本（R19）：不兼容演进递增，恢复时校验拒绝
 const SnapshotVersion uint64 = 1
+
+type validatableRoot interface {
+	ValidateAsRoot(*rockmem.Reader) bool
+}
+
+// validateSparseMetadata 校验快照稀疏表元数据（Len、Indices、Idx2Key 互逆一致性与 IsKOrder 真实性），
+// 并返回用于恢复 lastKey 的最大/末位键，防止读档后再插入触发越界或 merge-join 漏行。
+func validateSparseMetadata(n int, indices, idx2Key []int32, isKOrder bool) (int32, error) {
+	if len(idx2Key) != n {
+		return 0, fmt.Errorf("ecs: sparse idx2Key length mismatch: want %d, got %d", n, len(idx2Key))
+	}
+	for i, k := range idx2Key {
+		if k < 0 || int(k) >= len(indices) {
+			return 0, fmt.Errorf("ecs: sparse idx2Key[%d]=%d out of indices range [0,%d)", i, k, len(indices))
+		}
+		if indices[k] != int32(i+1) {
+			return 0, fmt.Errorf("ecs: sparse reciprocal index mismatch at key %d: got %d, want %d", k, indices[k], i+1)
+		}
+		if isKOrder && i > 0 && k <= idx2Key[i-1] {
+			return 0, fmt.Errorf("ecs: sparse IsKOrder=true but idx2Key not strictly ascending at %d (%d <= %d)", i, k, idx2Key[i-1])
+		}
+	}
+	nonZero := 0
+	for _, v := range indices {
+		if v < 0 || int(v) > n {
+			return 0, fmt.Errorf("ecs: sparse indices value %d out of range [0,%d]", v, n)
+		}
+		if v != 0 {
+			nonZero++
+		}
+	}
+	if nonZero != n {
+		return 0, fmt.Errorf("ecs: sparse indices active count %d != len %d", nonZero, n)
+	}
+	if n == 0 || !isKOrder {
+		return 0, nil
+	}
+	return idx2Key[n-1], nil
+}
 
 // USet serialization methods
 
@@ -41,30 +82,41 @@ func (u *USet[T]) MarshalTo(writer rockmem.Writer) (uint, error) {
 }
 
 // Unmarshal deserializes SerializableUSetData to USet[T].
-// R19：校验快照与当前类型的布局一致性（EleSize 必须等于 sizeof(T)）与数据长度，
-// 非法输入返回 error 且不修改目标（原子失败）
+// R19：无论 Len 是否为 0，均校验快照与当前类型的布局一致性（EleSize == sizeof(T)）、非负长度与 InitSize，
+// 非法输入返回 error 且不修改目标（原子失败）。
 func (u *USet[T]) Unmarshal(data *SerializableUSetData) error {
 	wantSize := uint64(TypeOf[T]().Size())
+	if data.Len < 0 {
+		return fmt.Errorf("ecs: USet negative length %d", data.Len)
+	}
+	if data.InitSize < 0 {
+		return fmt.Errorf("ecs: USet negative initSize %d", data.InitSize)
+	}
+	if data.EleSize != wantSize {
+		return fmt.Errorf("ecs: USet element size mismatch: snapshot=%d current=%d", data.EleSize, wantSize)
+	}
 	if data.Len > 0 {
-		if data.EleSize != wantSize {
-			return fmt.Errorf("ecs: USet element size mismatch: snapshot=%d current=%d", data.EleSize, wantSize)
-		}
 		eleCount := int(data.Len)
-		if eleCount < 0 || int64(eleCount) != data.Len {
+		if int64(eleCount) != data.Len {
 			return fmt.Errorf("ecs: USet invalid length %d", data.Len)
 		}
-		byteSize := eleCount * int(data.EleSize)
-		if byteSize < 0 || byteSize > len(data.Data) {
+		if wantSize > 0 && uint64(eleCount) > uint64(math.MaxInt)/wantSize {
+			return fmt.Errorf("ecs: USet byte size overflow for len %d", data.Len)
+		}
+		byteSize := eleCount * int(wantSize)
+		if byteSize > len(data.Data) {
 			return fmt.Errorf("ecs: USet data too short: need %d bytes, got %d", byteSize, len(data.Data))
 		}
 
 		u.data = u.a.alloc(eleCount, eleCount)
-		dstPtr := unsafe.Pointer(&u.data[0])
-		copy(unsafe.Slice((*byte)(dstPtr), byteSize), data.Data[:byteSize])
+		if byteSize > 0 {
+			dstPtr := unsafe.Pointer(&u.data[0])
+			copy(unsafe.Slice((*byte)(dstPtr), byteSize), data.Data[:byteSize])
+		}
 	} else {
 		u.data = u.a.alloc(0, int(data.InitSize))
 	}
-	u.eleSize = data.EleSize
+	u.eleSize = wantSize
 	u.len = data.Len
 	u.initSize = data.InitSize
 	return nil
@@ -73,6 +125,9 @@ func (u *USet[T]) Unmarshal(data *SerializableUSetData) error {
 // UnmarshalFrom reads USet[T] from a rockmem.Reader
 func (u *USet[T]) UnmarshalFrom(reader *rockmem.Reader) error {
 	data := &SerializableUSetData{}
+	if !data.ValidateAsRoot(reader) {
+		return fmt.Errorf("ecs: invalid SerializableUSetData root buffer")
+	}
 	data.ReadAsRoot(reader)
 	return u.Unmarshal(data)
 }
@@ -113,6 +168,13 @@ func (s *SparseArray[K, V]) MarshalTo(writer rockmem.Writer) (uint, error) {
 // Unmarshal deserializes SerializableSparseArrayData to SparseArray[K, V]
 // IMPORTANT: The caller must ensure types K and V match the original serialized types
 func (s *SparseArray[K, V]) Unmarshal(data *SerializableSparseArrayData) error {
+	if data.MaxKey < 0 {
+		return fmt.Errorf("ecs: SparseArray negative maxKey %d", data.MaxKey)
+	}
+	lastKey, err := validateSparseMetadata(int(data.USetData.Len), data.Indices, data.Idx2Key, data.IsKOrder)
+	if err != nil {
+		return err
+	}
 	// Unmarshal the embedded USet
 	if err := s.USet.Unmarshal(&data.USetData); err != nil {
 		return err
@@ -122,6 +184,7 @@ func (s *SparseArray[K, V]) Unmarshal(data *SerializableSparseArrayData) error {
 	s.shrinkThreshold = data.ShrinkThreshold
 	s.initSize = int(data.InitSize)
 	s.isKOrder = data.IsKOrder
+	s.lastKey = K(lastKey)
 
 	// Copy indices slice
 	if len(data.Indices) > 0 {
@@ -144,6 +207,9 @@ func (s *SparseArray[K, V]) Unmarshal(data *SerializableSparseArrayData) error {
 // UnmarshalFrom reads SparseArray[K, V] from a rockmem.Reader
 func (s *SparseArray[K, V]) UnmarshalFrom(reader *rockmem.Reader) error {
 	data := &SerializableSparseArrayData{}
+	if !data.ValidateAsRoot(reader) {
+		return fmt.Errorf("ecs: invalid SerializableSparseArrayData root buffer")
+	}
 	data.ReadAsRoot(reader)
 	return s.Unmarshal(data)
 }
@@ -212,17 +278,36 @@ func (c *CSet[T, TP]) Unmarshal(data *SerializableSparseArrayData) error {
 }
 
 // unmarshalIDL 按 IDL 布局（偏移表 + 逐元素 blob）恢复组件。
-// R19：校验偏移表单调且在数据界内，损坏快照返回 error（原子失败）
+// R19：校验偏移表非负/单调/在数据界内、稀疏元数据一致，以及元素 blob 的 ValidateAsRoot，损坏快照原子失败。
 func (c *CSet[T, TP]) unmarshalIDL(data *SerializableSparseArrayData) error {
-	raw := data.USetData.Data
+	if data.USetData.Len <= 0 || data.USetData.InitSize < 0 || data.MaxKey < 0 {
+		return fmt.Errorf("ecs: invalid IDL USetData header (len=%d init=%d maxKey=%d)",
+			data.USetData.Len, data.USetData.InitSize, data.MaxKey)
+	}
 	n := int(data.USetData.Len)
-	hdrLen := int64((n + 1) * 8)
+	if int64(n) != data.USetData.Len || n > (math.MaxInt/8)-1 {
+		return fmt.Errorf("ecs: IDL length overflow %d", data.USetData.Len)
+	}
+	lastKey, err := validateSparseMetadata(n, data.Indices, data.Idx2Key, data.IsKOrder)
+	if err != nil {
+		return err
+	}
+
+	raw := data.USetData.Data
+	hdrLen := int64(n+1) * 8
 	if int64(len(raw)) < hdrLen {
 		return fmt.Errorf("ecs: IDL snapshot header truncated: need %d, got %d", hdrLen, len(raw))
 	}
 	offsets := make([]int64, n+1)
 	for i := 0; i <= n; i++ {
-		offsets[i] = int64(binary.LittleEndian.Uint64(raw[i*8:]))
+		off := binary.LittleEndian.Uint64(raw[i*8:])
+		if off > uint64(math.MaxInt64) {
+			return fmt.Errorf("ecs: IDL offset overflow at %d", i)
+		}
+		offsets[i] = int64(off)
+		if offsets[i] < 0 {
+			return fmt.Errorf("ecs: IDL negative offset at %d: %d", i, offsets[i])
+		}
 		if i > 0 && offsets[i] < offsets[i-1] {
 			return fmt.Errorf("ecs: IDL offset table not monotonic at %d", i)
 		}
@@ -232,21 +317,34 @@ func (c *CSet[T, TP]) unmarshalIDL(data *SerializableSparseArrayData) error {
 		return fmt.Errorf("ecs: IDL blob truncated: need %d, got %d", offsets[n], blobLen)
 	}
 
+	// 先对临时缓冲区解码与 ValidateAsRoot，避免破坏目标 c（原子失败）
+	tmpData := c.USet.a.alloc(n, n)
+	for i := 0; i < n; i++ {
+		blob := raw[hdrLen+offsets[i] : hdrLen+offsets[i+1]]
+		m, ok := any(TP(&tmpData[i])).(rockmemMessage)
+		if !ok {
+			return fmt.Errorf("ecs: component type %T does not implement rockmemMessage for IDL restore", TP(nil))
+		}
+		r := rockmem.NewReader(blob)
+		if vr, ok := any(m).(validatableRoot); ok {
+			if !vr.ValidateAsRoot(r) {
+				return fmt.Errorf("ecs: IDL component %d failed ValidateAsRoot", i)
+			}
+		}
+		m.ReadAsRoot(r)
+	}
+
 	c.USet.eleSize = uint64(TypeOf[T]().Size())
 	c.USet.len = int64(n)
 	c.USet.initSize = data.USetData.InitSize
-	c.USet.data = c.USet.a.alloc(n, n)
-	for i := 0; i < n; i++ {
-		blob := raw[hdrLen+offsets[i] : hdrLen+offsets[i+1]]
-		m := any(TP(&c.USet.data[i])).(rockmemMessage)
-		m.ReadAsRoot(rockmem.NewReader(blob))
-	}
+	c.USet.data = tmpData
 
 	// SparseArray 元数据（与 SparseArray.Unmarshal 相同部分）
 	c.maxKey = EntityIndex(data.MaxKey)
 	c.shrinkThreshold = data.ShrinkThreshold
 	c.initSize = int(data.InitSize)
 	c.isKOrder = data.IsKOrder
+	c.lastKey = EntityIndex(lastKey)
 	if len(data.Indices) > 0 {
 		c.indices = make([]int32, len(data.Indices))
 		copy(c.indices, data.Indices)
@@ -265,6 +363,9 @@ func (c *CSet[T, TP]) unmarshalIDL(data *SerializableSparseArrayData) error {
 // UnmarshalFrom reads CSet[T] from a rockmem.Reader
 func (c *CSet[T, TP]) UnmarshalFrom(reader *rockmem.Reader) error {
 	data := &SerializableSparseArrayData{}
+	if !data.ValidateAsRoot(reader) {
+		return fmt.Errorf("ecs: invalid SerializableSparseArrayData root buffer")
+	}
 	data.ReadAsRoot(reader)
 	return c.Unmarshal(data)
 }
@@ -364,7 +465,14 @@ func (es *EntitySet) MarshalTo(writer rockmem.Writer) (uint, error) {
 // Note: world pointer in each EntityInfo must be set separately after deserialization
 // R19：校验 parallel arrays 一致性（offsets/lengths 与 CompoundData 界内），非法返回 error
 func (es *EntitySet) Unmarshal(data *SerializableEntitySetData) error {
+	if data.InitSize < 0 || data.MaxKey < 0 {
+		return fmt.Errorf("ecs: entity set negative initSize=%d or maxKey=%d", data.InitSize, data.MaxKey)
+	}
 	count := len(data.EntityIds)
+	lastKey, err := validateSparseMetadata(count, data.Indices, data.Idx2Key, data.IsKOrder)
+	if err != nil {
+		return err
+	}
 	if count > 0 {
 		if len(data.CompoundOffsets) != count || len(data.CompoundLengths) != count {
 			return fmt.Errorf("ecs: entity parallel arrays length mismatch: ids=%d offsets=%d lengths=%d",
@@ -372,6 +480,9 @@ func (es *EntitySet) Unmarshal(data *SerializableEntitySetData) error {
 		}
 		prevEnd := int32(0)
 		for i := 0; i < count; i++ {
+			if Entity(data.EntityIds[i]).Index() != EntityIndex(data.Idx2Key[i]) {
+				return fmt.Errorf("ecs: entity[%d] index %d != idx2Key %d", i, Entity(data.EntityIds[i]).Index(), data.Idx2Key[i])
+			}
 			off, ln := data.CompoundOffsets[i], data.CompoundLengths[i]
 			if off < 0 || ln < 0 || off != prevEnd || int64(off)+int64(ln) > int64(len(data.CompoundData)) {
 				return fmt.Errorf("ecs: entity compound span invalid at %d (off=%d len=%d data=%d)", i, off, ln, len(data.CompoundData))
@@ -384,6 +495,7 @@ func (es *EntitySet) Unmarshal(data *SerializableEntitySetData) error {
 	es.shrinkThreshold = data.ShrinkThreshold
 	es.initSize = int(data.InitSize)
 	es.isKOrder = data.IsKOrder
+	es.lastKey = EntityIndex(lastKey)
 
 	// Deserialize all EntityInfos from parallel arrays
 	if count > 0 {
@@ -434,6 +546,9 @@ func (es *EntitySet) Unmarshal(data *SerializableEntitySetData) error {
 // UnmarshalFrom reads EntitySet from a rockmem.Reader
 func (es *EntitySet) UnmarshalFrom(reader *rockmem.Reader) error {
 	data := &SerializableEntitySetData{}
+	if !data.ValidateAsRoot(reader) {
+		return fmt.Errorf("ecs: invalid SerializableEntitySetData root buffer")
+	}
 	data.ReadAsRoot(reader)
 	return es.Unmarshal(data)
 }
@@ -499,16 +614,35 @@ func (e *EntityIDGenerator) MarshalTo(writer rockmem.Writer) (uint, error) {
 }
 
 // Unmarshal deserializes SerializableEntityIDGeneratorData to EntityIDGenerator.
-// R19：校验 freelist 不变量（pending 不越界），非法返回 error
+// R19：校验 freelist 不变量（pending/free/len/delayFree 不越界），非法返回 error
 func (e *EntityIDGenerator) Unmarshal(data *SerializableEntityIDGeneratorData) error {
 	if data.Pending < 0 || int64(len(data.Ids)) < int64(data.Pending) {
 		return fmt.Errorf("ecs: id generator pending %d exceeds ids %d", data.Pending, len(data.Ids))
 	}
+	if data.Len < 0 || data.DelayFree < 0 || data.DelayCap < 0 {
+		return fmt.Errorf("ecs: id generator negative field (len=%d delayFree=%d delayCap=%d)",
+			data.Len, data.DelayFree, data.DelayCap)
+	}
+	delayCap := data.DelayCap
+	if delayCap <= 0 {
+		delayCap = 10 // 与 NewEntityIDGenerator 默认值对齐
+	}
+	if data.DelayFree > delayCap {
+		return fmt.Errorf("ecs: id generator delayFree %d exceeds delayCap %d", data.DelayFree, delayCap)
+	}
+	if len(data.Ids) > 0 {
+		if data.Free < 0 || (data.Free != data.Pending && int(data.Free) >= len(data.Ids)) {
+			return fmt.Errorf("ecs: id generator free %d out of range [0,%d)", data.Free, len(data.Ids))
+		}
+	} else if data.Len != 0 || data.DelayFree != 0 {
+		return fmt.Errorf("ecs: id generator empty ids with non-zero len=%d or delayFree=%d", data.Len, data.DelayFree)
+	}
+
 	e.free = EntityIndex(data.Free)
 	e.pending = EntityIndex(data.Pending)
 	e.len = data.Len
 	e.delayFree = data.DelayFree
-	e.delayCap = data.DelayCap
+	e.delayCap = delayCap
 
 	// Convert int64 slice to ReuseID slice
 	if len(data.Ids) > 0 {
@@ -525,12 +659,11 @@ func (e *EntityIDGenerator) Unmarshal(data *SerializableEntityIDGeneratorData) e
 		e.pending = 1
 	}
 
-	if e.delayCap <= 0 {
-		e.delayCap = 10 // 与 NewEntityIDGenerator 默认值对齐
-	}
-
 	// Convert int64 slice to removeDelay slice
 	if len(data.RemoveDelay) > 0 {
+		if int(e.delayFree) > len(data.RemoveDelay) {
+			return fmt.Errorf("ecs: id generator delayFree %d exceeds removeDelay len %d", e.delayFree, len(data.RemoveDelay))
+		}
 		e.removeDelay = make([]ReuseID, len(data.RemoveDelay))
 		for i, id := range data.RemoveDelay {
 			e.removeDelay[i] = Entity(id).toReuseID()
@@ -539,6 +672,9 @@ func (e *EntityIDGenerator) Unmarshal(data *SerializableEntityIDGeneratorData) e
 			e.removeDelay = append(e.removeDelay, make([]ReuseID, int(e.delayCap)-len(e.removeDelay))...)
 		}
 	} else {
+		if e.delayFree > 0 {
+			return fmt.Errorf("ecs: id generator delayFree %d with empty removeDelay", e.delayFree)
+		}
 		e.removeDelay = make([]ReuseID, e.delayCap)
 	}
 	return nil
@@ -547,6 +683,9 @@ func (e *EntityIDGenerator) Unmarshal(data *SerializableEntityIDGeneratorData) e
 // UnmarshalFrom reads EntityIDGenerator from a rockmem.Reader
 func (e *EntityIDGenerator) UnmarshalFrom(reader *rockmem.Reader) error {
 	data := &SerializableEntityIDGeneratorData{}
+	if !data.ValidateAsRoot(reader) {
+		return fmt.Errorf("ecs: invalid SerializableEntityIDGeneratorData root buffer")
+	}
 	data.ReadAsRoot(reader)
 	return e.Unmarshal(data)
 }
@@ -564,6 +703,11 @@ func NewEntityIDGeneratorFromData(data *SerializableEntityIDGeneratorData) (*Ent
 
 // Marshal serializes serializableWorld to SerializableWorldData
 func (w *serializableWorld) Marshal() (*SerializableWorldData, error) {
+	return w.marshalWithArchetypes(nil)
+}
+
+// marshalWithArchetypes 只读联合导出世界状态（含可选组表列与 CSet 残段），按 ComponentIntType 升序确定性输出。
+func (w *serializableWorld) marshalWithArchetypes(archetypes *ArchetypeRegistry) (*SerializableWorldData, error) {
 	data := &SerializableWorldData{
 		Version: SnapshotVersion,
 		Frame:   w.frame,
@@ -579,18 +723,59 @@ func (w *serializableWorld) Marshal() (*SerializableWorldData, error) {
 		data.IdGenerator = *w.idGenerator.Marshal()
 	}
 
-	// Serialize component sets
-	if len(w.components) > 0 {
-		data.ComponentSets = make([]SerializableComponentSetEntry, 0, len(w.components))
-		for compType, compSet := range w.components {
-			// Cast to CSet to access Marshal method
-			cset, ok := compSet.(interface {
-				Marshal() (*SerializableSparseArrayData, error)
-			})
-			if !ok {
-				return nil, fmt.Errorf("ecs: component set type %d does not support serialization", compType)
+	// 汇总待导出组件类型并按升序确定性导出
+	typeSet := make(map[ComponentIntType]struct{}, len(w.components))
+	for compType := range w.components {
+		typeSet[compType] = struct{}{}
+	}
+	if archetypes != nil {
+		for compType := range archetypes.ownerOf {
+			typeSet[compType] = struct{}{}
+		}
+	}
+	if len(typeSet) > 0 {
+		compTypes := make([]ComponentIntType, 0, len(typeSet))
+		for compType := range typeSet {
+			compTypes = append(compTypes, compType)
+		}
+		sort.Slice(compTypes, func(i, j int) bool { return compTypes[i] < compTypes[j] })
+
+		data.ComponentSets = make([]SerializableComponentSetEntry, 0, len(compTypes))
+		registry := GetComponentRegistry()
+		for _, compType := range compTypes {
+			compSet := w.components[compType]
+			var a *Archetype
+			var col int
+			if archetypes != nil {
+				if owner, ok := archetypes.owner(compType); ok && owner.Len() > 0 {
+					a = owner
+					col, _ = a.colOf(compType)
+				}
 			}
-			csetData, err := cset.Marshal()
+			if compSet == nil && a != nil {
+				var ok bool
+				compSet, ok = registry.CreateComponentSet(compType)
+				if !ok {
+					return nil, fmt.Errorf("ecs: component type %d not registered for group marshal", compType)
+				}
+			}
+			if compSet == nil {
+				continue
+			}
+
+			var csetData *SerializableSparseArrayData
+			var err error
+			if a != nil {
+				csetData, err = compSet.marshalWithGroup(a, col)
+			} else {
+				cset, ok := compSet.(interface {
+					Marshal() (*SerializableSparseArrayData, error)
+				})
+				if !ok {
+					return nil, fmt.Errorf("ecs: component set type %d does not support serialization", compType)
+				}
+				csetData, err = cset.Marshal()
+			}
 			if err != nil {
 				return nil, fmt.Errorf("ecs: marshal component %d: %w", compType, err)
 			}
@@ -629,35 +814,54 @@ func (w *serializableWorld) MarshalTo(writer rockmem.Writer) (uint, error) {
 	return data.WriteAsRoot(writer)
 }
 
+func (w *World) checkNoPendingForMarshal() error {
+	if w.opLog != nil && w.opLog.HasPending() {
+		return fmt.Errorf("ecs: cannot marshal world with pending component operations (call Update/Step first)")
+	}
+	w.destroyMu.Lock()
+	hasDestroy := len(w.pendingDestroy) > 0
+	w.destroyMu.Unlock()
+	if hasDestroy {
+		return fmt.Errorf("ecs: cannot marshal world with pending entity destructions (call Update/Step first)")
+	}
+	return nil
+}
+
 // MarshalTo writes world to a rockmem.Writer (convenience method)
-// 组表数据先散回 CSet 导出（格式兼容），完成后重新收拢恢复布局。
+// 只读联合导出组表列与 CSet 残段，不修改实时世界布局。
 func (w *World) MarshalTo(writer rockmem.Writer) (uint, error) {
-	w.scatterAll()
-	defer w.absorbAll()
-	return w.serializableWorld.MarshalTo(writer)
+	data, err := w.Marshal()
+	if err != nil {
+		return 0, err
+	}
+	return data.WriteAsRoot(writer)
 }
 
 // Marshal serializes world to SerializableWorldData (convenience method)
-// 组表数据先散回 CSet 导出（格式兼容），完成后重新收拢恢复布局。
+// 只读联合导出组表列与 CSet 残段，不修改实时世界布局。
 func (w *World) Marshal() (*SerializableWorldData, error) {
-	w.scatterAll()
-	defer w.absorbAll()
-	return w.serializableWorld.Marshal()
+	if err := w.checkNoPendingForMarshal(); err != nil {
+		return nil, err
+	}
+	return w.serializableWorld.marshalWithArchetypes(w.archetypes)
 }
 
 // Unmarshal deserializes SerializableWorldData to serializableWorld.
-// R19：版本校验、组件逐个 error 传播（未注册类型报错而非静默跳过）、
+// R19：版本校验、重复组件池拒绝、组件逐个 error 传播（未注册类型报错而非静默跳过）、
 // 任何失败原子返回（调用方负责在失败时不替换目标世界状态）
 func (w *serializableWorld) Unmarshal(data *SerializableWorldData) error {
 	if data.Version != SnapshotVersion {
 		return fmt.Errorf("ecs: snapshot version mismatch: data=%d current=%d", data.Version, SnapshotVersion)
 	}
 
-	// 组件集先行恢复（最易失败），成功后才提交到 world
+	// 组件集先行恢复（最易失败），拒绝重复 ComponentType，成功后才提交到 world
 	components := make(map[ComponentIntType]ComponentSet, len(data.ComponentSets))
 	registry := GetComponentRegistry()
 	for _, entry := range data.ComponentSets {
 		compType := ComponentIntType(entry.ComponentType)
+		if _, dup := components[compType]; dup {
+			return fmt.Errorf("ecs: duplicate component set %d in snapshot", compType)
+		}
 		compSet, err := registry.UnmarshalComponentSet(compType, &entry.Data)
 		if err != nil {
 			return fmt.Errorf("ecs: unmarshal component %d: %w", compType, err)
@@ -704,23 +908,31 @@ func (w *serializableWorld) Unmarshal(data *SerializableWorldData) error {
 // UnmarshalFrom reads serializableWorld from a rockmem.Reader
 func (w *serializableWorld) UnmarshalFrom(reader *rockmem.Reader) error {
 	data := &SerializableWorldData{}
+	if !data.ValidateAsRoot(reader) {
+		return fmt.Errorf("ecs: invalid SerializableWorldData root buffer")
+	}
 	data.ReadAsRoot(reader)
 	return w.Unmarshal(data)
 }
 
 // Unmarshal deserializes SerializableWorldData to world (convenience method)。
-// R19 运行时卫生：仅允许在停止/初始化完成（非 Running）的世界上原地恢复；
-// 恢复整体替换组件表、丢弃遗留销毁队列与操作日志、递增组件版本使查询缓存失效。
+// R19 运行时卫生：仅允许在初始化期（非 Running/Stop）的世界上原地恢复；
+// 恢复整体替换组件表、清空旧组表行、丢弃遗留销毁队列与操作日志、递增组件版本使查询缓存失效。
 // 失败原子返回，目标世界保持原状。
 func (w *World) Unmarshal(data *SerializableWorldData) error {
-	if w.status == WorldStatusRunning {
-		return fmt.Errorf("ecs: cannot unmarshal into a running world (quiesce first)")
+	if w.status == WorldStatusRunning || w.status == WorldStatusStop {
+		return fmt.Errorf("ecs: cannot unmarshal into world in status %v", w.status)
 	}
 	if err := w.serializableWorld.Unmarshal(data); err != nil {
 		return err
 	}
+	if w.archetypes != nil {
+		w.archetypes.clearRows()
+	}
 	// 丢弃快照前的运行时残留：遗留销毁/操作不得打进新世界
+	w.destroyMu.Lock()
 	w.pendingDestroy = nil
+	w.destroyMu.Unlock()
 	if w.opLog != nil {
 		w.opLog = NewOpLog(w, runtime.NumCPU())
 	}
@@ -733,6 +945,9 @@ func (w *World) Unmarshal(data *SerializableWorldData) error {
 // UnmarshalFrom reads world from a rockmem.Reader (convenience method)
 func (w *World) UnmarshalFrom(reader *rockmem.Reader) error {
 	data := &SerializableWorldData{}
+	if !data.ValidateAsRoot(reader) {
+		return fmt.Errorf("ecs: invalid SerializableWorldData root buffer")
+	}
 	data.ReadAsRoot(reader)
 	return w.Unmarshal(data)
 }

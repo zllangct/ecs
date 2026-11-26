@@ -47,6 +47,9 @@ func NewSparseArray[K Integer, V any](initSize ...int) *SparseArray[K, V] {
 }
 
 func (s *SparseArray[K, V]) Add(key K, value *V) *V {
+	if key < 0 {
+		return nil
+	}
 	length := len(s.indices)
 	// already existed
 	if key < K(length) && s.indices[key] != 0 {
@@ -103,6 +106,9 @@ func (s *SparseArray[K, V]) Remove(key K) *V {
 	lastKey := s.idx2Key[lastIdx]
 	removed := s.data[idx]
 	s.data[idx] = s.data[lastIdx]
+	// 清零空出的尾槽，避免滞留指针/GC 引用
+	var zero V
+	s.data[lastIdx] = zero
 	s.len--
 
 	s.idx2Key[idx] = lastKey
@@ -151,6 +157,16 @@ func (s *SparseArray[K, V]) Reset() {
 	s.idx2Key = []int32{}
 	s.isKOrder = true
 	s.lastKey = 0
+}
+
+// Free 释放底层数组与稀疏索引内存
+func (s *SparseArray[K, V]) Free() {
+	s.USet.Free()
+	s.indices = nil
+	s.idx2Key = nil
+	s.maxKey = 0
+	s.lastKey = 0
+	s.isKOrder = true
 }
 
 func (s *SparseArray[K, V]) Less(i, j int) bool {

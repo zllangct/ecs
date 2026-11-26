@@ -81,26 +81,33 @@ func (x *GameState) Write(writer rockmem.Writer, start uint) (offset uint, err e
 	return offset, nil
 }
 
-// WriteDefault writes the GameState default value to the writer at the specified offset
+var _defaultRoot_GameState = [48]byte{}
+
+// WriteDefault writes the GameState default value to the writer using a precomputed static template
 func (x *GameState) WriteDefault(writer rockmem.Writer, start uint) (offset uint, err error) {
-	offset = start
-	size := uint(48)
-	if offset == 0 {
-		offset, err = writer.Alloc(size)
+	if start == 0 {
+		offset, err = writer.Alloc(48)
 		if err != nil {
 			return 0, err
 		}
+		writer.WriteAt(offset, _defaultRoot_GameState[:])
+		return offset, nil
 	}
-
-	writer.Write4At(offset, uint32(size))
-	__game_nameOffset := offset + 12
-	writer.WriteAt(__game_nameOffset, (*[32]byte)(unsafe.Pointer(&x.GameName))[:])
-
+	offset = start
+	writer.WriteAt(offset, _defaultRoot_GameState[:48])
 	return offset, nil
 }
 
 func (x *GameState) ReadAsRoot(reader *rockmem.Reader) {
 	x.Read(NewGameStateViewer(reader, 0), reader)
+}
+
+// ValidateAsRoot 受检根解码校验（Q12）：校验 inline 固定长度 48 界内 + 深校验。
+func (x *GameState) ValidateAsRoot(reader *rockmem.Reader) bool {
+	if !reader.IsValidOffset(0, 48) {
+		return false
+	}
+	return NewGameStateViewer(reader, 0).Validate(reader)
 }
 
 func (x *GameState) ReadWithOffset(reader *rockmem.Reader, offset uint32) {
@@ -166,24 +173,33 @@ func (x *Position) Write(writer rockmem.Writer, start uint) (offset uint, err er
 	return offset, nil
 }
 
-// WriteDefault writes the Position default value to the writer at the specified offset
+var _defaultRoot_Position = [16]byte{}
+
+// WriteDefault writes the Position default value to the writer using a precomputed static template
 func (x *Position) WriteDefault(writer rockmem.Writer, start uint) (offset uint, err error) {
-	offset = start
-	size := uint(16)
-	if offset == 0 {
-		offset, err = writer.Alloc(size)
+	if start == 0 {
+		offset, err = writer.Alloc(16)
 		if err != nil {
 			return 0, err
 		}
+		writer.WriteAt(offset, _defaultRoot_Position[:])
+		return offset, nil
 	}
-
-	writer.Write4At(offset, uint32(size))
-
+	offset = start
+	writer.WriteAt(offset, _defaultRoot_Position[:16])
 	return offset, nil
 }
 
 func (x *Position) ReadAsRoot(reader *rockmem.Reader) {
 	x.Read(NewPositionViewer(reader, 0), reader)
+}
+
+// ValidateAsRoot 受检根解码校验（Q12）：校验 inline 固定长度 16 界内 + 深校验。
+func (x *Position) ValidateAsRoot(reader *rockmem.Reader) bool {
+	if !reader.IsValidOffset(0, 16) {
+		return false
+	}
+	return NewPositionViewer(reader, 0).Validate(reader)
 }
 
 func (x *Position) ReadWithOffset(reader *rockmem.Reader, offset uint32) {
@@ -248,24 +264,33 @@ func (x *Velocity) Write(writer rockmem.Writer, start uint) (offset uint, err er
 	return offset, nil
 }
 
-// WriteDefault writes the Velocity default value to the writer at the specified offset
+var _defaultRoot_Velocity = [16]byte{}
+
+// WriteDefault writes the Velocity default value to the writer using a precomputed static template
 func (x *Velocity) WriteDefault(writer rockmem.Writer, start uint) (offset uint, err error) {
-	offset = start
-	size := uint(16)
-	if offset == 0 {
-		offset, err = writer.Alloc(size)
+	if start == 0 {
+		offset, err = writer.Alloc(16)
 		if err != nil {
 			return 0, err
 		}
+		writer.WriteAt(offset, _defaultRoot_Velocity[:])
+		return offset, nil
 	}
-
-	writer.Write4At(offset, uint32(size))
-
+	offset = start
+	writer.WriteAt(offset, _defaultRoot_Velocity[:16])
 	return offset, nil
 }
 
 func (x *Velocity) ReadAsRoot(reader *rockmem.Reader) {
 	x.Read(NewVelocityViewer(reader, 0), reader)
+}
+
+// ValidateAsRoot 受检根解码校验（Q12）：校验 inline 固定长度 16 界内 + 深校验。
+func (x *Velocity) ValidateAsRoot(reader *rockmem.Reader) bool {
+	if !reader.IsValidOffset(0, 16) {
+		return false
+	}
+	return NewVelocityViewer(reader, 0).Validate(reader)
 }
 
 func (x *Velocity) ReadWithOffset(reader *rockmem.Reader, offset uint32) {
@@ -329,26 +354,33 @@ func (x *EntityData) Write(writer rockmem.Writer, start uint) (offset uint, err 
 	return offset, nil
 }
 
-// WriteDefault writes the EntityData default value to the writer at the specified offset
+var _defaultRoot_EntityData = [24]byte{}
+
+// WriteDefault writes the EntityData default value to the writer using a precomputed static template
 func (x *EntityData) WriteDefault(writer rockmem.Writer, start uint) (offset uint, err error) {
-	offset = start
-	size := uint(24)
-	if offset == 0 {
-		offset, err = writer.Alloc(size)
+	if start == 0 {
+		offset, err = writer.Alloc(24)
 		if err != nil {
 			return 0, err
 		}
+		writer.WriteAt(offset, _defaultRoot_EntityData[:])
+		return offset, nil
 	}
-
-	writer.Write4At(offset, uint32(size))
-	__nameOffset := offset + 0
-	writer.WriteAt(__nameOffset, (*[16]byte)(unsafe.Pointer(&x.Name))[:])
-
+	offset = start
+	writer.WriteAt(offset, _defaultRoot_EntityData[:24])
 	return offset, nil
 }
 
 func (x *EntityData) ReadAsRoot(reader *rockmem.Reader) {
 	x.Read(NewEntityDataViewer(reader, 0), reader)
+}
+
+// ValidateAsRoot 受检根解码校验（Q12）：校验 inline 固定长度 24 界内 + 深校验。
+func (x *EntityData) ValidateAsRoot(reader *rockmem.Reader) bool {
+	if !reader.IsValidOffset(0, 24) {
+		return false
+	}
+	return NewEntityDataViewer(reader, 0).Validate(reader)
 }
 
 func (x *EntityData) ReadWithOffset(reader *rockmem.Reader, offset uint32) {
@@ -411,26 +443,33 @@ func (x *Inventory) Write(writer rockmem.Writer, start uint) (offset uint, err e
 	return offset, nil
 }
 
-// WriteDefault writes the Inventory default value to the writer at the specified offset
+var _defaultRoot_Inventory = [40]byte{}
+
+// WriteDefault writes the Inventory default value to the writer using a precomputed static template
 func (x *Inventory) WriteDefault(writer rockmem.Writer, start uint) (offset uint, err error) {
-	offset = start
-	size := uint(40)
-	if offset == 0 {
-		offset, err = writer.Alloc(size)
+	if start == 0 {
+		offset, err = writer.Alloc(40)
 		if err != nil {
 			return 0, err
 		}
+		writer.WriteAt(offset, _defaultRoot_Inventory[:])
+		return offset, nil
 	}
-
-	writer.Write4At(offset, uint32(size))
-	__itemsOffset := offset + 0
-	writer.WriteAt(__itemsOffset, (*[32]byte)(unsafe.Pointer(&x.Items))[:])
-
+	offset = start
+	writer.WriteAt(offset, _defaultRoot_Inventory[:40])
 	return offset, nil
 }
 
 func (x *Inventory) ReadAsRoot(reader *rockmem.Reader) {
 	x.Read(NewInventoryViewer(reader, 0), reader)
+}
+
+// ValidateAsRoot 受检根解码校验（Q12）：校验 inline 固定长度 40 界内 + 深校验。
+func (x *Inventory) ValidateAsRoot(reader *rockmem.Reader) bool {
+	if !reader.IsValidOffset(0, 40) {
+		return false
+	}
+	return NewInventoryViewer(reader, 0).Validate(reader)
 }
 
 func (x *Inventory) ReadWithOffset(reader *rockmem.Reader, offset uint32) {
@@ -462,10 +501,11 @@ func (x *GameStateViewer) size() uint32 {
 
 // Validate 深校验数据边界（不可信输入接入端使用；offset 合法性由 NewGameStateViewer 保证）
 func (x *GameStateViewer) Validate(reader *rockmem.Reader) bool {
-	return x.validate(reader, 0)
+	return x.ValidateDepth(reader, 0)
 }
 
-func (x *GameStateViewer) validate(reader *rockmem.Reader, depth int) bool {
+// ValidateDepth 带递归深度限制的深校验（跨包嵌套调用使用）
+func (x *GameStateViewer) ValidateDepth(reader *rockmem.Reader, depth int) bool {
 	if depth > 32 {
 		return false // 循环引用/超限深度
 	}
@@ -514,10 +554,11 @@ func (x *PositionViewer) size() uint32 {
 
 // Validate 深校验数据边界（不可信输入接入端使用；offset 合法性由 NewPositionViewer 保证）
 func (x *PositionViewer) Validate(reader *rockmem.Reader) bool {
-	return x.validate(reader, 0)
+	return x.ValidateDepth(reader, 0)
 }
 
-func (x *PositionViewer) validate(reader *rockmem.Reader, depth int) bool {
+// ValidateDepth 带递归深度限制的深校验（跨包嵌套调用使用）
+func (x *PositionViewer) ValidateDepth(reader *rockmem.Reader, depth int) bool {
 	if depth > 32 {
 		return false // 循环引用/超限深度
 	}
@@ -556,10 +597,11 @@ func (x *VelocityViewer) size() uint32 {
 
 // Validate 深校验数据边界（不可信输入接入端使用；offset 合法性由 NewVelocityViewer 保证）
 func (x *VelocityViewer) Validate(reader *rockmem.Reader) bool {
-	return x.validate(reader, 0)
+	return x.ValidateDepth(reader, 0)
 }
 
-func (x *VelocityViewer) validate(reader *rockmem.Reader, depth int) bool {
+// ValidateDepth 带递归深度限制的深校验（跨包嵌套调用使用）
+func (x *VelocityViewer) ValidateDepth(reader *rockmem.Reader, depth int) bool {
 	if depth > 32 {
 		return false // 循环引用/超限深度
 	}
@@ -598,10 +640,11 @@ func (x *EntityDataViewer) size() uint32 {
 
 // Validate 深校验数据边界（不可信输入接入端使用；offset 合法性由 NewEntityDataViewer 保证）
 func (x *EntityDataViewer) Validate(reader *rockmem.Reader) bool {
-	return x.validate(reader, 0)
+	return x.ValidateDepth(reader, 0)
 }
 
-func (x *EntityDataViewer) validate(reader *rockmem.Reader, depth int) bool {
+// ValidateDepth 带递归深度限制的深校验（跨包嵌套调用使用）
+func (x *EntityDataViewer) ValidateDepth(reader *rockmem.Reader, depth int) bool {
 	if depth > 32 {
 		return false // 循环引用/超限深度
 	}
@@ -650,10 +693,11 @@ func (x *InventoryViewer) size() uint32 {
 
 // Validate 深校验数据边界（不可信输入接入端使用；offset 合法性由 NewInventoryViewer 保证）
 func (x *InventoryViewer) Validate(reader *rockmem.Reader) bool {
-	return x.validate(reader, 0)
+	return x.ValidateDepth(reader, 0)
 }
 
-func (x *InventoryViewer) validate(reader *rockmem.Reader, depth int) bool {
+// ValidateDepth 带递归深度限制的深校验（跨包嵌套调用使用）
+func (x *InventoryViewer) ValidateDepth(reader *rockmem.Reader, depth int) bool {
 	if depth > 32 {
 		return false // 循环引用/超限深度
 	}
@@ -696,14 +740,23 @@ func newGameStateModifierByViewer(viewer *GameStateViewer, reader *rockmem.Reade
 }
 
 func (x *GameStateModifier) SetTick(v int64) {
+	if x.GameStateViewer == (*GameStateViewer)(unsafe.Pointer(&_Null_components[0])) {
+		return
+	}
 	*(*int64)(unsafe.Add(unsafe.Pointer(x.GameStateViewer), 0)) = v
 }
 
 func (x *GameStateModifier) SetScore(v int32) {
+	if x.GameStateViewer == (*GameStateViewer)(unsafe.Pointer(&_Null_components[0])) {
+		return
+	}
 	*(*int32)(unsafe.Add(unsafe.Pointer(x.GameStateViewer), 8)) = v
 }
 
 func (x *GameStateModifier) SetGameName(v *[32]byte) {
+	if x.GameStateViewer == (*GameStateViewer)(unsafe.Pointer(&_Null_components[0])) {
+		return
+	}
 	if len(v) != 32 {
 		if rockmem.IsDebugEnabled() {
 			panic("array length mismatch: expected 32, got " + string(rune(len(v))))
@@ -727,14 +780,23 @@ func newPositionModifierByViewer(viewer *PositionViewer, reader *rockmem.Reader)
 }
 
 func (x *PositionModifier) SetX(v float32) {
+	if x.PositionViewer == (*PositionViewer)(unsafe.Pointer(&_Null_components[0])) {
+		return
+	}
 	*(*float32)(unsafe.Add(unsafe.Pointer(x.PositionViewer), 0)) = v
 }
 
 func (x *PositionModifier) SetY(v float32) {
+	if x.PositionViewer == (*PositionViewer)(unsafe.Pointer(&_Null_components[0])) {
+		return
+	}
 	*(*float32)(unsafe.Add(unsafe.Pointer(x.PositionViewer), 4)) = v
 }
 
 func (x *PositionModifier) SetZ(v float32) {
+	if x.PositionViewer == (*PositionViewer)(unsafe.Pointer(&_Null_components[0])) {
+		return
+	}
 	*(*float32)(unsafe.Add(unsafe.Pointer(x.PositionViewer), 8)) = v
 }
 
@@ -752,14 +814,23 @@ func newVelocityModifierByViewer(viewer *VelocityViewer, reader *rockmem.Reader)
 }
 
 func (x *VelocityModifier) SetX(v float32) {
+	if x.VelocityViewer == (*VelocityViewer)(unsafe.Pointer(&_Null_components[0])) {
+		return
+	}
 	*(*float32)(unsafe.Add(unsafe.Pointer(x.VelocityViewer), 0)) = v
 }
 
 func (x *VelocityModifier) SetY(v float32) {
+	if x.VelocityViewer == (*VelocityViewer)(unsafe.Pointer(&_Null_components[0])) {
+		return
+	}
 	*(*float32)(unsafe.Add(unsafe.Pointer(x.VelocityViewer), 4)) = v
 }
 
 func (x *VelocityModifier) SetZ(v float32) {
+	if x.VelocityViewer == (*VelocityViewer)(unsafe.Pointer(&_Null_components[0])) {
+		return
+	}
 	*(*float32)(unsafe.Add(unsafe.Pointer(x.VelocityViewer), 8)) = v
 }
 
@@ -777,6 +848,9 @@ func newEntityDataModifierByViewer(viewer *EntityDataViewer, reader *rockmem.Rea
 }
 
 func (x *EntityDataModifier) SetName(v *[16]byte) {
+	if x.EntityDataViewer == (*EntityDataViewer)(unsafe.Pointer(&_Null_components[0])) {
+		return
+	}
 	if len(v) != 16 {
 		if rockmem.IsDebugEnabled() {
 			panic("array length mismatch: expected 16, got " + string(rune(len(v))))
@@ -787,10 +861,16 @@ func (x *EntityDataModifier) SetName(v *[16]byte) {
 }
 
 func (x *EntityDataModifier) SetTypeId(v int32) {
+	if x.EntityDataViewer == (*EntityDataViewer)(unsafe.Pointer(&_Null_components[0])) {
+		return
+	}
 	*(*int32)(unsafe.Add(unsafe.Pointer(x.EntityDataViewer), 16)) = v
 }
 
 func (x *EntityDataModifier) SetFlags(v uint32) {
+	if x.EntityDataViewer == (*EntityDataViewer)(unsafe.Pointer(&_Null_components[0])) {
+		return
+	}
 	*(*uint32)(unsafe.Add(unsafe.Pointer(x.EntityDataViewer), 20)) = v
 }
 
@@ -808,6 +888,9 @@ func newInventoryModifierByViewer(viewer *InventoryViewer, reader *rockmem.Reade
 }
 
 func (x *InventoryModifier) SetItems(v *[8]int32) {
+	if x.InventoryViewer == (*InventoryViewer)(unsafe.Pointer(&_Null_components[0])) {
+		return
+	}
 	if len(v) != 8 {
 		if rockmem.IsDebugEnabled() {
 			panic("array length mismatch: expected 8, got " + string(rune(len(v))))
@@ -818,6 +901,9 @@ func (x *InventoryModifier) SetItems(v *[8]int32) {
 }
 
 func (x *InventoryModifier) SetCount(v int32) {
+	if x.InventoryViewer == (*InventoryViewer)(unsafe.Pointer(&_Null_components[0])) {
+		return
+	}
 	*(*int32)(unsafe.Add(unsafe.Pointer(x.InventoryViewer), 32)) = v
 }
 

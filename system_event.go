@@ -71,6 +71,9 @@ type SyncAfterPostDestroyReceiver interface {
 	SyncAfterDestroy(ctx *SystemContext, event Event) error
 }
 
+// SyncAfterDestroyReceiver 是 SyncAfterPostDestroyReceiver 的规范别名。
+type SyncAfterDestroyReceiver = SyncAfterPostDestroyReceiver
+
 func implsCheck(system any) uint16 {
 	var impls uint16
 	imp := false

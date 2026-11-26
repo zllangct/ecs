@@ -47,15 +47,21 @@ type querySlot func(EntityIndex) unsafe.Pointer
 // world.compVersion 变化（新组件池创建）时失效重建。
 type queryCached struct {
 	config *QueryConfig
-	// group buddies 全部属于同一张组表时，直接以组表行为主迭代源（零过滤连续扫描）
+	// group buddies 全部属于同一张组表时指向该表
 	group *Archetype
+	// groupFull buddies 精确覆盖 group 全集（无残段实体可能）
+	groupFull bool
+	// buddyGroups 与 config.queryBuddies 平行的所属组表
+	buddyGroups []*Archetype
+	// hasGrouped 任一 buddy 属于某张组表
+	hasGrouped bool
 	// minSet CSet 路径的最小组件池（主迭代源）
 	minSet ComponentSet
-	// pools 与 config.queryBuddies 平行的 buddy 池（CSet 路径 Exist 过滤用）
+	// pools 与 config.queryBuddies 平行的 buddy 池（CSet 路径/残段 Exist 过滤用）
 	pools []ComponentSet
 	// slots buddy → 预解析访问槽位（仅声明为非只读依赖的 buddy）
 	slots map[ComponentIntType]querySlot
-	// empty 解析时即知结果恒空（某 buddy 池不存在）
+	// empty 解析时即知结果恒空（某非组 buddy 池不存在）
 	empty bool
 	// version 构建时的 world.compVersion
 	version int
@@ -75,9 +81,29 @@ func (q *Query) Iter() iter.Seq2[EntityIndex, *EntityInfo] {
 	stat := q.ctx.info.getOptReporter()
 	stat.shapeUsageAddKey(c.config.shapeKey)
 	if c.group != nil {
-		// 组表路径：行 ⟺ 拥有组全集 ⊇ buddies，过滤恒真，跳过 IsSubSet。
 		g := c.group
-		if g.Len() == 0 {
+		if c.groupFull {
+			// 全集组表路径：行 ⟺ 拥有组全集 == buddies，无残段可能，跳过 IsSubSet 与 CSet
+			if g.Len() == 0 {
+				return empty
+			}
+			return func(yield func(EntityIndex, *EntityInfo) bool) {
+				for row := 0; row < g.Len(); row++ {
+					index := g.entities[row]
+					info := q.ctx.world.entities.getByIndex(index)
+					if info == nil {
+						continue
+					}
+					if !yield(index, info) {
+						return
+					}
+				}
+			}
+		}
+
+		// 组表真子集路径：先扫组表行，再扫全部 buddy 在 CSet 残段中的交集
+		resMinSet := pickMinNonEmptyPool(c.pools)
+		if g.Len() == 0 && resMinSet == nil {
 			return empty
 		}
 		return func(yield func(EntityIndex, *EntityInfo) bool) {
@@ -91,19 +117,125 @@ func (q *Query) Iter() iter.Seq2[EntityIndex, *EntityInfo] {
 					return
 				}
 			}
+			if resMinSet == nil {
+				return
+			}
+			if mergeable(c.pools) {
+				for index, info := range mergeJoinIter(q.ctx.world, resMinSet, c.pools) {
+					if !yield(index, info) {
+						return
+					}
+				}
+				return
+			}
+			for index, info := range existFilterIter(q.ctx.world, resMinSet, c.pools) {
+				if !yield(index, info) {
+					return
+				}
+			}
 		}
 	}
-	if c.minSet == nil || c.minSet.Len() == 0 {
+
+	// 混合路径（含组内 + 组外组件，或跨多张组表）
+	if c.hasGrouped {
+		driver := pickMinMixedDriver(c.buddyGroups, c.pools)
+		if driver < 0 {
+			return empty
+		}
+		dg := c.buddyGroups[driver]
+		dp := c.pools[driver]
+		return func(yield func(EntityIndex, *EntityInfo) bool) {
+			emit := func(index EntityIndex) bool {
+				for j := range c.pools {
+					if j == driver {
+						continue
+					}
+					has := false
+					if aj := c.buddyGroups[j]; aj != nil {
+						_, has = aj.rowOf(index)
+					}
+					if !has && c.pools[j] != nil {
+						has = c.pools[j].Exist(index)
+					}
+					if !has {
+						return true
+					}
+				}
+				info := q.ctx.world.entities.getByIndex(index)
+				if info == nil {
+					return true
+				}
+				return yield(index, info)
+			}
+			if dg != nil {
+				for row := 0; row < dg.Len(); row++ {
+					if !emit(dg.entities[row]) {
+						return
+					}
+				}
+			}
+			if dp != nil {
+				for _, index := range dp.EntityIndexes() {
+					if !emit(index) {
+						return
+					}
+				}
+			}
+		}
+	}
+
+	// 纯 CSet 路径：动态选当前最小池作驱动源（避免历史缓存 minSet 僵化）
+	minSet := pickMinNonEmptyPool(c.pools)
+	if minSet == nil {
 		return empty
 	}
 	// merge-join：全部 buddy 池按 key 有序时，有序归并求交（全程顺序访问，
 	// 取代逐 key 稀疏查找与过滤）；任一池失序回退 Exist 过滤路径
 	if mergeable(c.pools) {
-		return mergeJoinIter(q.ctx.world, c.minSet, c.pools)
+		return mergeJoinIter(q.ctx.world, minSet, c.pools)
 	}
-	idx := c.minSet.EntityIndexes()
-	pools := c.pools
-	minSet := c.minSet
+	return existFilterIter(q.ctx.world, minSet, c.pools)
+}
+
+// pickMinNonEmptyPool 存在任一 nil 或空池则返回 nil；否则返回元素最少的池
+func pickMinNonEmptyPool(pools []ComponentSet) ComponentSet {
+	var minSet ComponentSet
+	for _, p := range pools {
+		if p == nil || p.Len() == 0 {
+			return nil
+		}
+		if minSet == nil || p.Len() < minSet.Len() {
+			minSet = p
+		}
+	}
+	return minSet
+}
+
+// pickMinMixedDriver 在混合查询中挑选总条目数（组表行 + CSet 残段）最小的 buddy 下标；任一 buddy 为空返回 -1
+func pickMinMixedDriver(groups []*Archetype, pools []ComponentSet) int {
+	best := -1
+	bestLen := 0
+	for i := range pools {
+		total := 0
+		if groups[i] != nil {
+			total += groups[i].Len()
+		}
+		if pools[i] != nil {
+			total += pools[i].Len()
+		}
+		if total == 0 {
+			return -1
+		}
+		if best == -1 || total < bestLen {
+			best = i
+			bestLen = total
+		}
+	}
+	return best
+}
+
+func existFilterIter(world *World, minSet ComponentSet, pools []ComponentSet) iter.Seq2[EntityIndex, *EntityInfo] {
+	idx := minSet.EntityIndexes()
 	return func(yield func(EntityIndex, *EntityInfo) bool) {
 	outer:
 		for _, index := range idx {
@@ -117,7 +249,7 @@ func (q *Query) Iter() iter.Seq2[EntityIndex, *EntityInfo] {
 					continue outer
 				}
 			}
-			info := q.ctx.world.entities.getByIndex(index)
+			info := world.entities.getByIndex(index)
 			if info == nil {
 				continue
 			}

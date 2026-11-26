@@ -2,7 +2,6 @@ package ecs
 
 import (
 	"iter"
-	"sort"
 )
 
 // systemTreeNode system tree systemTreeNode
@@ -13,7 +12,7 @@ type systemTreeNode struct {
 }
 
 // isFriend 判断两个 system 是否因共享组件依赖而"相关"（任一方可写即冲突）。
-// 命名取"好友"形象义：好友必须排进同一条串行链（不同 batch），不能并行。
+// 命名取"好友"形象义：好友必须排进不同 batch 串行，不能并行。
 func (p *systemTreeNode) isFriend(node *systemTreeNode) bool {
 	for _, r := range p.val.getDeps() {
 		for _, rTarget := range node.val.getDeps() {
@@ -28,28 +27,12 @@ func (p *systemTreeNode) isFriend(node *systemTreeNode) bool {
 	return false
 }
 
-func (p *systemTreeNode) attach(node *systemTreeNode) {
-	isAttached := false
-	for i := 0; i < len(p.children); i++ {
-		if p.children[i].isFriend(node) {
-			p.children[i].attach(node)
-			isAttached = true
-			break
-		}
-	}
-	if !isAttached {
-		if p.val == node.val {
-			return
-		}
-		p.children = append(p.children, node)
-	}
-}
-
-// SystemRelatedGroups system group ordered by interrelation
+// SystemRelatedGroups 按冲突关系与注册顺序分层调度系统。
+// 同 Order 档位内：互不冲突（含无依赖/全只读共享）的系统进入同一 batch 并行；
+// 存在读写冲突的系统严格按注册顺序分入后续 batch 串行。
 type SystemRelatedGroups struct {
 	systems      []*systemTreeNode
-	ref          map[ComponentIntType]int
-	root         *systemTreeNode
+	batches      [][]SystemInfo
 	order        Order
 	batchTotal   int
 	maxPeerBatch int
@@ -59,57 +42,54 @@ type SystemRelatedGroups struct {
 func NewSystemRelatedGroups() SystemTraverser {
 	return &SystemRelatedGroups{
 		systems: make([]*systemTreeNode, 0),
-		ref:     map[ComponentIntType]int{},
 		ordered: true,
-		root: &systemTreeNode{
-			parent:   nil,
-			children: []*systemTreeNode{},
-			val:      nil,
-		},
 	}
-}
-
-func (s *SystemRelatedGroups) refCount(rqs []ComponentDependency) int {
-	ref := 0
-	for _, com := range rqs {
-		ref += s.ref[com.intType()] - 1
-	}
-	return ref
 }
 
 func (s *SystemRelatedGroups) resort() {
 	if s.ordered {
 		return
 	}
-	sort.Slice(s.systems, func(i, j int) bool {
-		return s.refCount(s.systems[i].val.getDeps()) >
-			s.refCount(s.systems[j].val.getDeps())
-	})
+	n := len(s.systems)
+	if n == 0 {
+		s.batches = nil
+		s.batchTotal = 0
+		s.maxPeerBatch = 0
+		s.ordered = true
+		return
+	}
 
-	s.root.children = []*systemTreeNode{}
-	for _, node := range s.systems {
-		node.children = []*systemTreeNode{}
-		s.root.attach(node)
+	// 按注册顺序逐个分配最早无冲突批次：
+	// 若 i < j 且 systems[i] 与 systems[j] 冲突，则 layer[j] >= layer[i] + 1，
+	// 既保证任意同批内全对全无读写冲突，又保证同档位冲突系统严格按注册顺序执行。
+	layers := make([]int, n)
+	maxLayer := 0
+	for j := 0; j < n; j++ {
+		layer := 0
+		for i := 0; i < j; i++ {
+			if s.systems[i].isFriend(s.systems[j]) && layers[i]+1 > layer {
+				layer = layers[i] + 1
+			}
+		}
+		layers[j] = layer
+		if layer > maxLayer {
+			maxLayer = layer
+		}
+	}
+
+	s.batches = make([][]SystemInfo, maxLayer+1)
+	for i, node := range s.systems {
+		l := layers[i]
+		s.batches[l] = append(s.batches[l], node.val)
+	}
+	s.batchTotal = len(s.batches)
+	s.maxPeerBatch = 0
+	for _, b := range s.batches {
+		if len(b) > s.maxPeerBatch {
+			s.maxPeerBatch = len(b)
+		}
 	}
 	s.ordered = true
-
-	s.batchTotal = 0
-	s.maxPeerBatch = 0
-
-	var top []*systemTreeNode = s.root.children
-	for len(top) > 0 {
-		count := 0
-		temp := top
-		top = make([]*systemTreeNode, 0)
-		for _, node := range temp {
-			count++
-			top = append(top, node.children...)
-		}
-		if count > s.maxPeerBatch {
-			s.maxPeerBatch = count
-		}
-		s.batchTotal++
-	}
 }
 
 func (s *SystemRelatedGroups) systemCount() int {
@@ -136,7 +116,7 @@ func (s *SystemRelatedGroups) setOrder(order Order) {
 	s.order = order
 }
 
-// get all systems
+// get all systems (preserving registration order)
 func (s *SystemRelatedGroups) all() []SystemInfo {
 	systems := make([]SystemInfo, len(s.systems))
 	for i, n := range s.systems {
@@ -145,28 +125,12 @@ func (s *SystemRelatedGroups) all() []SystemInfo {
 	return systems
 }
 
-// insert system
+// insert system (including zero-dependency systems)
 func (s *SystemRelatedGroups) add(sys SystemInfo) error {
-	//get system's required components
-	rqs := sys.getDeps()
-	if len(rqs) == 0 {
-		return nil
-	}
-	//reference count
-	for _, com := range rqs {
-		if _, ok := s.ref[com.intType()]; ok {
-			s.ref[com.intType()] += 1
-		} else {
-			s.ref[com.intType()] = 1
-		}
-	}
-	//add system
 	node := &systemTreeNode{
-		children: make([]*systemTreeNode, 0),
-		val:      sys,
+		val: sys,
 	}
 	s.systems = append(s.systems, node)
-	//set unordered
 	s.ordered = false
 	return nil
 }
@@ -183,29 +147,13 @@ func (s *SystemRelatedGroups) has(sys SystemInfo) bool {
 
 // remove system
 func (s *SystemRelatedGroups) remove(sys SystemInfo) error {
-	//get system's required components
-	rqs := sys.getDeps()
-	has := false
 	for i, system := range s.systems {
 		if system.val.id() == sys.id() {
 			s.systems = append(s.systems[:i], s.systems[i+1:]...)
-			has = true
-			break
+			s.ordered = false
+			return nil
 		}
 	}
-	if !has {
-		return nil
-	}
-	//reference count
-	for _, com := range rqs {
-		if _, ok := s.ref[com.intType()]; ok {
-			s.ref[com.intType()] -= 1
-		} else {
-			panic("component ref wrong")
-		}
-	}
-	//set unordered
-	s.ordered = false
 	return nil
 }
 
@@ -213,40 +161,16 @@ func (s *SystemRelatedGroups) independentGroups() iter.Seq[[]SystemInfo] {
 	if !s.ordered {
 		s.resort()
 	}
-
-	if s.maxPeerBatch == 0 {
+	if len(s.batches) == 0 {
 		return func(yield func([]SystemInfo) bool) {}
 	}
-	top := make([]*systemTreeNode, s.maxPeerBatch)
-	topTemp := make([]*systemTreeNode, s.maxPeerBatch)
-	buffer := make([]SystemInfo, s.maxPeerBatch)
-	size := 0
-	copy(top, s.root.children)
-	topSize := len(s.root.children)
-
+	batches := s.batches
 	return func(yield func([]SystemInfo) bool) {
-		for {
-			if topSize == 0 {
-				size = 0
-				return
+		for _, batch := range batches {
+			if len(batch) == 0 {
+				continue
 			}
-			topTemp, top = top, topTemp
-			tempSize := topSize
-			topSize = 0
-			size = 0
-			for i := 0; i < tempSize; i++ {
-				buffer[size] = topTemp[i].val
-				size++
-				for j := 0; j < len(topTemp[i].children); j++ {
-					top[topSize+j] = topTemp[i].children[j]
-				}
-				topSize += len(topTemp[i].children)
-			}
-
-			if size == 0 {
-				return
-			}
-			if !yield(buffer[:size]) {
+			if !yield(batch) {
 				return
 			}
 		}

@@ -755,7 +755,10 @@ func TestWorldSerialization(t *testing.T) {
 		}
 	}
 
-	// Update frame counter
+	// Update frame counter (flush pending component adds before Marshal)
+	if err := original.Update(); err != nil {
+		t.Fatal(err)
+	}
 	original.frame = 42
 
 	// Serialize
@@ -817,6 +820,9 @@ func TestWorldSerializationWithRockmem(t *testing.T) {
 		info.Add(&testWorldComponent2{X: float32(i), Y: float32(i * 2)})
 	}
 
+	if err := original.Update(); err != nil {
+		t.Fatal(err)
+	}
 	original.frame = 100
 
 	// Serialize to rockmem writer
@@ -865,6 +871,10 @@ func TestWorldSerializationRoundTrip(t *testing.T) {
 		if i%3 == 0 {
 			info.Add(&testWorldComponent2{X: float32(i), Y: float32(i * 10)})
 		}
+	}
+
+	if err := original.Update(); err != nil {
+		t.Fatal(err)
 	}
 
 	// Simulate some frames
@@ -966,6 +976,9 @@ func TestNewWorldFromData(t *testing.T) {
 		info, _ := original.GetEntityInfo(entity)
 		info.Add(&testWorldComponent{Value: int32(i)})
 	}
+	if err := original.Update(); err != nil {
+		t.Fatal(err)
+	}
 	original.frame = 123
 
 	// Serialize
@@ -1003,6 +1016,9 @@ func BenchmarkWorldSerialization(b *testing.B) {
 		if i%2 == 0 {
 			info.Add(&testWorldComponent2{X: float32(i), Y: float32(i * 2)})
 		}
+	}
+	if err := w.Update(); err != nil {
+		b.Fatal(err)
 	}
 	w.frame = 1000
 

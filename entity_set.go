@@ -11,8 +11,8 @@ func NewEntitySet() *EntitySet {
 }
 
 func (es *EntitySet) Exist(entity Entity) bool {
-	index := entity.Index()
-	return es.SparseArray.Exist(index)
+	_, ok := es.Get(entity)
+	return ok
 }
 
 func (es *EntitySet) Get(entity Entity) (*EntityInfo, bool) {
@@ -34,6 +34,9 @@ func (es *EntitySet) Add(entityInfo EntityInfo) *EntityInfo {
 }
 
 func (es *EntitySet) Remove(entity Entity) *EntityInfo {
+	if _, ok := es.Get(entity); !ok {
+		return nil
+	}
 	index := entity.Index()
 	return es.SparseArray.Remove(index)
 }
