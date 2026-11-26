@@ -115,6 +115,25 @@ func View2RO[A any, BR ReadOnlyView[BR], PA ComponentPointer[A]](ctx *SystemCont
 
 	// 回退路径
 	q := ctx.NewQuery(WithComp[A, PA](), WithBuddies(*NewQueryBuddies(itB)))
+	if !okA && !okB {
+		// 两列只存于 CSet，依赖权限在入口已校验；每行直接从这两个池取组件。
+		setA, hasA := ctx.world.getComponentSet(itA)
+		setB, hasB := ctx.world.getComponentSet(itB)
+		if !hasA || !hasB {
+			return empty
+		}
+		return func(yield func(*A, BR) bool) {
+			for index := range q.Iter() {
+				if !ctx.constraint.isValid() {
+					return
+				}
+				a, b := setA.get(index), setB.get(index)
+				if a != nil && b != nil && !yield((*A)(a), zeroB.FromPtr(b)) {
+					return
+				}
+			}
+		}
+	}
 	return func(yield func(*A, BR) bool) {
 		for index := range q.Iter() {
 			a, okA := QueryGet[A, PA](&q, index)
