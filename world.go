@@ -303,15 +303,19 @@ func (w *World) Update() error {
 	}
 	delta := now.Sub(w.lastUpdate)
 	w.lastUpdate = now
-	return w.stepWithStart(delta, now)
+	if err := w.Step(delta); err != nil {
+		return err
+	}
+	if w.config.AutoOptimize {
+		budget := time.Second/time.Duration(w.config.Rate) - time.Since(now)
+		return w.Optimize(budget, false)
+	}
+	return nil
 }
 
-// Step 使用调用方显式传入的固定帧间隔 delta 推进一帧，用于确定性回放/帧同步场景。
+// Step 使用调用方显式传入的 delta 推进一帧，不按墙钟余量重排存储。
+// WithWorldAutoOptimize 的帧预算仅用于 Update。
 func (w *World) Step(delta time.Duration) error {
-	return w.stepWithStart(delta, time.Now())
-}
-
-func (w *World) stepWithStart(delta time.Duration, start time.Time) error {
 	if w.status == WorldStatusStop {
 		return errors.New("ecs: update on stopped world")
 	}
@@ -330,21 +334,7 @@ func (w *World) stepWithStart(delta time.Duration, start time.Time) error {
 		Frame: w.frame,
 		Delta: w.delta,
 	}
-	err := w.systems.Execute(e)
-	if err != nil {
-		return err
-	}
-
-	if w.config.AutoOptimize {
-		elapsed := time.Since(start) // 本帧系统执行耗时
-		t := (time.Second / time.Duration(w.config.Rate)) - elapsed
-		err = w.Optimize(t, false)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return w.systems.Execute(e)
 }
 
 func (w *World) Destroy() error {

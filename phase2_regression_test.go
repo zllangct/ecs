@@ -746,23 +746,23 @@ func TestDeterministicReplay_StepAndReadOnlyMarshal(t *testing.T) {
 			WithDeps(Dep[p2CompA](), Dep[p2CompB](ReadOnly)),
 			WithGroup(Dep[p2CompA](), Dep[p2CompB]()),
 		)
-		// 两个并行/跨帧向同一实体的同组件投递操作的系统
-		w.RegisterLight(LightSystem(func(ctx *SystemContext, event Event) error {
-			for idx := range ctx.GetComponents[p2CompA]() {
-				if info, ok := ctx.world.entities.Get(Entity(idx)); ok {
-					ctx.AddComponents(info.Entity(), &p2CompTag{V: int32(idx) + 100})
+		// 两个读者可并行，分别向私有命令队列投递同一组件。首个注册者应获胜。
+		var firstFrameSubmissions [2]int
+		for i, offset := range []int32{100, 200} {
+			err := w.RegisterLight(func(ctx *SystemContext, event Event) error {
+				for idx := range ctx.GetComponentsReadOnly[p2CompBView]() {
+					info := ctx.world.entities.getByIndex(idx)
+					ctx.AddComponents(info.Entity(), &p2CompTag{V: int32(idx) + offset})
+					if event.Frame == 1 {
+						firstFrameSubmissions[i]++
+					}
 				}
+				return nil
+			}, WithDepReadOnly[p2CompB]())
+			if err != nil {
+				t.Fatal(err)
 			}
-			return nil
-		}), WithDeps(Dep[p2CompA](ReadOnly), Dep[p2CompTag]()), WithName("tagger1"))
-		w.RegisterLight(LightSystem(func(ctx *SystemContext, event Event) error {
-			for idx := range ctx.GetComponents[p2CompA]() {
-				if info, ok := ctx.world.entities.Get(Entity(idx)); ok {
-					ctx.AddComponents(info.Entity(), &p2CompTag{V: int32(idx) + 200})
-				}
-			}
-			return nil
-		}), WithDeps(Dep[p2CompA](ReadOnly), Dep[p2CompTag]()), WithName("tagger2"))
+		}
 
 		var ents []Entity
 		for i := 0; i < 20; i++ {
@@ -771,6 +771,15 @@ func TestDeterministicReplay_StepAndReadOnlyMarshal(t *testing.T) {
 		for frame := 0; frame < 5; frame++ {
 			if err := w.Step(16 * time.Millisecond); err != nil {
 				t.Fatal(err)
+			}
+		}
+		if firstFrameSubmissions != [2]int{20, 20} {
+			t.Fatalf("expected competing tag submissions, got %v", firstFrameSubmissions)
+		}
+		for _, e := range ents {
+			tag, ok := w.GetComponent[p2CompTag](e)
+			if !ok || tag.V != int32(e.Index())+100 {
+				t.Fatalf("entity %v: first registered tagger should win, got %v", e, tag)
 			}
 		}
 		// 销毁部分实体并加入新实体（组表 churn）

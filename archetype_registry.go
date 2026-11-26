@@ -2,6 +2,7 @@ package ecs
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"unsafe"
 )
@@ -166,8 +167,8 @@ func (w *World) scatterAll() {
 	}
 }
 
-// absorbAll 按 ownerOf 把 CSet 中集齐组组件的实体收拢入行
-// （Unmarshal 恢复后、Marshal 导出后调用）。
+// absorbAll 首帧按快照密集索引的顺序还原组行。每个组内组件的快照
+// 都以相同的组行序列结尾，前缀是该组件自己的残段。
 func (w *World) absorbAll() {
 	for _, a := range w.archetypes.groups {
 		// 候选 = 组内最小 CSet 的实体集合
@@ -180,11 +181,8 @@ func (w *World) absorbAll() {
 		if minSet == nil {
 			continue
 		}
-		touched := make(map[EntityIndex]struct{}, minSet.Len())
-		for _, index := range minSet.EntityIndexes() {
-			touched[index] = struct{}{}
-		}
-		w.syncGroup(a, touched)
+		// 收拢会对各池进行 swap-remove，需先保留候选的原始顺序。
+		w.syncGroupOrdered(a, slices.Clone(minSet.EntityIndexes()))
 	}
 }
 
@@ -197,7 +195,10 @@ func (w *World) syncGroup(a *Archetype, entities map[EntityIndex]struct{}) {
 		ordered = append(ordered, index)
 	}
 	sort.Slice(ordered, func(i, j int) bool { return ordered[i] < ordered[j] })
+	w.syncGroupOrdered(a, ordered)
+}
 
+func (w *World) syncGroupOrdered(a *Archetype, ordered []EntityIndex) {
 	for _, index := range ordered {
 		info := w.entities.getByIndex(index)
 		if info == nil {

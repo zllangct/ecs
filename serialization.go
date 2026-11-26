@@ -748,12 +748,12 @@ func (w *serializableWorld) marshalWithArchetypes(archetypes *ArchetypeRegistry)
 			var a *Archetype
 			var col int
 			if archetypes != nil {
-				if owner, ok := archetypes.owner(compType); ok && owner.Len() > 0 {
+				if owner, ok := archetypes.owner(compType); ok {
 					a = owner
 					col, _ = a.colOf(compType)
 				}
 			}
-			if compSet == nil && a != nil {
+			if compSet == nil && a != nil && a.Len() > 0 {
 				var ok bool
 				compSet, ok = registry.CreateComponentSet(compType)
 				if !ok {
@@ -935,7 +935,12 @@ func (w *World) Unmarshal(data *SerializableWorldData) error {
 	w.pendingDestroy = nil
 	w.destroyMu.Unlock()
 	if w.opLog != nil {
+		order := w.opLog.sysOrder
 		w.opLog = NewOpLog(w, runtime.NumCPU())
+		// 原位恢复保留已注册的系统。为它们重建空的专属队列，丢弃快照之前的命令。
+		for _, id := range order {
+			w.opLog.registerSystem(id)
+		}
 	}
 	w.compVersion++ // 组件池整体替换：旧查询缓存全部失效
 	// Set world pointer for all entities after deserialization

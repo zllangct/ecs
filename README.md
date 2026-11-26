@@ -150,8 +150,8 @@ func main() {
 通过 `ecs.NewWorld(opts...)` 创建世界：
 
 - `ecs.WithWorldSyncMode()`（默认）：所有系统按 `Stage` 与 `Order` 在单线程线性执行。
-- `ecs.WithWorldASyncMode()`：非同步阶段（`Start` / `PreUpdate` / `Update` / `PostUpdate` / `Destroy`）根据依赖冲突关系分批并发执行，同 `Order` 档位内冲突系统保持注册顺序；`Sync*` 阶段仍在主 goroutine 串行执行。
-- `ecs.WithWorldAutoOptimize()`：每帧结束后利用剩余帧预算对 `CSet` 执行有序整理。
+- `ecs.WithWorldASyncMode()` 在 `Start`、`PreUpdate`、`Update`、`PostUpdate` 阶段按依赖冲突分批并发执行，同 `Order` 档位内的冲突系统依注册顺序执行。`Sync*` 和 `World.Destroy()` 的收尾回调均在调用者的 goroutine 串行执行。
+- `ecs.WithWorldAutoOptimize()` 使 `Update()` 在帧末利用剩余墙钟预算整理 `CSet`。`Step(delta)` 只推进模拟，使固定输入的遍历顺序与本机帧耗时无关。
 - `ecs.WithWorldDefaultUpdateRate(rate)`：设置默认目标帧率（默认 `30`）。
 - `ecs.WithoutGroups()`：全局关闭 `Archetype` 组表存储，所有组件保留在 `CSet`（用于回归对照，与开启组表语义完全等价）。
 
@@ -212,18 +212,19 @@ func main() {
 ### 帧同步点与操作日志（OpLog）
 
 - 在系统执行期间请使用 `ctx.AddComponents(entity, comps...)` 写入所属系统的无锁操作队列（切勿在并行系统内直接调用非线程安全的 `world.NewEntity`）。
-- 帧首与帧尾同步点统一执行实体销毁与两阶段组件合并：第一相更新 `CSet` 与 `entity.compound`，第二相按确定性顺序将实体收拢入组表或拆行散回 `CSet`。
+- 帧首先处理挂起的实体销毁，再合并组件命令。系统回调结束后清理一次性和游牧组件，再合并本帧产生的组件命令。每次合并先更新 `CSet` 与实体的组件集合，再按确定顺序收拢或拆出组行。系统内提交的新增组件在下一帧对系统可见。
 
 ---
 
 ## 世界序列化与确定性回放
 
-- **快照导出与恢复**：
-  - `world.Marshal()` / `world.MarshalTo(writer)`：采用只读联合导出（合并读取 `Archetype` 列与 `CSet` 残段，不修改实时世界布局）。**调用前需确保无未应用的挂起操作**（请先调用 `Update()` / `Step()`，否则返回错误）。
-  - `ecs.NewWorldFromData(data, opts...)` / `world.Unmarshal(data)` / `world.UnmarshalFrom(reader)`：内置版本、元素宽度、IDL 偏移、稀疏索引互逆一致性及 `ValidateAsRoot` 校验，任何损坏输入均原子报错不污染目标世界；恢复后需重新注册 `System`，首帧 `Update`/`Step` 自动重新吸收进组表。
-- **确定性推进**：
-  - 使用 `world.Step(fixedDelta)` 替代依赖墙钟的 `world.Update()`；
-  - `OpLog` 合并、`syncGroup` 入行及快照导出均按确定性顺序执行，在相同初始状态与输入序列下（无论同步或异步模式），逐帧状态与导出快照字节完全一致。
+在世界静止时调用 `world.Marshal()` 或 `world.MarshalTo(writer)`。此时所有系统回调均已结束，外部调用者也应暂停对世界的写入。导出只读取现有存储，遇到尚未应用的组件命令或实体销毁会返回错误。
+
+`ecs.NewWorldFromData(data, opts...)` 创建新的世界。续跑前按原顺序注册系统，并恢复应用自行维护的系统状态。`world.Unmarshal(data)` 和 `world.UnmarshalFrom(reader)` 可在已初始化、尚未运行的世界上原位恢复，保留现有系统和它们的注册顺序，丢弃旧世界的待执行命令。首个 `Step` 或 `Update` 按所声明的组重建列存储。
+
+当前写出的 V1 快照按每种组件的残段顺序和组行顺序编码。以相同的组件组重新装配后，首帧会沿存档顺序恢复这些行。旧 V1 快照仍可读取，旧写入器已排序的组件只能从存档保留的顺序开始。改变组声明、关闭组表或调用 `Optimize` 都可能改变后续遍历顺序。
+
+固定步长回放使用 `world.Step(fixedDelta)`。要让顺序敏感的系统从检查点复现原结果，还需保持相同的系统配置、外部输入顺序和系统私有状态，并确保并发回调的共享副作用具备确定的顺序。
 
 ---
 

@@ -2,6 +2,7 @@ package ecs
 
 import (
 	"iter"
+	"slices"
 	"unsafe"
 )
 
@@ -72,18 +73,33 @@ func (c *CSet[T, TP]) Free() {
 }
 
 func (c *CSet[T, TP]) marshalWithGroup(a *Archetype, col int) (*SerializableSparseArrayData, error) {
-	if a == nil || a.Len() == 0 {
-		return c.Marshal()
+	source := c
+	if a.Len() > 0 {
+		// 行序也是存档数据。恢复时移出共同尾部的组行，保留前缀中各自的残段顺序。
+		source = NewCSet[T, TP](c.Len() + a.Len())
+		for idx, val := range c.Iter() {
+			source.SparseArray.Add(idx, val)
+		}
+		for row, idx := range a.entities {
+			source.SparseArray.Add(idx, (*T)(a.cellPtr(col, row)))
+		}
 	}
-	merged := NewCSet[T, TP](c.Len() + a.Len())
-	for idx, val := range c.Iter() {
-		merged.SparseArray.Add(idx, val)
+	data, err := source.Marshal()
+	if err != nil {
+		return nil, err
 	}
-	for row := 0; row < a.Len(); row++ {
-		merged.SparseArray.Add(a.entities[row], (*T)(a.cellPtr(col, row)))
+	// 还原真实组件池的配置。稀疏索引的预留尾部及失序标志的历史值均不影响
+	// 元素顺序，将它们规范化，确保组行全部拆出后的下一份快照仍可逐字节复现。
+	data.InitSize = int32(c.SparseArray.initSize)
+	data.USetData.InitSize = c.USet.initSize
+	data.ShrinkThreshold = c.shrinkThreshold
+	end := len(data.Indices)
+	for end > 0 && data.Indices[end-1] == 0 {
+		end--
 	}
-	merged.Sort()
-	return merged.Marshal()
+	data.Indices = data.Indices[:end]
+	data.IsKOrder = data.IsKOrder || slices.IsSorted(data.Idx2Key)
+	return data, nil
 }
 
 // AddRaw 从裸内存拷贝一个元素入集（USet.Add 为拷贝语义，不与 src 共享内存）
