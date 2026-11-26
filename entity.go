@@ -3,6 +3,7 @@ package ecs
 import (
 	"cmp"
 	"fmt"
+	"math"
 	"math/bits"
 	"slices"
 	"unsafe"
@@ -53,6 +54,9 @@ type EntityIDGenerator struct {
 	// contains one maximum per page; every parent holds its children's max.
 	// Zero means no known free slot. The linked list remains authoritative.
 	freePages []EntityIndex
+	// During a run of allocations the sorted freelist cannot reach the
+	// current page's largest free ID before this index.
+	nextAnchorCheck EntityIndex
 }
 
 const freePageSize = 128
@@ -93,7 +97,7 @@ func (e *EntityIDGenerator) NewID() Entity {
 		slot.index = id.index
 	}
 	e.len++
-	if e.freePages != nil {
+	if e.freePages != nil && id.index >= e.nextAnchorCheck {
 		e.forgetPageAnchor(id.index)
 	}
 	return id.ToEntity()
@@ -145,6 +149,8 @@ func (e *EntityIDGenerator) delayFlush() {
 	// need a long search from the head when releases arrive out of order.
 	if e.freePages != nil || (e.mergeHint > first && last-e.free >= freePageSize) {
 		e.growFreePages(last)
+		// A newly merged ID can precede the next anchor scheduled for removal.
+		e.nextAnchorCheck = 0
 	}
 
 	link := &e.free
@@ -230,7 +236,15 @@ func (e *EntityIDGenerator) recordPageAnchor(index EntityIndex) {
 
 func (e *EntityIDGenerator) forgetPageAnchor(index EntityIndex) {
 	node := len(e.freePages)/2 + int(index)/freePageSize
-	if node >= len(e.freePages) || e.freePages[node] != index {
+	if node >= len(e.freePages) || e.freePages[1] == 0 {
+		e.nextAnchorCheck = math.MaxInt32
+		return
+	}
+	e.nextAnchorCheck = e.free
+	if anchor := e.freePages[node]; anchor != index {
+		if anchor > index {
+			e.nextAnchorCheck = anchor
+		}
 		return
 	}
 	// Allocation takes the smallest free ID. When the page maximum is
