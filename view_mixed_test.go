@@ -2,8 +2,41 @@ package ecs
 
 import (
 	"iter"
+	"slices"
 	"testing"
 )
+
+func TestMixedView2ROReusedSequenceChangesDriver(t *testing.T) {
+	w := NewWorld()
+	w.NewEntity(WithComponents(&p2CompA{V: 1}, &p2CompB{}, &p2CompC{}))
+	w.NewEntity(WithComponents(&p2CompA{V: 2}, &p2CompB{}))
+	w.NewEntity(WithComponents(&p2CompA{V: 3}, &p2CompB{}, &p2CompC{}))
+	w.NewEntity(WithComponents(&p2CompB{}))
+	var rows iter.Seq2[*p2CompA, p2CompBView]
+	var observed []int32
+	err := w.RegisterLight(func(ctx *SystemContext, _ Event) error {
+		if rows == nil {
+			rows = View2RO[p2CompA, p2CompBView](ctx)
+		}
+		observed = observed[:0]
+		for a := range rows {
+			observed = append(observed, a.V)
+		}
+		return nil
+	}, WithDeps(Dep[p2CompA](), Dep[p2CompB](ReadOnly), Dep[p2CompC]()), WithGroup(Dep[p2CompA](), Dep[p2CompC]()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Step(1); err != nil || !slices.Equal(observed, []int32{1, 3, 2}) {
+		t.Fatalf("group and residual order: %v, err=%v", observed, err)
+	}
+	for range 3 {
+		w.NewEntity(WithComponents(&p2CompA{}))
+	}
+	if err := w.Step(1); err != nil || !slices.Equal(observed, []int32{1, 2, 3}) {
+		t.Fatalf("pool order: %v, err=%v", observed, err)
+	}
+}
 
 type mixedFilteredPool struct {
 	*CSet[p2CompB, *p2CompB]
