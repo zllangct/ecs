@@ -147,7 +147,7 @@ func (c *OpLog) getOpTasks() ([]func(), []func(), func()) {
 	}
 	slices.Sort(orderedTypes)
 
-	var tasks []func()
+	tasks := make([]func(), 0, len(orderedTypes)+1)
 	for _, intType := range orderedTypes {
 		taskList := combination[intType]
 		set := c.world.components[intType]
@@ -192,36 +192,38 @@ func (c *OpLog) getOpTasks() ([]func(), []func(), func()) {
 	tasks = append(tasks, fn)
 
 	// 第二相：组表成员资格 sync。收集本帧涉及组内类型的实体，按组聚合（按组首类型升序确定性排列）。
-	touched := map[*Archetype]map[EntityIndex]struct{}{}
+	var touchedGroups []*Archetype
 	for _, it := range orderedTypes {
 		list := combination[it]
 		a, ok := c.world.archetypes.owner(it)
 		if !ok {
 			continue
 		}
-		if touched[a] == nil {
-			touched[a] = map[EntityIndex]struct{}{}
+		if len(a.pendingRows) == 0 {
+			touchedGroups = append(touchedGroups, a)
 		}
 		for task := list.head; task != nil; task = task.next {
-			touched[a][task.target.Index()] = struct{}{}
+			index := task.target.Index()
+			if n := len(a.pendingRows); n == 0 || a.pendingRows[n-1] != index {
+				a.pendingRows = append(a.pendingRows, index)
+			}
 		}
-	}
-	touchedGroups := make([]*Archetype, 0, len(touched))
-	for a := range touched {
-		touchedGroups = append(touchedGroups, a)
 	}
 	slices.SortFunc(touchedGroups, func(left, right *Archetype) int {
 		return cmp.Compare(left.types[0], right.types[0])
 	})
-	var syncTasks []func()
+	syncTasks := make([]func(), 0, len(touchedGroups))
 	for _, a := range touchedGroups {
-		a, entities := a, touched[a]
 		syncTasks = append(syncTasks, func() {
-			c.world.syncGroup(a, entities)
+			slices.Sort(a.pendingRows)
+			c.world.syncGroupOrdered(a, slices.Compact(a.pendingRows))
 		})
 	}
 
 	clean := func() {
+		for _, a := range touchedGroups {
+			a.pendingRows = a.pendingRows[:0]
+		}
 		for _, list := range combination {
 			next := list.head
 			for next != nil {

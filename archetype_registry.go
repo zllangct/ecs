@@ -186,18 +186,7 @@ func (w *World) absorbAll() {
 	}
 }
 
-// syncGroup 帧同步点组成员资格重评估（两阶段 flush 的第二相，单线程/组间并发安全——
-// 各组类型集合互不重叠，实体行只属一张表）。
-// 对触及实体按 EntityIndex 升序确定性重评估：在表中但已失去组内组件 → 拆行散回 CSet；不在表中但已集齐 → 收拢入行。
-func (w *World) syncGroup(a *Archetype, entities map[EntityIndex]struct{}) {
-	ordered := make([]EntityIndex, 0, len(entities))
-	for index := range entities {
-		ordered = append(ordered, index)
-	}
-	sort.Slice(ordered, func(i, j int) bool { return ordered[i] < ordered[j] })
-	w.syncGroupOrdered(a, ordered)
-}
-
+// Live flushes supply unique ascending IDs. Restore supplies snapshot row order.
 func (w *World) syncGroupOrdered(a *Archetype, ordered []EntityIndex) {
 	for _, index := range ordered {
 		info := w.entities.getByIndex(index)

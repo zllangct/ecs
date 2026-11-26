@@ -9,11 +9,12 @@ import (
 // 不变量：实体拥有 G 全集 ⟺ 在表中占一行；组件实例只存一处（表列或 CSet 残段）。
 // 仅在帧同步点被单线程修改；system 执行期只读。
 type Archetype struct {
-	types    []ComponentIntType // 升序
-	sizes    []int              // 与 types 平行，列 stride
-	columns  [][]byte           // 与 types 平行，len = rows*size
-	entities []EntityIndex      // 行 → 实体
-	rowIdx   []int32            // 稀疏: EntityIndex → 行号+1，0=不在表（仿 SparseArray.indices）
+	types       []ComponentIntType // 升序
+	sizes       []int              // 与 types 平行，列 stride
+	columns     [][]byte           // 与 types 平行，len = rows*size
+	entities    []EntityIndex      // 行 → 实体
+	rowIdx      []int32            // 稀疏: EntityIndex → 行号+1，0=不在表（仿 SparseArray.indices）
+	pendingRows []EntityIndex      // scratch, owned by this group's structural flush
 }
 
 // NewArchetype types/sizes 为平行数组；内部按 types 升序重排（同步重排 sizes）。
@@ -119,6 +120,7 @@ func (a *Archetype) entityIndexes() []EntityIndex { return a.entities }
 func (a *Archetype) clearRows() {
 	a.entities = nil
 	a.rowIdx = nil
+	a.pendingRows = nil
 	for i := range a.columns {
 		a.columns[i] = nil
 	}
