@@ -119,27 +119,25 @@ func (s *SparseArray[K, V]) denseIndex(key K) int32 {
 func (s *SparseArray[K, V]) removeAt(key K, idx int32) {
 	// swap-remove：用末尾元素覆盖被删位置，同步维护 indices/idx2Key
 	lastIdx := int32(s.len) - 1
-	lastKey := s.idx2Key[lastIdx]
-	s.data[idx] = s.data[lastIdx]
+	if idx != lastIdx {
+		movedKey := s.idx2Key[lastIdx]
+		s.data[idx] = s.data[lastIdx]
+		s.idx2Key[idx] = movedKey
+		s.indices[movedKey] = idx + 1
+		s.isKOrder = false
+	} else if lastIdx > 0 {
+		s.lastKey = K(s.idx2Key[lastIdx-1])
+	} else {
+		s.isKOrder = true
+		s.lastKey = 0
+	}
 	// 清零空出的尾槽，避免滞留指针/GC 引用
 	var zero V
 	s.data[lastIdx] = zero
 	s.len--
 
-	s.idx2Key[idx] = lastKey
-	s.indices[lastKey] = idx + 1
 	s.indices[key] = 0
 	s.idx2Key = s.idx2Key[:lastIdx]
-
-	switch {
-	case lastIdx == 0:
-		s.isKOrder = true
-		s.lastKey = 0
-	case idx == lastIdx:
-		s.lastKey = K(s.idx2Key[lastIdx-1])
-	default:
-		s.isKOrder = false
-	}
 	s.shrink(key)
 }
 
