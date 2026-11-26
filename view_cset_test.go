@@ -148,7 +148,7 @@ func TestView2ROCSetOrderAfterSwapRemove(t *testing.T) {
 	var entities [8]Entity
 	for i := range entities {
 		var comps []Component
-		if i > 0 {
+		if i > 0 && i < 6 {
 			comps = append(comps, newGroupCompA(int32(i)))
 		}
 		if i < 7 {
@@ -163,12 +163,18 @@ func TestView2ROCSetOrderAfterSwapRemove(t *testing.T) {
 		if rows == nil {
 			rows = View2RO[groupCompA, groupCompBSnapshot](ctx)
 		}
+		usage := ctx.info.getOptReporter().shapeUsage
+		shape := FixedCompound2{GetIntType[groupCompA](), GetIntType[groupCompB]()}
+		before := usage[shape]
 		got = got[:0]
 		for a, b := range rows {
 			if b.V() != 10*a.V || b.doubled != 20*a.V {
 				t.Fatalf("mismatched columns at A=%d: B=%d doubled=%d", a.V, b.V(), b.doubled)
 			}
 			got = append(got, a.V)
+		}
+		if n := usage[shape] - before; n != 1 {
+			t.Fatalf("reused iterator reported %d scans, want 1", n)
 		}
 		return nil
 	}, WithDeps(Dep[groupCompA](), Dep[groupCompB](ReadOnly))); err != nil {
@@ -183,7 +189,12 @@ func TestView2ROCSetOrderAfterSwapRemove(t *testing.T) {
 			t.Fatalf("iteration order %v, want %v", got, want)
 		}
 	}
-	// Initially both pools are dense, but start at different entity IDs.
+	update(1, 2, 3, 4, 5) // B's contiguous keys 0..6 cover A.
+	for _, i := range []int{6, 7} {
+		info, _ := w.GetEntityInfo(entities[i])
+		info.Add(newGroupCompA(int32(i)))
+	}
+	// A now spans 1..7, B spans 0..6. The same iterator must switch to the ordered merge.
 	update(1, 2, 3, 4, 5, 6)
 	info, _ := w.GetEntityInfo(entities[2])
 	info.Remove(newGroupCompB(0))
