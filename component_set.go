@@ -101,25 +101,19 @@ func (c *CSet[T, TP]) IsKeyOrdered() bool {
 	return c.SparseArray.isKOrder
 }
 
-func (c *CSet[T, TP]) remove(entity Entity) *T {
-	index := entity.Index()
-	return c.SparseArray.Remove(index)
-}
-
 func (c *CSet[T, TP]) Remove(entity Entity) {
-	data := c.remove(entity)
-	if data == nil {
-		return
+	key := entity.Index()
+	if idx := c.denseIndex(key); idx >= 0 {
+		c.removeAt(key, idx)
 	}
 }
 
 func (c *CSet[T, TP]) RemoveAndReturn(entity Entity) Component {
-	r := c.remove(entity)
+	r := c.SparseArray.Remove(entity.Index())
 	if r == nil {
 		return nil
 	}
-	cpy := *r
-	return any(&cpy).(Component)
+	return TP(r)
 }
 
 func (c *CSet[T, TP]) Get(entity Entity) Component {

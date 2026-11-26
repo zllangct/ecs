@@ -93,18 +93,26 @@ func (s *SparseArray[K, V]) Add(key K, value *V) *V {
 }
 
 func (s *SparseArray[K, V]) Remove(key K) *V {
-	if key < 0 || key >= K(len(s.indices)) {
-		return nil
-	}
-	idx := s.indices[key] - 1
+	idx := s.denseIndex(key)
 	if idx < 0 {
 		return nil
 	}
+	removed := s.data[idx]
+	s.removeAt(key, idx)
+	return &removed
+}
 
+func (s *SparseArray[K, V]) denseIndex(key K) int32 {
+	if key < 0 || key >= K(len(s.indices)) {
+		return -1
+	}
+	return s.indices[key] - 1
+}
+
+func (s *SparseArray[K, V]) removeAt(key K, idx int32) {
 	// swap-remove：用末尾元素覆盖被删位置，同步维护 indices/idx2Key
 	lastIdx := int32(s.len) - 1
 	lastKey := s.idx2Key[lastIdx]
-	removed := s.data[idx]
 	s.data[idx] = s.data[lastIdx]
 	// 清零空出的尾槽，避免滞留指针/GC 引用
 	var zero V
@@ -119,8 +127,6 @@ func (s *SparseArray[K, V]) Remove(key K) *V {
 	s.shrink(key)
 
 	s.isKOrder = false
-
-	return &removed
 }
 
 func (s *SparseArray[K, V]) Exist(key K) bool {
