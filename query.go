@@ -120,15 +120,7 @@ func (q *Query) Iter() iter.Seq2[EntityIndex, *EntityInfo] {
 			if resMinSet == nil {
 				return
 			}
-			if mergeable(c.pools) {
-				for index, info := range mergeJoinIter(q.ctx.world, resMinSet, c.pools) {
-					if !yield(index, info) {
-						return
-					}
-				}
-				return
-			}
-			for index, info := range existFilterIter(q.ctx.world, resMinSet, c.pools) {
+			for index, info := range intersectPools(q.ctx.world, resMinSet, c.pools) {
 				if !yield(index, info) {
 					return
 				}
@@ -189,12 +181,76 @@ func (q *Query) Iter() iter.Seq2[EntityIndex, *EntityInfo] {
 	if minSet == nil {
 		return empty
 	}
-	// merge-join：全部 buddy 池按 key 有序时，有序归并求交（全程顺序访问，
-	// 取代逐 key 稀疏查找与过滤）；任一池失序回退 Exist 过滤路径
-	if mergeable(c.pools) {
-		return mergeJoinIter(q.ctx.world, minSet, c.pools)
+	return intersectPools(q.ctx.world, minSet, c.pools)
+}
+
+func intersectPools(world *World, minSet ComponentSet, pools []ComponentSet) iter.Seq2[EntityIndex, *EntityInfo] {
+	if len(pools) == 2 {
+		other := pools[0]
+		if other == minSet {
+			other = pools[1]
+		}
+		return intersectPair(world, minSet, other)
 	}
-	return existFilterIter(q.ctx.world, minSet, c.pools)
+	if mergeable(pools) {
+		return mergeJoinIter(world, minSet, pools)
+	}
+	return existFilterIter(world, minSet, pools)
+}
+
+// Both pools are nonempty. Keep the smaller pool's traversal order on every path.
+func intersectPair(world *World, driver, other ComponentSet) iter.Seq2[EntityIndex, *EntityInfo] {
+	keys := driver.EntityIndexes()
+	if driver.IsKeyOrdered() && other.IsKeyOrdered() {
+		peers := other.EntityIndexes()
+		first, last := peers[0], peers[len(peers)-1]
+		if keys[len(keys)-1] < first || keys[0] > last {
+			return func(func(EntityIndex, *EntityInfo) bool) {}
+		}
+		// Distinct sorted peer keys filling their entire range prove membership
+		// for every driver key inside it, with no per-entity peer access.
+		if int64(last)-int64(first)+1 == int64(len(peers)) && keys[0] >= first && keys[len(keys)-1] <= last {
+			return func(yield func(EntityIndex, *EntityInfo) bool) {
+				for _, key := range keys {
+					if info := world.entities.getByIndex(key); info != nil && !yield(key, info) {
+						return
+					}
+				}
+			}
+		}
+		// A merge stops at the final driver key. A small prefix can be cheap even
+		// when the rest of the peer pool is large. Use 64-bit math for key spans.
+		scanBound := min(int64(len(peers)), int64(keys[len(keys)-1])-int64(first)+1)
+		const probeRatio = 8
+		if scanBound < probeRatio*int64(len(keys)) {
+			return func(yield func(EntityIndex, *EntityInfo) bool) {
+				j := 0
+				for _, key := range keys {
+					for j < len(peers) && peers[j] < key {
+						j++
+					}
+					if j == len(peers) {
+						return
+					}
+					if peers[j] == key {
+						j++
+						if info := world.entities.getByIndex(key); info != nil && !yield(key, info) {
+							return
+						}
+					}
+				}
+			}
+		}
+	}
+	return func(yield func(EntityIndex, *EntityInfo) bool) {
+		for _, key := range keys {
+			if other.Exist(key) {
+				if info := world.entities.getByIndex(key); info != nil && !yield(key, info) {
+					return
+				}
+			}
+		}
+	}
 }
 
 // pickMinNonEmptyPool 存在任一 nil 或空池则返回 nil；否则返回元素最少的池
