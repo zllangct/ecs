@@ -145,8 +145,32 @@ func TestCheckpointKeepsMergedGroupAndResidualOrder(t *testing.T) {
 		t.Fatalf("expected four out-of-order group rows and four residual matches, got %v", originalRows)
 	}
 
+	checkpoint := encode(original)
+	t.Run("regroup", func(t *testing.T) {
+		other := NewWorld()
+		if err := other.UnmarshalFrom(rockmem.NewReader(checkpoint)); err != nil {
+			t.Fatal(err)
+		}
+		if err := other.RegisterLight(groupProbeLight, WithGroup(Dep[p2CompA](), Dep[p2CompC]())); err != nil {
+			t.Fatal(err)
+		}
+		if err := other.Step(delta); err != nil {
+			t.Fatal(err)
+		}
+		// 9 号实体原来缺 B 而位于残段，现在具备新组 {A,C} 的全部组件。
+		g, _ := other.archetypes.owner(GetIntType[p2CompA, *p2CompA]())
+		if _, inGroup := g.rowOf(ids[8].Index()); !inGroup {
+			t.Fatal("restored entity failed to join the new group")
+		}
+		a, hasA := other.GetComponent[p2CompA](ids[8])
+		c, hasC := other.GetComponent[p2CompC](ids[8])
+		if !hasA || !hasC || a.V != 9 || c.V != 9 {
+			t.Fatal("regrouped component values changed")
+		}
+	})
+
 	restored := NewWorld()
-	if err := restored.UnmarshalFrom(rockmem.NewReader(encode(original))); err != nil {
+	if err := restored.UnmarshalFrom(rockmem.NewReader(checkpoint)); err != nil {
 		t.Fatal(err)
 	}
 	register(restored, &restoredRows)

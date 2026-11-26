@@ -1,6 +1,10 @@
 package ecs
 
 import (
+	"bytes"
+	"encoding/binary"
+	"errors"
+	"strings"
 	"testing"
 	"unsafe"
 
@@ -11,6 +15,62 @@ import (
 type stringyComp struct {
 	Name string
 	Seq  int32
+}
+
+func TestCSetMarshalVariableLengthWireLayout(t *testing.T) {
+	set := NewCSet[stringyComp](8)
+	values := []stringyComp{{Name: strings.Repeat("x", 8192), Seq: 17}, {Seq: 2}, {Name: "字段", Seq: 5}}
+	for i, v := range values {
+		set.Add(Entity(i+1), &v)
+	}
+	got, err := set.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// V1 格式约定，首项是零偏移，后续偏移相对于所有偏移之后的第一个字节。
+	var offsets, payload []byte
+	offsets = binary.LittleEndian.AppendUint64(offsets, 0)
+	for _, v := range values {
+		payload = binary.LittleEndian.AppendUint32(payload, uint32(len(v.Name)))
+		payload = binary.LittleEndian.AppendUint32(payload, uint32(v.Seq))
+		payload = append(payload, v.Name...)
+		offsets = binary.LittleEndian.AppendUint64(offsets, uint64(len(payload)))
+	}
+	if !bytes.Equal(got.USetData.Data, append(offsets, payload...)) || got.USetData.EleSize != 0 ||
+		got.USetData.Len != 3 || got.USetData.InitSize != 8 {
+		t.Fatalf("IDL element bytes or layout metadata changed")
+	}
+	set.Free()
+	back, err := NewCSetFromData[stringyComp](got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, want := range values {
+		if got := back.Get(Entity(i+1)); got == nil || *got.(*stringyComp) != want {
+			t.Fatalf("element %d: snapshot was not independent of source and encoder scratch", i)
+		}
+	}
+}
+
+type failingStringyComp struct{ stringyComp }
+
+var errFixtureEncode = errors.New("fixture encode error")
+
+func (d *failingStringyComp) WriteAsRoot(w rockmem.Writer) (uint, error) {
+	if d.Seq < 0 {
+		return 0, errFixtureEncode
+	}
+	return d.stringyComp.WriteAsRoot(w)
+}
+
+func TestCSetMarshalIDLErrorDiscardsPartialData(t *testing.T) {
+	set := NewCSet[failingStringyComp]()
+	set.Add(1, &failingStringyComp{stringyComp{Seq: 1}})
+	set.Add(2, &failingStringyComp{stringyComp{Seq: -1}})
+	got, err := set.Marshal()
+	if got != nil || !errors.Is(err, errFixtureEncode) || !strings.Contains(err.Error(), "component 1") {
+		t.Fatalf("partially encoded component set returned %v, %v", got, err)
+	}
 }
 
 func (d *stringyComp) NewComponentSet() ComponentSet {

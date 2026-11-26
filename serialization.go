@@ -136,8 +136,12 @@ func (u *USet[T]) UnmarshalFrom(reader *rockmem.Reader) error {
 
 // Marshal serializes SparseArray[K, V] to SerializableSparseArrayData
 func (s *SparseArray[K, V]) Marshal() *SerializableSparseArrayData {
+	return s.marshalWithData(*s.USet.Marshal())
+}
+
+func (s *SparseArray[K, V]) marshalWithData(elements SerializableUSetData) *SerializableSparseArrayData {
 	data := &SerializableSparseArrayData{
-		USetData:        *s.USet.Marshal(),
+		USetData:        elements,
 		MaxKey:          int64(s.maxKey),
 		ShrinkThreshold: s.shrinkThreshold,
 		InitSize:        int32(s.initSize),
@@ -228,16 +232,17 @@ type rockmemMessage interface {
 // 支持 string/slice/嵌套等非 POD 字段；否则回退 legacy raw 布局（仅 POD 安全）。
 // R19：IDL 序列化失败返回 error，不再静默回退 raw（raw 含指针的快照跨进程无效）
 func (c *CSet[T, TP]) Marshal() (*SerializableSparseArrayData, error) {
-	data := c.SparseArray.Marshal()
-
 	var probe TP
 	if _, ok := any(probe).(rockmemMessage); !ok || c.Len() == 0 {
-		return data, nil
+		return c.SparseArray.Marshal(), nil
 	}
 
 	n := c.Len()
-	offsets := make([]int64, n+1)
-	var blob []byte
+	if n > math.MaxInt/8-1 {
+		return nil, fmt.Errorf("ecs: IDL offset table too large for %d components", n)
+	}
+	headerSize := (n + 1) * 8
+	var encoded []byte
 	w := rockmem.NewWriter()
 	for i := 0; i < n; i++ {
 		w.Reset()
@@ -245,18 +250,25 @@ func (c *CSet[T, TP]) Marshal() (*SerializableSparseArrayData, error) {
 		if _, err := m.WriteAsRoot(w); err != nil {
 			return nil, fmt.Errorf("ecs: marshal component %d: %w", i, err)
 		}
-		offsets[i] = int64(len(blob))
-		blob = append(blob, w.Bytes()...)
+		elem := w.Bytes()
+		if i == 0 {
+			// 对固定宽度组件一次分配。限制变长编码的估计，避免超大的首元素放大整池容量。
+			width := min(len(elem), int(c.eleSize))
+			capacity := headerSize
+			if width <= (math.MaxInt-headerSize)/n {
+				capacity += n * width
+			}
+			encoded = make([]byte, headerSize, capacity)
+		}
+		encoded = append(encoded, elem...)
+		binary.LittleEndian.PutUint64(encoded[(i+1)*8:], uint64(len(encoded)-headerSize))
 	}
-	offsets[n] = int64(len(blob))
-
-	hdr := make([]byte, (n+1)*8)
-	for i, o := range offsets {
-		binary.LittleEndian.PutUint64(hdr[i*8:], uint64(o))
-	}
-	data.USetData.Data = append(hdr, blob...)
-	data.USetData.EleSize = 0 // IDL 路径标记
-	return data, nil
+	return c.SparseArray.marshalWithData(SerializableUSetData{
+		EleSize:  0, // IDL 路径标记；偏移相对于首个 blob
+		Len:      c.len,
+		InitSize: c.USet.initSize,
+		Data:     encoded,
+	}), nil
 }
 
 // MarshalTo writes CSet[T] to a rockmem.Writer
