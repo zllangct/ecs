@@ -152,22 +152,19 @@ func (p *flow) runOpTasks(tasks []func()) error {
 	if len(tasks) == 0 {
 		return nil
 	}
-	wg := &sync.WaitGroup{}
 	switch p.config.ExecuteMode {
 	case ExecuteModeLinear:
 		for _, task := range tasks {
 			task()
 		}
 	case ExecuteModeParallel:
-		wg.Add(len(tasks))
-		for _, task := range tasks {
-			fn := func() {
-				task()
-				wg.Done()
-			}
-			go fn()
+		for _, task := range tasks[1:] {
+			p.workers.Go(task)
 		}
-		wg.Wait()
+		tasks[0]()
+		if len(tasks) > 1 {
+			p.workers.Wait()
+		}
 	default:
 		return fmt.Errorf("invalid flow mode: %d", p.config.ExecuteMode)
 	}
