@@ -8,6 +8,40 @@ type groupAccessRecorder struct {
 	queryHit map[EntityIndex]bool
 }
 
+func TestBuddyBindingsRefreshWhenPoolAppears(t *testing.T) {
+	w := NewWorld()
+	e := w.NewEntity(WithComponents(newGroupCompA(1)))
+	next := &dummyComponent{Seq: 12}
+	var called int
+	err := w.RegisterLight(func(ctx *SystemContext, _ Event) error {
+		called++
+		if _, writable := ctx.GetBuddy[dummyComponent](e.Index()); writable {
+			t.Fatal("first, read-only declaration must take precedence")
+		}
+		value, found := ctx.GetBuddyReadOnly[dummyComponentReadOnly](e.Index())
+		if called == 1 {
+			if found {
+				t.Fatal("component visible before deferred add")
+			}
+			ctx.AddComponents(e, next)
+		} else if !found || value.Seq() != next.Seq {
+			t.Fatal("new component pool missing on next callback")
+		}
+		return nil
+	}, WithDeps(Dep[dummyComponent](ReadOnly), Dep[dummyComponent](ReadWrite)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		if err := w.Update(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if called != 2 {
+		t.Fatalf("expected two callbacks, got %d", called)
+	}
+}
+
 type groupAccessProbe struct{ rec *groupAccessRecorder }
 
 func (s *groupAccessProbe) Update(ctx *SystemContext, event Event) error {
