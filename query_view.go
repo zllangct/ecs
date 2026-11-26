@@ -289,15 +289,14 @@ func mixedView2RO[A any, BR ReadOnlyView[BR], PA ComponentPointer[A]](ctx *Syste
 			return
 		}
 		var view BR
-		emit := func(key EntityIndex, pa *A) bool {
+		emit := func(key EntityIndex, pa *A, pb unsafe.Pointer) bool {
 			if !ctx.constraint.isValid() {
 				return false
 			}
 			if pa == nil || !ctx.world.entities.SparseArray.Exist(key) {
 				return true
 			}
-			pb := b.get(key)
-			return pb == nil || yield(pa, view.FromPtr(pb))
+			return yield(pa, view.FromPtr(pb))
 		}
 		findA := func(key EntityIndex) *A {
 			if row, ok := group.rowOf(key); ok {
@@ -307,25 +306,32 @@ func mixedView2RO[A any, BR ReadOnlyView[BR], PA ComponentPointer[A]](ctx *Syste
 		}
 		if totalB < totalA || (totalB == totalA && itB < itA) {
 			for _, key := range b.EntityIndexes() {
-				if !emit(key, findA(key)) {
-					return
+				if pa := findA(key); pa != nil {
+					if pb := b.get(key); pb != nil && !emit(key, pa, pb) {
+						return
+					}
 				}
 			}
 			return
 		}
 		for row := 0; row < group.Len(); row++ {
-			if !emit(group.entities[row], (*A)(group.cellPtr(col, row))) {
+			key := group.entities[row]
+			if pb := b.get(key); pb != nil && !emit(key, (*A)(group.cellPtr(col, row)), pb) {
 				return
 			}
 		}
 		for row, key := range a.EntityIndexes() {
+			pb := b.get(key)
+			if pb == nil {
+				continue
+			}
 			var pa *A
 			if row < len(a.idx2Key) && a.idx2Key[row] == int32(key) {
 				pa = &a.data[row]
 			} else {
 				pa = findA(key)
 			}
-			if !emit(key, pa) {
+			if !emit(key, pa, pb) {
 				return
 			}
 		}
