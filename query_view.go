@@ -72,9 +72,43 @@ func View2[A, B any, PA ComponentPointer[A], PB ComponentPointer[B]](ctx *System
 // 同属一张组表时走 lockstep，否则回退通用路径。
 // 约定（静默失败）：约束失效、依赖未声明/权限不匹配时返回空迭代器。
 func View2RO[A any, BR ReadOnlyView[BR], PA ComponentPointer[A]](ctx *SystemContext) iter.Seq2[*A, BR] {
-	empty := func(yield func(*A, BR) bool) {}
+	return buildView2RO(ctx, prepareView2RO[A, BR, PA])
+}
+
+// 构造迭代器时即解析权限与列。将解析函数作为参数，使入口足够小，
+// Go 编译器可以把完整组循环与调用方的 range 循环体一起内联。
+func buildView2RO[A any, BR ReadOnlyView[BR]](ctx *SystemContext, resolve func(*SystemContext) view2ROPlan[A, BR]) iter.Seq2[*A, BR] {
+	plan := resolve(ctx)
+	return func(yield func(*A, BR) bool) {
+		if plan.fallback != nil {
+			plan.fallback(yield)
+			return
+		}
+		var view BR
+		offsetA, offsetB := 0, 0
+		// 每列长度为 rows * stride。只在访问当前行时构造指针，末行之后仅推进整数偏移。
+		for range plan.rows {
+			a := (*A)(unsafe.Add(plan.baseA, offsetA))
+			b := view.FromPtr(unsafe.Add(plan.baseB, offsetB))
+			if !yield(a, b) {
+				return
+			}
+			offsetA += plan.strideA
+			offsetB += plan.strideB
+		}
+	}
+}
+
+type view2ROPlan[A, BR any] struct {
+	baseA, baseB     unsafe.Pointer
+	strideA, strideB int
+	rows             int
+	fallback         iter.Seq2[*A, BR]
+}
+
+func prepareView2RO[A any, BR ReadOnlyView[BR], PA ComponentPointer[A]](ctx *SystemContext) (plan view2ROPlan[A, BR]) {
 	if !ctx.constraint.isValid() {
-		return empty
+		return
 	}
 	itA := GetIntType[A, PA]()
 	var zeroB BR
@@ -82,7 +116,7 @@ func View2RO[A any, BR ReadOnlyView[BR], PA ComponentPointer[A]](ctx *SystemCont
 	depA, okA := ctx.info.getDep(itA)
 	depB, okB := ctx.info.getDep(itB)
 	if !okA || !okB || depA.readonly() || !depB.readonly() {
-		return empty
+		return
 	}
 
 	aA, okA := ctx.world.archetypes.owner(itA)
@@ -94,7 +128,13 @@ func View2RO[A any, BR ReadOnlyView[BR], PA ComponentPointer[A]](ctx *SystemCont
 		dataA, dataB := aA.columns[colA], aA.columns[colB]
 		rows := aA.Len()
 		isSubset := distinctComponentCount(itA, itB) < len(aA.types)
-		return func(yield func(*A, BR) bool) {
+		if !isSubset {
+			plan.baseA = unsafe.Pointer(unsafe.SliceData(dataA))
+			plan.baseB = unsafe.Pointer(unsafe.SliceData(dataB))
+			plan.strideA, plan.strideB, plan.rows = sizeA, sizeB, rows
+			return
+		}
+		plan.fallback = func(yield func(*A, BR) bool) {
 			for row := 0; row < rows; row++ {
 				if !yield(
 					(*A)(unsafe.Pointer(&dataA[row*sizeA])),
@@ -103,14 +143,13 @@ func View2RO[A any, BR ReadOnlyView[BR], PA ComponentPointer[A]](ctx *SystemCont
 					return
 				}
 			}
-			if isSubset {
-				for ptrs := range iterResidualPtrs(ctx, itA, itB) {
-					if !yield((*A)(ptrs[0]), zeroB.FromPtr(ptrs[1])) {
-						return
-					}
+			for ptrs := range iterResidualPtrs(ctx, itA, itB) {
+				if !yield((*A)(ptrs[0]), zeroB.FromPtr(ptrs[1])) {
+					return
 				}
 			}
 		}
+		return
 	}
 
 	// 回退路径
@@ -120,9 +159,9 @@ func View2RO[A any, BR ReadOnlyView[BR], PA ComponentPointer[A]](ctx *SystemCont
 		setA, hasA := ctx.world.getComponentSet(itA)
 		setB, hasB := ctx.world.getComponentSet(itB)
 		if !hasA || !hasB {
-			return empty
+			return
 		}
-		return func(yield func(*A, BR) bool) {
+		plan.fallback = func(yield func(*A, BR) bool) {
 			for index := range q.Iter() {
 				if !ctx.constraint.isValid() {
 					return
@@ -133,8 +172,9 @@ func View2RO[A any, BR ReadOnlyView[BR], PA ComponentPointer[A]](ctx *SystemCont
 				}
 			}
 		}
+		return
 	}
-	return func(yield func(*A, BR) bool) {
+	plan.fallback = func(yield func(*A, BR) bool) {
 		for index := range q.Iter() {
 			a, okA := QueryGet[A, PA](&q, index)
 			if !okA {
@@ -149,4 +189,5 @@ func View2RO[A any, BR ReadOnlyView[BR], PA ComponentPointer[A]](ctx *SystemCont
 			}
 		}
 	}
+	return
 }
