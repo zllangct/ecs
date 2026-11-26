@@ -189,6 +189,7 @@ func (s *SparseArray[K, V]) Unmarshal(data *SerializableSparseArrayData) error {
 	s.initSize = int(data.InitSize)
 	s.isKOrder = data.IsKOrder
 	s.lastKey = K(lastKey)
+	s.lastShrunkKey = 0
 
 	// Copy indices slice
 	if len(data.Indices) > 0 {
@@ -365,6 +366,7 @@ func (c *CSet[T, TP]) unmarshalIDL(data *SerializableSparseArrayData) error {
 	c.initSize = int(data.InitSize)
 	c.isKOrder = data.IsKOrder
 	c.lastKey = EntityIndex(lastKey)
+	c.lastShrunkKey = 0
 	if len(data.Indices) > 0 {
 		c.indices = make([]int32, len(data.Indices))
 		copy(c.indices, data.Indices)
@@ -516,6 +518,7 @@ func (es *EntitySet) Unmarshal(data *SerializableEntitySetData) error {
 	es.initSize = int(data.InitSize)
 	es.isKOrder = data.IsKOrder
 	es.lastKey = EntityIndex(lastKey)
+	es.lastShrunkKey = 0
 
 	// Deserialize all EntityInfos from parallel arrays
 	if count > 0 {

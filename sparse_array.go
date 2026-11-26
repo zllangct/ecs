@@ -16,6 +16,8 @@ type SparseArray[K Integer, V any] struct {
 	// lastKey 最近一次 Add 的 key：递增添加不破坏 isKOrder（保序优化，
 	// 使 merge-join 在"顺序创建实体"的常规负载下无需 Sort 即可生效）
 	lastKey K
+	// Last peak that actually triggered a shrink. A repeated peak can reuse a bounded backing array.
+	lastShrunkKey K
 }
 
 func NewSparseArray[K Integer, V any](initSize ...int) *SparseArray[K, V] {
@@ -50,28 +52,14 @@ func (s *SparseArray[K, V]) Add(key K, value *V) *V {
 	if key < 0 {
 		return nil
 	}
-	length := len(s.indices)
 	// already existed
-	if key < K(length) && s.indices[key] != 0 {
+	if uint64(key) < uint64(len(s.indices)) && s.indices[key] != 0 {
 		return nil
 	}
-	_, idx := s.USet.Add(value)
-	if key >= K(length) {
-		m := K(0)
-		if length == 0 {
-			m = key + 1
-		} else if length < int(s.shrinkThreshold) {
-			m = key * 2
-		} else {
-			m = key * 5 / 4
-		}
-		newIndices := make([]int32, m)
-		count := copy(newIndices, s.indices)
-		if count != length {
-			panic("copy failed")
-		}
-		s.indices = newIndices
+	if uint64(key) >= uint64(len(s.indices)) {
+		s.growIndices(int(key))
 	}
+	_, idx := s.USet.Add(value)
 	if int(idx) < len(s.idx2Key) {
 		s.idx2Key[int32(idx)] = int32(key)
 	} else {
@@ -92,6 +80,25 @@ func (s *SparseArray[K, V]) Add(key K, value *V) *V {
 	return &s.data[idx]
 }
 
+func (s *SparseArray[K, V]) growIndices(key int) {
+	n := key + 1
+	if len(s.indices) > 0 {
+		if len(s.indices) < int(s.shrinkThreshold) {
+			n = max(n, key*2)
+		} else {
+			n = max(n, key+key/4)
+		}
+	}
+	if n <= cap(s.indices) {
+		// Every slot above maxKey was zero when the slice was shortened.
+		s.indices = s.indices[:n]
+		return
+	}
+	indices := make([]int32, n)
+	copy(indices, s.indices)
+	s.indices = indices
+}
+
 func (s *SparseArray[K, V]) Remove(key K) *V {
 	idx := s.denseIndex(key)
 	if idx < 0 {
@@ -103,7 +110,7 @@ func (s *SparseArray[K, V]) Remove(key K) *V {
 }
 
 func (s *SparseArray[K, V]) denseIndex(key K) int32 {
-	if key < 0 || key >= K(len(s.indices)) {
+	if uint64(key) >= uint64(len(s.indices)) {
 		return -1
 	}
 	return s.indices[key] - 1
@@ -137,14 +144,14 @@ func (s *SparseArray[K, V]) removeAt(key K, idx int32) {
 }
 
 func (s *SparseArray[K, V]) Exist(key K) bool {
-	if key < 0 || key >= K(len(s.indices)) {
+	if uint64(key) >= uint64(len(s.indices)) {
 		return false
 	}
 	return !(s.indices[key] == 0)
 }
 
 func (s *SparseArray[K, V]) Get(key K) *V {
-	if key < 0 || key >= K(len(s.indices)) {
+	if uint64(key) >= uint64(len(s.indices)) {
 		return nil
 	}
 	idx := s.indices[key] - 1
@@ -155,13 +162,20 @@ func (s *SparseArray[K, V]) Get(key K) *V {
 }
 
 func (s *SparseArray[K, V]) Reset() {
+	retained := s.lastShrunkKey != 0 && cap(s.indices) > 1024 && cap(s.indices) > len(s.indices)
+	s.lastShrunkKey = 0
 	if s.Len() == 0 {
+		if retained {
+			s.indices = make([]int32, len(s.indices))
+		}
 		return
 	}
 	s.USet.Reset()
 	if int(s.maxKey) < 1024 {
-		for i := 0; i < len(s.indices); i++ {
-			s.indices[i] = 0
+		if retained {
+			s.indices = make([]int32, len(s.indices))
+		} else {
+			clear(s.indices)
 		}
 	} else {
 		s.indices = make([]int32, 0, s.initSize)
@@ -179,6 +193,7 @@ func (s *SparseArray[K, V]) Free() {
 	s.idx2Key = nil
 	s.maxKey = 0
 	s.lastKey = 0
+	s.lastShrunkKey = 0
 	s.isKOrder = true
 }
 
@@ -240,20 +255,42 @@ func (s *SparseArray[K, V]) shrink(key K) {
 		return
 	}
 
-	s.maxKey = 0
-	for i := key; i > 0; i-- {
-		if s.indices[i] != 0 {
-			s.maxKey = i
-			break
-		}
+	if s.isKOrder {
+		s.maxKey = s.lastKey
+	} else {
+		s.maxKey = s.maxAfterRemove(int(key))
 	}
 
 	if len(s.indices) > 1024 && int(s.maxKey) < len(s.indices)/2 {
-		m := (s.maxKey + 1) * 5 / 4
-		newIndices := make([]int32, m)
-		copy(newIndices, s.indices[:m])
-		s.indices = newIndices
+		n := (int(s.maxKey) + 1) * 5 / 4
+		// Release a one-off peak immediately. Repeated toggles may retain up to
+		// 1 MiB per pool; shorten the logical index in either case for snapshots.
+		const maxRetainedSlots = (1 << 20) / 4
+		if key == s.lastShrunkKey && cap(s.indices) <= maxRetainedSlots {
+			s.indices = s.indices[:n]
+		} else {
+			indices := make([]int32, n)
+			copy(indices, s.indices[:n])
+			s.indices = indices
+		}
+		s.lastShrunkKey = key
 	}
+}
+
+func (s *SparseArray[K, V]) maxAfterRemove(key int) K {
+	// Nearby dense keys need only a few probes. Bound probes across a sparse
+	// gap by the cost of inspecting the remaining dense keys.
+	stop := max(0, key-len(s.idx2Key))
+	for i := key - 1; i >= stop; i-- {
+		if s.indices[i] != 0 {
+			return K(i)
+		}
+	}
+	var highest int32
+	for _, k := range s.idx2Key {
+		highest = max(highest, k)
+	}
+	return K(highest)
 }
 
 func (s *SparseArray[K, V]) Iter() iter.Seq2[K, *V] {

@@ -2,11 +2,64 @@ package ecs
 
 import (
 	"math/rand/v2"
+	"reflect"
 	"testing"
 )
 
 type saTestVal struct {
 	Seq int
+}
+
+func TestSparseArrayRepeatedHighKeyCapacity(t *testing.T) {
+	s := NewSparseArray[int, saTestVal]()
+	s.Add(1, &saTestVal{1})
+	const high = 100000
+	toggle := func(key int) {
+		if s.Add(key, &saTestVal{key}) == nil || s.Remove(key).Seq != key || s.Exist(key) {
+			t.Fatalf("failed toggle of key %d", key)
+		}
+	}
+	toggle(high)
+	if cap(s.indices) > 1024 {
+		t.Fatal("one transient peak retained its backing array")
+	}
+	cold := s.Marshal()
+	toggle(high)
+	if cap(s.indices) <= high || len(s.indices) > 1024 || !reflect.DeepEqual(s.Marshal(), cold) {
+		t.Fatal("repeated peak should reuse capacity and preserve the same serialized index")
+	}
+	retained := &s.indices[0]
+	toggle(high)
+	if &s.indices[0] != retained {
+		t.Fatal("repeated peak reallocated the sparse index")
+	}
+	s.Reset()
+	if cap(s.indices) > 1024 || s.Exist(1) {
+		t.Fatal("reset retained a previous peak or a resident component")
+	}
+	s.Add(1, &saTestVal{1})
+	toggle(300000)
+	toggle(300000)
+	if cap(s.indices) > 1024 {
+		t.Fatal("retained a backing array above the capacity limit")
+	}
+}
+
+func TestSparseArrayHighKeyUnorderedAndNarrowKeys(t *testing.T) {
+	s := NewSparseArray[int, saTestVal]()
+	for _, key := range []int{71, 6, 7, 100000} {
+		s.Add(key, &saTestVal{key})
+	}
+	s.Remove(100000)
+	if s.maxKey != 71 || s.Get(71).Seq != 71 {
+		t.Fatal("incorrect maximum after removing a distant, unordered key")
+	}
+	narrow := NewSparseArray[uint8, saTestVal]()
+	narrow.Add(1, &saTestVal{1})
+	narrow.Add(255, &saTestVal{255})
+	if !narrow.Exist(255) || narrow.Get(255).Seq != 255 || narrow.Remove(255).Seq != 255 {
+		t.Fatal("index length overflowed the narrow key type")
+	}
 }
 
 func TestSparseArrayTailOrder(t *testing.T) {

@@ -67,12 +67,7 @@ func (c *CSet[T, TP]) Add(entity Entity, comp Component) Component {
 }
 
 func (c *CSet[T, TP]) Free() {
-	c.SparseArray.USet.Free()
-	c.SparseArray.indices = nil
-	c.SparseArray.idx2Key = nil
-	c.SparseArray.maxKey = 0
-	c.SparseArray.lastKey = 0
-	c.SparseArray.isKOrder = true
+	c.SparseArray.Free()
 }
 
 func (c *CSet[T, TP]) marshalWithGroup(a *Archetype, col int) (*SerializableSparseArrayData, error) {
