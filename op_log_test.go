@@ -58,6 +58,51 @@ func TestOpLog_SystemCtxAddComponents(t *testing.T) {
 	}
 }
 
+// Main-queue writers can submit more work after the synchronization point
+// has detached a batch and before its cleanup returns the old nodes.
+func TestOpLog_ReactivateBucketWhileBatchIsDetached(t *testing.T) {
+	w := NewWorld()
+	first, second := w.NewEntity(), w.NewEntity()
+	queue := w.opLog
+	add := func(e Entity, comp Component) {
+		queue.operate(Operate{Entity: e, Comp: comp, Op: ComponentOperateAdd})
+	}
+	add(first, &groupCompA{1})
+	add(first, &groupCompB{2})
+	tasks, syncTasks, clean := queue.getOpTasks()
+	if queue.HasPending() {
+		t.Fatal("detached batch still pending")
+	}
+	add(second, &groupCompB{3})
+	add(second, &groupCompA{4})
+	for _, run := range tasks {
+		run()
+	}
+	for _, run := range syncTasks {
+		run()
+	}
+	clean()
+	if !queue.HasPending() {
+		t.Fatal("lost commands submitted during flush")
+	}
+	if _, ok := w.GetComponent[groupCompA](second); ok {
+		t.Fatal("new command applied before its synchronization point")
+	}
+	if err := w.Step(1); err != nil {
+		t.Fatal(err)
+	}
+	for i, e := range []Entity{first, second} {
+		a, okA := w.GetComponent[groupCompA](e)
+		b, okB := w.GetComponent[groupCompB](e)
+		if !okA || !okB || a.V != []int32{1, 4}[i] || b.V != []int32{2, 3}[i] {
+			t.Fatalf("entity %v components = %v, %v", e, a, b)
+		}
+	}
+	if queue.HasPending() {
+		t.Fatal("drained queue still pending")
+	}
+}
+
 // C1: 并行模式下多 system 并发经各自队列提交，synctest 提供确定性调度
 func TestOpLog_ParallelSubmitNoRace(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {

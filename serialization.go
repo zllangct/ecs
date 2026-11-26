@@ -966,8 +966,8 @@ func (w *World) Unmarshal(data *SerializableWorldData) error {
 		order := w.opLog.sysOrder
 		w.opLog = NewOpLog(w, runtime.NumCPU())
 		// 原位恢复保留已注册的系统。为它们重建空的专属队列，丢弃快照之前的命令。
-		for _, id := range order {
-			w.opLog.registerSystem(id)
+		for _, queue := range order {
+			w.opLog.registerSystem(queue.systemID)
 		}
 	}
 	w.compVersion++ // 组件池整体替换：旧查询缓存全部失效

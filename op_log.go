@@ -21,6 +21,20 @@ type Operate struct {
 	Op     ComponentOperate
 }
 
+// Each writer retains its type buckets across frames. Only nonempty buckets
+// are linked, so a flush never visits a type merely because it was used before.
+type opBucket struct {
+	opTaskList
+	typ  ComponentIntType
+	next *opBucket
+}
+
+type opQueue struct {
+	systemID uint64
+	buckets  map[ComponentIntType]*opBucket
+	active   *opBucket
+}
+
 // OpLog 组件操作日志。
 // 写入路径分双轨：
 //   - system 执行期间（经 SystemContext.AddComponents）写入所属 system 的独立队列，
@@ -32,42 +46,39 @@ type OpLog struct {
 	world *World
 
 	mu       sync.Mutex
-	main     map[ComponentIntType]*opTaskList
-	sys      map[uint64]map[ComponentIntType]*opTaskList
-	sysOrder []uint64
+	main     opQueue
+	sys      map[uint64]*opQueue
+	sysOrder []*opQueue
 }
 
 func NewOpLog(world *World, k int) *OpLog {
 	return &OpLog{
 		world: world,
-		main:  make(map[ComponentIntType]*opTaskList),
-		sys:   make(map[uint64]map[ComponentIntType]*opTaskList),
+		main:  opQueue{buckets: make(map[ComponentIntType]*opBucket)},
+		sys:   make(map[uint64]*opQueue),
 	}
 }
 
 // registerSystem 为 system 分配独立操作队列，注册期主线程调用，并记录固定合并顺序
 func (c *OpLog) registerSystem(id uint64) {
 	if _, ok := c.sys[id]; !ok {
-		c.sys[id] = make(map[ComponentIntType]*opTaskList)
-		c.sysOrder = append(c.sysOrder, id)
+		q := &opQueue{systemID: id, buckets: make(map[ComponentIntType]*opBucket)}
+		c.sys[id] = q
+		c.sysOrder = append(c.sysOrder, q)
 	}
 }
 
 // HasPending 是否仍有尚未 flush 到组件存储的操作（Marshal 只读导出前校验用）
 func (c *OpLog) HasPending() bool {
 	c.mu.Lock()
-	for _, list := range c.main {
-		if list.Len() > 0 {
-			c.mu.Unlock()
-			return true
-		}
-	}
+	pending := c.main.active != nil
 	c.mu.Unlock()
-	for _, id := range c.sysOrder {
-		for _, list := range c.sys[id] {
-			if list.Len() > 0 {
-				return true
-			}
+	if pending {
+		return true
+	}
+	for _, q := range c.sysOrder {
+		if q.active != nil {
+			return true
 		}
 	}
 	return false
@@ -77,31 +88,35 @@ func (c *OpLog) HasPending() bool {
 func (c *OpLog) operate(op Operate) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	appendOp(c.main, op)
+	c.main.append(op)
 }
 
 // operateForSystem system 执行期间入口，仅所属 system 的 goroutine 写入，无锁
 func (c *OpLog) operateForSystem(id uint64, op Operate) {
 	if q, ok := c.sys[id]; ok {
-		appendOp(q, op)
+		q.append(op)
 		return
 	}
 	c.operate(op)
 }
 
-func appendOp(b map[ComponentIntType]*opTaskList, op Operate) {
+func (q *opQueue) append(op Operate) {
 	typ := GetIntTypeByComp(op.Comp)
 	newOpt := opTaskPool.Get()
 	newOpt.target = op.Entity
 	newOpt.com = op.Comp
 	newOpt.op = op.Op
 
-	tl, ok := b[typ]
-	if !ok {
-		tl = &opTaskList{}
-		b[typ] = tl
+	bucket := q.buckets[typ]
+	if bucket == nil {
+		bucket = &opBucket{typ: typ}
+		q.buckets[typ] = bucket
 	}
-	tl.Append(newOpt)
+	if bucket.head == nil {
+		bucket.next = q.active
+		q.active = bucket
+	}
+	bucket.Append(newOpt)
 }
 
 // getOpTasks 返回两阶段任务：
@@ -110,29 +125,31 @@ func appendOp(b map[ComponentIntType]*opTaskList, op Operate) {
 func (c *OpLog) getOpTasks() ([]func(), []func(), func()) {
 	var combination map[ComponentIntType]*opTaskList
 
-	merge := func(src map[ComponentIntType]*opTaskList) {
-		for it, list := range src {
-			if list.Len() == 0 {
-				continue
-			}
-			if dst := combination[it]; dst != nil {
-				dst.Combine(list)
+	merge := func(src *opQueue) {
+		for src.active != nil {
+			bucket := src.active
+			src.active = bucket.next
+			bucket.next = nil
+			if dst := combination[bucket.typ]; dst != nil {
+				dst.Combine(&bucket.opTaskList)
 			} else {
 				if combination == nil {
 					combination = make(map[ComponentIntType]*opTaskList)
 				}
-				combination[it] = list.Clone()
+				combination[bucket.typ] = bucket.Clone()
 			}
-			list.Reset()
+			bucket.Reset()
 		}
 	}
 
 	c.mu.Lock()
-	merge(c.main)
+	merge(&c.main)
 	c.mu.Unlock()
 	// 帧同步点调用，system 均未运行，按系统注册顺序确定性合并 sys 队列
-	for _, id := range c.sysOrder {
-		merge(c.sys[id])
+	for _, q := range c.sysOrder {
+		if q.active != nil {
+			merge(q)
+		}
 	}
 	if len(combination) == 0 {
 		return nil, nil, func() {}
