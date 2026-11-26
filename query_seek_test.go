@@ -6,20 +6,31 @@ import (
 	"testing"
 )
 
-func TestSkewedQueryPreservesCapturedPeerCursors(t *testing.T) {
-	for _, mutation := range []string{"grow", "swap-remove"} {
-		t.Run(mutation, func(t *testing.T) {
+func TestOrderedThreePoolQueryPreservesCapturedPeerCursors(t *testing.T) {
+	for _, scenario := range []struct {
+		name   string
+		stride int
+		grow   bool
+	}{
+		{"seek/grow", 64, true}, {"seek/swap-remove", 64, false},
+		{"merge/grow", 4, true}, {"merge/swap-remove", 4, false},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
 			w := NewWorld(WithoutGroups())
 			entities := make([]Entity, 257)
+			var want []EntityIndex
 			for i := range entities {
 				comps := []Component{&p2CompC{}}
-				if i%64 == 0 {
+				if i%scenario.stride == 0 {
 					comps = append(comps, &p2CompA{})
 				}
 				if i != 128 {
 					comps = append(comps, &p2CompB{})
 				}
 				entities[i] = w.NewEntity(WithComponents(comps...))
+				if i%scenario.stride == 0 && i != 128 {
+					want = append(want, entities[i].Index())
+				}
 			}
 			var next, reference func() (EntityIndex, *EntityInfo, bool)
 			var stop, stopReference func()
@@ -42,7 +53,6 @@ func TestSkewedQueryPreservesCapturedPeerCursors(t *testing.T) {
 				for range rows {
 					break
 				}
-				want := []EntityIndex{entities[0].Index(), entities[64].Index(), entities[192].Index(), entities[256].Index()}
 				for range 2 {
 					var got []EntityIndex
 					for key, info := range rows {
@@ -73,7 +83,7 @@ func TestSkewedQueryPreservesCapturedPeerCursors(t *testing.T) {
 			}
 			defer stop()
 			defer stopReference()
-			if mutation == "grow" {
+			if scenario.grow {
 				info, _ := w.GetEntityInfo(entities[128])
 				info.Add(&p2CompB{})
 				for range 512 {

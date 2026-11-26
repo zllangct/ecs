@@ -199,7 +199,9 @@ func intersectPools(world *World, minSet ComponentSet, pools []ComponentSet) ite
 		// scanned before the driver ends. Only inspect native outliers' keys.
 		const seekRatio = 16
 		minScan := seekRatio * int64(len(keys))
-		if minScan > 0 {
+		// Native entity keys start at zero or above. A small absolute upper
+		// bound rules out every seek without querying individual pool sizes.
+		if minScan > 0 && int64(keys[len(keys)-1])+1 >= minScan {
 			for _, pool := range pools {
 				if int64(pool.Len()) < minScan {
 					continue
@@ -212,6 +214,19 @@ func intersectPools(world *World, minSet ComponentSet, pools []ComponentSet) ite
 				if len(peer) > 0 && int64(keys[len(keys)-1])-int64(peer[0])+1 >= minScan {
 					return seekJoinIter(world, minSet, pools, keys)
 				}
+			}
+		}
+		if len(pools) == 3 {
+			var peers [2]ComponentSet
+			n := 0
+			for _, p := range pools {
+				if p != minSet {
+					peers[n] = p
+					n++
+				}
+			}
+			if n == 2 {
+				return mergeThreeIter(world, keys, peers[0].EntityIndexes(), peers[1].EntityIndexes())
 			}
 		}
 		return mergeJoinIter(world, minSet, pools, keys)
@@ -401,6 +416,36 @@ func mergeJoinIter(world *World, minSet ComponentSet, pools []ComponentSet, keys
 			}
 			if !yield(k, info) {
 				return
+			}
+		}
+	}
+}
+
+// Each consumption gets two independent cursors. Keeping the remaining
+// slices local avoids allocating peer and cursor arrays for a three-pool join.
+func mergeThreeIter(world *World, keys, first, second []EntityIndex) iter.Seq2[EntityIndex, *EntityInfo] {
+	return func(yield func(EntityIndex, *EntityInfo) bool) {
+		left, right := first, second
+		for _, key := range keys {
+			for len(left) > 0 && left[0] < key {
+				left = left[1:]
+			}
+			if len(left) == 0 {
+				return
+			}
+			if left[0] != key {
+				continue
+			}
+			for len(right) > 0 && right[0] < key {
+				right = right[1:]
+			}
+			if len(right) == 0 {
+				return
+			}
+			if right[0] == key {
+				if info := world.entities.getByIndex(key); info != nil && !yield(key, info) {
+					return
+				}
 			}
 		}
 	}
