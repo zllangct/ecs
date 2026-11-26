@@ -277,21 +277,22 @@ func (w *World) flushPendingDestroy() {
 
 	for _, e := range list {
 		// reuse 代数校验：忽略已被销毁/复用的旧句柄
-		info, ok := w.entities.Get(e)
-		if !ok {
+		index := e.Index()
+		row := w.entities.denseIndex(index)
+		if row < 0 || w.entities.data[row].entity != e {
 			continue
 		}
-		for _, it := range info.compound {
+		for _, it := range w.entities.data[row].compound {
 			// Every complete row owns the group's smallest type. Testing
 			// that type once also works for entities in several groups.
 			if a, ok := w.archetypes.owner(it); ok && it == a.types[0] {
-				a.removeRow(e.Index())
+				a.removeRow(index)
 			}
 			if set := w.components[it]; set != nil {
 				set.Remove(e)
 			}
 		}
-		w.entities.SparseArray.Remove(e.Index())
+		w.entities.removeAt(index, row)
 		w.idGenerator.FreeID(e)
 	}
 }
