@@ -1,6 +1,7 @@
 package ecs
 
 import (
+	"iter"
 	"testing"
 	"unsafe"
 
@@ -17,6 +18,72 @@ func (v groupCompBView) FromPtr(p unsafe.Pointer) groupCompBView {
 	return groupCompBView{b: (*groupCompB)(p)}
 }
 func (v groupCompBView) V() int32 { return v.b.V }
+
+type groupCompBSnapshot struct {
+	groupCompBView
+	doubled int32
+}
+
+func (groupCompBSnapshot) FromPtr(p unsafe.Pointer) groupCompBSnapshot {
+	view := groupCompBView{}.FromPtr(p)
+	return groupCompBSnapshot{groupCompBView: view, doubled: 2 * view.V()}
+}
+
+func TestView2ROExactGroupIterator(t *testing.T) {
+	// The two columns have different strides (16 and 4 bytes).
+	RegisterComponent[PositionTestComp]("test_ext")
+	w := NewWorld()
+	var savedCtx *SystemContext
+	var denied iter.Seq2[*PositionTestComp, groupCompBSnapshot]
+	var entities []Entity
+	if err := w.RegisterLight(func(ctx *SystemContext, _ Event) error {
+		savedCtx = ctx
+		if denied != nil {
+			for range denied {
+				t.Fatal("iterator created with an inactive context yielded after reactivation")
+			}
+		}
+
+		rows := View2RO[PositionTestComp, groupCompBSnapshot](ctx)
+		first := 0
+		for range rows {
+			first++
+			break
+		}
+		if first != min(1, len(entities)) {
+			t.Fatalf("early break visited %d rows for %d entities", first, len(entities))
+		}
+		for a, b := range rows {
+			want := 10 * int32(a.X)
+			if b.V() != want || b.doubled != 2*want {
+				t.Fatalf("row X=%v: B=%v, doubled=%v, want %v and %v", a.X, b.V(), b.doubled, want, 2*want)
+			}
+			a.Y++
+		}
+		return nil
+	}, WithDeps(Dep[PositionTestComp](), Dep[groupCompB](ReadOnly)),
+		WithGroup(Dep[PositionTestComp](), Dep[groupCompB]())); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Update(); err != nil {
+		t.Fatal(err)
+	}
+	if savedCtx == nil {
+		t.Fatal("system did not run with an empty group")
+	}
+	denied = View2RO[PositionTestComp, groupCompBSnapshot](savedCtx)
+	for i := 1; i <= 3; i++ {
+		entities = append(entities, w.NewEntity(WithComponents(&PositionTestComp{X: float32(i)}, newGroupCompB(10*int32(i)))))
+	}
+	if err := w.Update(); err != nil {
+		t.Fatal(err)
+	}
+	for _, entity := range entities {
+		if a, ok := w.GetComponent[PositionTestComp](entity); !ok || a.Y != 1 {
+			t.Fatalf("reused iterator must write to entity %v once, got %v", entity, a)
+		}
+	}
+}
 
 type viewRecorder struct {
 	pairs map[EntityIndex][2]int32
