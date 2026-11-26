@@ -3,6 +3,7 @@ package ecs
 import (
 	"cmp"
 	"fmt"
+	"math/bits"
 	"slices"
 	"unsafe"
 )
@@ -48,8 +49,9 @@ type EntityIDGenerator struct {
 	// Last merged free slot. Allocation and restore invalidate the hint,
 	// so it always points into this generator's current sorted freelist.
 	mergeHint EntityIndex
-	// For scattered frees, keep the largest known free slot per page.
-	// Zero means that the page has no known anchor; the list is authoritative.
+	// Optional tree of free slots for scattered releases. Its second half
+	// contains one maximum per page; every parent holds its children's max.
+	// Zero means no known free slot. The linked list remains authoritative.
 	freePages []EntityIndex
 }
 
@@ -92,12 +94,7 @@ func (e *EntityIDGenerator) NewID() Entity {
 	}
 	e.len++
 	if e.freePages != nil {
-		page := int(id.index) / freePageSize
-		if page < len(e.freePages) && e.freePages[page] == id.index {
-			// Allocation takes the smallest free ID. Once the largest known
-			// slot is taken, every smaller known slot in that page is gone.
-			e.freePages[page] = 0
-		}
+		e.forgetPageAnchor(id.index)
 	}
 	return id.ToEntity()
 }
@@ -144,13 +141,10 @@ func (e *EntityIDGenerator) delayFlush() {
 	})
 
 	first, last := delayed[0].index, delayed[len(delayed)-1].index
-	pages := int(last)/freePageSize + 1
-	// Sequential frees need only mergeHint. Build the optional index when
-	// a later window overlaps an earlier one and spans multiple pages.
-	if e.freePages != nil || (e.mergeHint > first && last-first >= freePageSize) {
-		if pages > len(e.freePages) {
-			e.freePages = append(e.freePages, make([]EntityIndex, pages-len(e.freePages))...)
-		}
+	// Sequential frees only need mergeHint. A singleton window may also
+	// need a long search from the head when releases arrive out of order.
+	if e.freePages != nil || (e.mergeHint > first && last-e.free >= freePageSize) {
+		e.growFreePages(last)
 	}
 
 	link := &e.free
@@ -160,10 +154,8 @@ func (e *EntityIDGenerator) delayFlush() {
 		previous = e.mergeHint
 	}
 	for _, id := range delayed {
-		page := int(id.index) / freePageSize
-		// Use at most one lookup; a sparse world must not scan empty pages.
-		if e.freePages != nil && page > 0 {
-			if anchor := e.freePages[page-1]; anchor > previous {
+		if e.freePages != nil {
+			if anchor := e.previousPageAnchor(int(id.index) / freePageSize); anchor > previous {
 				link = &e.ids[anchor].index
 			}
 		}
@@ -174,11 +166,77 @@ func (e *EntityIDGenerator) delayFlush() {
 		*link = id.index
 		link = &e.ids[id.index].index
 		*link = next
-		if e.freePages != nil && id.index > e.freePages[page] {
-			e.freePages[page] = id.index
+		if e.freePages != nil {
+			e.recordPageAnchor(id.index)
 		}
 		previous = id.index
 	}
 	e.delayFree = 0
 	e.mergeHint = last
+}
+
+func (e *EntityIDGenerator) growFreePages(last EntityIndex) {
+	oldLeaves := len(e.freePages) / 2
+	page := int(last) / freePageSize
+	if page < oldLeaves {
+		return
+	}
+	leaves := 1 << bits.Len(uint(page))
+	tree := make([]EntityIndex, 2*leaves)
+	copy(tree[leaves:], e.freePages[oldLeaves:])
+	// Index rows that were already free before this range was tracked.
+	// The never-allocated tail of the initial freelist has generation zero.
+	start := e.free
+	if oldLeaves > 0 && e.freePages[1] != 0 {
+		start = e.ids[e.freePages[1]].index
+	}
+	for id := start; id != e.pending && int(id)/freePageSize < leaves; id = e.ids[id].index {
+		if e.ids[id].reuse == 0 {
+			break
+		}
+		tree[leaves+int(id)/freePageSize] = id
+	}
+	for i := leaves - 1; i > 0; i-- {
+		tree[i] = max(tree[2*i], tree[2*i+1])
+	}
+	e.freePages = tree
+}
+
+// previousPageAnchor returns the nearest known predecessor in a lower page.
+// Dense releases usually hit the adjacent page. A sparse release skips empty
+// ranges by ascending the tree until a nonempty left sibling is found.
+func (e *EntityIDGenerator) previousPageAnchor(page int) EntityIndex {
+	if page == 0 {
+		return 0
+	}
+	node := len(e.freePages)/2 + page
+	if adjacent := e.freePages[node-1]; adjacent != 0 {
+		return adjacent
+	}
+	for ; node > 1; node /= 2 {
+		if node%2 != 0 && e.freePages[node-1] != 0 {
+			return e.freePages[node-1]
+		}
+	}
+	return 0
+}
+
+func (e *EntityIDGenerator) recordPageAnchor(index EntityIndex) {
+	leaf := len(e.freePages)/2 + int(index)/freePageSize
+	for node := leaf; node > 0 && e.freePages[node] < index; node /= 2 {
+		e.freePages[node] = index
+	}
+}
+
+func (e *EntityIDGenerator) forgetPageAnchor(index EntityIndex) {
+	node := len(e.freePages)/2 + int(index)/freePageSize
+	if node >= len(e.freePages) || e.freePages[node] != index {
+		return
+	}
+	// Allocation takes the smallest free ID. When the page maximum is
+	// taken, all smaller known free IDs in this page have already gone.
+	e.freePages[node] = 0
+	for node /= 2; node > 0 && e.freePages[node] == index; node /= 2 {
+		e.freePages[node] = max(e.freePages[2*node], e.freePages[2*node+1])
+	}
 }
