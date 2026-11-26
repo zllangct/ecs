@@ -170,8 +170,23 @@ func prepareView2RO[A any, BR ReadOnlyView[BR], PA ComponentPointer[A]](ctx *Sys
 		plan.fallback = queryView2ROCSet[A, BR, PA](ctx, itB, setA, setB)
 		return
 	}
+	plan.fallback = prepareMixedView2RO[A, BR, PA](ctx, itA, itB, aA, aB)
+	return
+}
+
+func prepareMixedView2RO[A any, BR ReadOnlyView[BR], PA ComponentPointer[A]](ctx *SystemContext, itA, itB ComponentIntType, groupA, groupB *Archetype) iter.Seq2[*A, BR] {
+	if groupA != nil && groupB == nil {
+		setA, _ := ctx.world.getComponentSet(itA)
+		setB, _ := ctx.world.getComponentSet(itB)
+		nativeA, aOK := setA.(*CSet[A, PA])
+		nativeB, bOK := setB.(interface{ nativeCSet() ComponentSet })
+		if aOK && bOK && nativeB.nativeCSet() == setB {
+			colA, _ := groupA.colOf(itA)
+			return mixedView2RO[A, BR](ctx, itA, itB, groupA, colA, nativeA, setB)
+		}
+	}
 	q := ctx.NewQuery(WithComp[A, PA](), WithBuddies(*NewQueryBuddies(itB)))
-	plan.fallback = func(yield func(*A, BR) bool) {
+	return func(yield func(*A, BR) bool) {
 		for index := range q.Iter() {
 			a, okA := QueryGet[A, PA](&q, index)
 			if !okA {
@@ -186,7 +201,6 @@ func prepareView2RO[A any, BR ReadOnlyView[BR], PA ComponentPointer[A]](ctx *Sys
 			}
 		}
 	}
-	return
 }
 
 // 原查询负责自定义池以及需要归并的池；消费时才捕获双方键切片与归并游标。
@@ -255,6 +269,63 @@ func view2ROCSet[A any, BR ReadOnlyView[BR], PA ComponentPointer[A]](ctx *System
 				continue
 			}
 			if pb := b.get(key); pb != nil && !yield(pa, view.FromPtr(pb)) {
+				return
+			}
+		}
+	}
+}
+
+// Choose the same driving column and tie order as Query.Iter on every consumption.
+// Re-read group rows and component addresses when a suspended consumer resumes.
+func mixedView2RO[A any, BR ReadOnlyView[BR], PA ComponentPointer[A]](ctx *SystemContext, itA, itB ComponentIntType, group *Archetype, col int, a *CSet[A, PA], b ComponentSet) iter.Seq2[*A, BR] {
+	shape := FixedCompound2{min(itA, itB), max(itA, itB)}
+	return func(yield func(*A, BR) bool) {
+		if !ctx.constraint.isValid() {
+			return
+		}
+		ctx.info.getOptReporter().shapeUsageAddKey(shape)
+		totalA, totalB := group.Len()+a.Len(), b.Len()
+		if totalA == 0 || totalB == 0 {
+			return
+		}
+		var view BR
+		emit := func(key EntityIndex, pa *A) bool {
+			if !ctx.constraint.isValid() {
+				return false
+			}
+			if pa == nil || !ctx.world.entities.SparseArray.Exist(key) {
+				return true
+			}
+			pb := b.get(key)
+			return pb == nil || yield(pa, view.FromPtr(pb))
+		}
+		findA := func(key EntityIndex) *A {
+			if row, ok := group.rowOf(key); ok {
+				return (*A)(group.cellPtr(col, row))
+			}
+			return a.getByIndex(key)
+		}
+		if totalB < totalA || (totalB == totalA && itB < itA) {
+			for _, key := range b.EntityIndexes() {
+				if !emit(key, findA(key)) {
+					return
+				}
+			}
+			return
+		}
+		for row := 0; row < group.Len(); row++ {
+			if !emit(group.entities[row], (*A)(group.cellPtr(col, row))) {
+				return
+			}
+		}
+		for row, key := range a.EntityIndexes() {
+			var pa *A
+			if row < len(a.idx2Key) && a.idx2Key[row] == int32(key) {
+				pa = &a.data[row]
+			} else {
+				pa = findA(key)
+			}
+			if !emit(key, pa) {
 				return
 			}
 		}
