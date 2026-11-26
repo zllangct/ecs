@@ -80,17 +80,17 @@ func NewEntityIDGenerator(initSize int, delayCap int) *EntityIDGenerator {
 
 func (e *EntityIDGenerator) NewID() Entity {
 	e.mergeHint = 0
-	id := ReuseID{}
+	id := ReuseID{index: e.free}
 	if e.free == e.pending {
-		e.ids = append(e.ids, ReuseID{index: e.free, reuse: 0})
+		e.ids = append(e.ids, id)
 		id = e.ids[e.pending]
 		e.free++
 		e.pending++
 	} else {
-		next := e.ids[e.free].index
-		e.ids[e.free].index = e.free
-		id = e.ids[e.free]
-		e.free = next
+		slot := &e.ids[id.index]
+		id.reuse = slot.reuse
+		e.free = slot.index
+		slot.index = id.index
 	}
 	e.len++
 	if e.freePages != nil {
