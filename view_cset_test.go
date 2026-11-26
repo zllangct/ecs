@@ -25,6 +25,9 @@ func TestView2ROStorageAndAccess(t *testing.T) {
 			unmatched := w.NewEntity(WithComponents(&p2CompA{3}))
 			if err := w.RegisterLight(func(ctx *SystemContext, _ Event) error {
 				rows := View2RO[p2CompA, p2CompBView](ctx)
+				usage := ctx.info.getOptReporter().shapeUsage
+				shape := FixedCompound2{GetIntType[p2CompA](), GetIntType[p2CompB]()}
+				before := usage[shape]
 				first := 0
 				for range rows {
 					first++
@@ -33,8 +36,14 @@ func TestView2ROStorageAndAccess(t *testing.T) {
 				if first != 1 {
 					t.Fatalf("early break visited %d rows", first)
 				}
+				if calls := usage[shape] - before; layout == "CSet" && calls != 1 {
+					t.Fatalf("early break reported %d scans, want 1", calls)
+				}
 				for a, bv := range rows {
 					a.V += bv.V()
+				}
+				if calls := usage[shape] - before; layout == "CSet" && calls != 2 {
+					t.Fatalf("two iterations reported %d scans, want 2", calls)
 				}
 				return nil
 			}, opts...); err != nil {
