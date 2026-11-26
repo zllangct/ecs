@@ -1,9 +1,11 @@
 package ecs
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"runtime"
+	"slices"
 	"sync"
 	"time"
 )
@@ -248,7 +250,9 @@ func (w *World) AddNomadic(comps ...Component) {
 	}
 }
 
-// DestroyEntity 销毁实体：延迟到帧同步点，回收 ID、清理所有组件与 compound
+// DestroyEntity queues destruction at the next frame's first synchronization
+// point. Requests in that batch run in entity-index order, with the complete
+// handle as a tiebreaker. Pending component operations are applied afterwards.
 func (w *World) DestroyEntity(entity Entity) {
 	w.destroyMu.Lock()
 	w.pendingDestroy = append(w.pendingDestroy, entity)
@@ -262,18 +266,32 @@ func (w *World) flushPendingDestroy() {
 	w.pendingDestroy = nil
 	w.destroyMu.Unlock()
 
+	if len(list) > 1 {
+		slices.SortFunc(list, func(a, b Entity) int {
+			if a.Index() != b.Index() {
+				return cmp.Compare(a.Index(), b.Index())
+			}
+			return cmp.Compare(a, b)
+		})
+	}
+
 	for _, e := range list {
 		// reuse 代数校验：忽略已被销毁/复用的旧句柄
-		if _, ok := w.entities.Get(e); !ok {
+		info, ok := w.entities.Get(e)
+		if !ok {
 			continue
 		}
-		for _, set := range w.components {
-			set.Remove(e)
+		for _, it := range info.compound {
+			// Every complete row owns the group's smallest type. Testing
+			// that type once also works for entities in several groups.
+			if a, ok := w.archetypes.owner(it); ok && it == a.types[0] {
+				a.removeRow(e.Index())
+			}
+			if set := w.components[it]; set != nil {
+				set.Remove(e)
+			}
 		}
-		for _, a := range w.archetypes.groups {
-			a.removeRow(e.Index())
-		}
-		w.entities.Remove(e)
+		w.entities.SparseArray.Remove(e.Index())
 		w.idGenerator.FreeID(e)
 	}
 }

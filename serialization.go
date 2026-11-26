@@ -677,6 +677,7 @@ func (e *EntityIDGenerator) Unmarshal(data *SerializableEntityIDGeneratorData) e
 		}
 		e.removeDelay = make([]ReuseID, e.delayCap)
 	}
+	e.mergeHint = 0 // The restored freelist has no relation to the previous one.
 	return nil
 }
 

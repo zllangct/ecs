@@ -1,8 +1,9 @@
 package ecs
 
 import (
+	"cmp"
 	"fmt"
-	"sort"
+	"slices"
 	"unsafe"
 )
 
@@ -44,6 +45,9 @@ type EntityIDGenerator struct {
 	removeDelay []ReuseID
 	delayFree   int32
 	delayCap    int32
+	// Last merged free slot. Allocation and restore invalidate the hint,
+	// so it always points into this generator's current sorted freelist.
+	mergeHint EntityIndex
 }
 
 func NewEntityIDGenerator(initSize int, delayCap int) *EntityIDGenerator {
@@ -68,6 +72,7 @@ func NewEntityIDGenerator(initSize int, delayCap int) *EntityIDGenerator {
 }
 
 func (e *EntityIDGenerator) NewID() Entity {
+	e.mergeHint = 0
 	id := ReuseID{}
 	if e.free == e.pending {
 		e.ids = append(e.ids, ReuseID{index: e.free, reuse: 0})
@@ -121,25 +126,23 @@ func (e *EntityIDGenerator) FreeID(entity Entity) {
 // 只遍历 freelist 链与缓冲批，代价与链长/批量成正比，不做 ids 全表扫描。
 func (e *EntityIDGenerator) delayFlush() {
 	delayed := e.removeDelay[:e.delayFree]
-	sort.Slice(delayed, func(i, j int) bool {
-		return delayed[i].index < delayed[j].index
+	slices.SortFunc(delayed, func(a, b ReuseID) int {
+		return cmp.Compare(a.index, b.index)
 	})
 
-	head := e.pending // 结果链头占位（pending 即"空链"哨兵）
-	tail := &head     // 链尾写入位置：存放下一个空闲 index
-	cur := e.free     // 原 freelist 链当前节点
-	for _, id := range delayed {
-		idx := id.index
-		// 原链中小于 idx 的节点先接入新链
-		for cur != e.pending && cur < idx {
-			*tail = cur
-			tail = &e.ids[cur].index
-			cur = e.ids[cur].index
-		}
-		*tail = idx
-		tail = &e.ids[idx].index
+	link := &e.free
+	if e.mergeHint != 0 && e.mergeHint < delayed[0].index {
+		link = &e.ids[e.mergeHint].index
 	}
-	*tail = cur // 接原链剩余部分（含末尾哨兵 pending）
-	e.free = head
+	for _, id := range delayed {
+		for *link != e.pending && *link < id.index {
+			link = &e.ids[*link].index
+		}
+		next := *link
+		*link = id.index
+		link = &e.ids[id.index].index
+		*link = next
+	}
 	e.delayFree = 0
+	e.mergeHint = delayed[len(delayed)-1].index
 }
