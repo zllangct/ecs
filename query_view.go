@@ -162,21 +162,12 @@ func prepareView2RO[A any, BR ReadOnlyView[BR], PA ComponentPointer[A]](ctx *Sys
 		nativeA, okA := setA.(*CSet[A, PA])
 		nativeB, okB := setB.(interface{ nativeCSet() ComponentSet })
 		if okA && okB && nativeB.nativeCSet() == setB {
-			plan.fallback = view2ROCSet[A, BR](ctx, itA, itB, nativeA, setB)
-			return
-		}
-		q := ctx.NewQuery(WithComp[A, PA](), WithBuddies(*NewQueryBuddies(itB)))
-		plan.fallback = func(yield func(*A, BR) bool) {
-			for index := range q.Iter() {
-				if !ctx.constraint.isValid() {
-					return
-				}
-				a, b := setA.get(index), setB.get(index)
-				if a != nil && b != nil && !yield((*A)(a), zeroB.FromPtr(b)) {
-					return
-				}
+			if scan := view2ROCSet[A, BR](ctx, itA, itB, nativeA, setB); scan != nil {
+				plan.fallback = scan
+				return
 			}
 		}
+		plan.fallback = queryView2ROCSet[A, BR, PA](ctx, itB, setA, setB)
 		return
 	}
 	q := ctx.NewQuery(WithComp[A, PA](), WithBuddies(*NewQueryBuddies(itB)))
@@ -198,53 +189,72 @@ func prepareView2RO[A any, BR ReadOnlyView[BR], PA ComponentPointer[A]](ctx *Sys
 	return
 }
 
-// 两池按当前大小选择驱动列；等长时与 Query 一样使用类型编号较小的一列。
+// 原查询负责自定义池以及需要归并的池；消费时才捕获双方键切片与归并游标。
+func queryView2ROCSet[A any, BR ReadOnlyView[BR], PA ComponentPointer[A]](ctx *SystemContext, itB ComponentIntType, a, b ComponentSet) iter.Seq2[*A, BR] {
+	q := ctx.NewQuery(WithComp[A, PA](), WithBuddies(*NewQueryBuddies(itB)))
+	return func(yield func(*A, BR) bool) {
+		var view BR
+		for key := range q.Iter() {
+			if !ctx.constraint.isValid() {
+				return
+			}
+			pa, pb := a.get(key), b.get(key)
+			if pa != nil && pb != nil && !yield((*A)(pa), view.FromPtr(pb)) {
+				return
+			}
+		}
+	}
+}
+
+// 每次按当前大小选驱动列，等长时使用类型编号较小的一列，与 Query 顺序一致。
+func csetViewKeys(itA, itB ComponentIntType, a, b ComponentSet) ([]EntityIndex, pairStrategy) {
+	keys, others := a.EntityIndexes(), b.EntityIndexes()
+	if len(others) < len(keys) || (len(others) == len(keys) && itB < itA) {
+		keys, others = others, keys
+	}
+	if len(keys) == 0 {
+		return keys, pairDisjoint
+	}
+	if a.IsKeyOrdered() && b.IsKeyOrdered() {
+		return keys, orderedPairStrategy(keys, others)
+	}
+	return keys, pairProbe
+}
+
 func view2ROCSet[A any, BR ReadOnlyView[BR], PA ComponentPointer[A]](ctx *SystemContext, itA, itB ComponentIntType, a *CSet[A, PA], b ComponentSet) iter.Seq2[*A, BR] {
+	if _, strategy := csetViewKeys(itA, itB, a, b); strategy == pairMerge {
+		return nil
+	}
 	shape := FixedCompound2{min(itA, itB), max(itA, itB)}
 	return func(yield func(*A, BR) bool) {
 		if !ctx.constraint.isValid() {
 			return
 		}
-		ctx.info.getOptReporter().shapeUsageAddKey(shape)
-		keys, others := a.EntityIndexes(), b.EntityIndexes()
-		if len(keys) == 0 || len(others) == 0 {
+		keys, strategy := csetViewKeys(itA, itB, a, b)
+		if strategy == pairMerge {
+			queryView2ROCSet[A, BR, PA](ctx, itB, a, b)(yield)
 			return
 		}
-		var driver, peer ComponentSet = a, b
-		if len(others) < len(keys) || (len(others) == len(keys) && itB < itA) {
-			driver, peer = peer, driver
-			keys, others = others, keys
+		ctx.info.getOptReporter().shapeUsageAddKey(shape)
+		if strategy == pairDisjoint {
+			return
 		}
 		var view BR
-		if !a.IsKeyOrdered() || !b.IsKeyOrdered() || !orderedPoolCovers(keys, others) {
-			// 复用归并和稀疏探测，暂停后恢复时继续使用原查询的游标。
-			for key := range intersectPair(ctx.world, driver, peer) {
-				if !ctx.constraint.isValid() {
-					return
-				}
-				pa, pb := a.getByIndex(key), b.get(key)
-				if pa != nil && pb != nil && !yield(pa, view.FromPtr(pb)) {
-					return
-				}
-			}
-			return
-		}
 		for row, key := range keys {
 			if !ctx.constraint.isValid() {
 				return
 			}
-			if !ctx.world.entities.SparseArray.Exist(key) {
-				continue
-			}
 			var pa *A
-			// 只有当前行仍属于该实体才能直接寻址。跨同步点恢复时池可能已重排或扩容。
-			if row < len(a.idx2Key) && a.idx2Key[row] == int32(key) {
+			// 同一行在结构同步点后可能属于其他实体，只对当前行键匹配的覆盖区间直取。
+			if strategy == pairCovered && row < len(a.idx2Key) && a.idx2Key[row] == int32(key) {
 				pa = &a.data[row]
 			} else {
 				pa = a.getByIndex(key)
 			}
-			pb := b.get(key)
-			if pa != nil && pb != nil && !yield(pa, view.FromPtr(pb)) {
+			if pa == nil || !ctx.world.entities.SparseArray.Exist(key) {
+				continue
+			}
+			if pb := b.get(key); pb != nil && !yield(pa, view.FromPtr(pb)) {
 				return
 			}
 		}

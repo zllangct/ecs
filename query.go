@@ -203,13 +203,10 @@ func intersectPair(world *World, driver, other ComponentSet) iter.Seq2[EntityInd
 	keys := driver.EntityIndexes()
 	if driver.IsKeyOrdered() && other.IsKeyOrdered() {
 		peers := other.EntityIndexes()
-		first, last := peers[0], peers[len(peers)-1]
-		if keys[len(keys)-1] < first || keys[0] > last {
+		switch orderedPairStrategy(keys, peers) {
+		case pairDisjoint:
 			return func(func(EntityIndex, *EntityInfo) bool) {}
-		}
-		// Distinct sorted peer keys filling their entire range prove membership
-		// for every driver key inside it, with no per-entity peer access.
-		if orderedPoolCovers(keys, peers) {
+		case pairCovered:
 			return func(yield func(EntityIndex, *EntityInfo) bool) {
 				for _, key := range keys {
 					if info := world.entities.getByIndex(key); info != nil && !yield(key, info) {
@@ -217,12 +214,7 @@ func intersectPair(world *World, driver, other ComponentSet) iter.Seq2[EntityInd
 					}
 				}
 			}
-		}
-		// A merge stops at the final driver key. A small prefix can be cheap even
-		// when the rest of the peer pool is large. Use 64-bit math for key spans.
-		scanBound := min(int64(len(peers)), int64(keys[len(keys)-1])-int64(first)+1)
-		const probeRatio = 8
-		if scanBound < probeRatio*int64(len(keys)) {
+		case pairMerge:
 			return func(yield func(EntityIndex, *EntityInfo) bool) {
 				j := 0
 				for _, key := range keys {
@@ -253,10 +245,31 @@ func intersectPair(world *World, driver, other ComponentSet) iter.Seq2[EntityInd
 	}
 }
 
-// 两个键数组均非空且有序。若另一池无间隙地覆盖驱动池，驱动池的每个键都属于交集。
-func orderedPoolCovers(keys, peers []EntityIndex) bool {
+type pairStrategy uint8
+
+const (
+	pairProbe pairStrategy = iota
+	pairDisjoint
+	pairCovered
+	pairMerge
+)
+
+// 调用方已确认两个键数组非空且有序。归并最多读到驱动池的末键。
+func orderedPairStrategy(keys, peers []EntityIndex) pairStrategy {
 	first, last := peers[0], peers[len(peers)-1]
-	return int64(last)-int64(first)+1 == int64(len(peers)) && keys[0] >= first && keys[len(keys)-1] <= last
+	lowest, highest := keys[0], keys[len(keys)-1]
+	if highest < first || lowest > last {
+		return pairDisjoint
+	}
+	if int64(last)-int64(first)+1 == int64(len(peers)) && lowest >= first && highest <= last {
+		return pairCovered
+	}
+	scanBound := min(int64(len(peers)), int64(highest)-int64(first)+1)
+	const probeRatio = 8
+	if scanBound < probeRatio*int64(len(keys)) {
+		return pairMerge
+	}
+	return pairProbe
 }
 
 // pickMinNonEmptyPool 存在任一 nil 或空池则返回 nil；否则返回元素最少的池
